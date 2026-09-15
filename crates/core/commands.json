@@ -1,0 +1,664 @@
+[
+  {
+    "id": "vault.default",
+    "title": "Default vault location",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "vault.init",
+    "title": "Create vault",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "workspace.get",
+    "title": "Read workspace",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.list",
+    "title": "List notes",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.read",
+    "title": "Read note",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.link",
+    "title": "Get a readable unambiguous note link",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.create",
+    "title": "Create note",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "folderId": {
+          "type": "string",
+          "description": "Folder UUID; empty string means vault root"
+        }
+      },
+      "required": ["title"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.update",
+    "title": "Update note",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "folderId": {
+          "type": "string",
+          "description": "Folder UUID; empty string means vault root"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.delete",
+    "title": "Move note to trash",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "trash.list",
+    "title": "List trash",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "trash.restore",
+    "title": "Restore item",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.list",
+    "title": "List databases",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.create",
+    "title": "Create independent database",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "properties": {
+          "type": "array"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.property.add",
+    "title": "Add property",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "property": {
+          "type": "object"
+        }
+      },
+      "required": ["databaseId", "property"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.property.preview",
+    "title": "Preview column type conversion",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "property": {
+          "type": "object"
+        }
+      },
+      "required": ["databaseId", "property"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.property.update",
+    "title": "Apply checked column type conversion",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "property": {
+          "type": "object"
+        },
+        "expectedRevision": {
+          "type": "string",
+          "description": "Schema and records revision returned by database.property.preview"
+        }
+      },
+      "required": ["databaseId", "property", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "record.create",
+    "title": "Create record without a note",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object"
+        }
+      },
+      "required": ["databaseId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "record.update",
+    "title": "Update record",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "record.delete",
+    "title": "Move record to trash",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "record.body",
+    "title": "Write or link record body",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "query.run",
+    "title": "Run structured query",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "filters": {
+          "type": "array"
+        },
+        "sort": {
+          "type": "string"
+        },
+        "descending": {
+          "type": "boolean"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": ["databaseId"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "links.list",
+    "title": "Read knowledge links",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "topics.list",
+    "title": "List topics from linked bullet blocks",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "topics.blocks",
+    "title": "Collect bullet subtrees for a topic",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "topic": { "type": "string", "description": "Opaque topic ID from topics.list" },
+        "limit": { "type": "integer", "description": "1–100 blocks, default 50" },
+        "offset": { "type": "integer" },
+        "descending": {
+          "type": "boolean",
+          "description": "Newest source-note creation date first, default true"
+        }
+      },
+      "required": ["topic"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "backlinks.list",
+    "title": "Read backlinks",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": ["target"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "search",
+    "title": "Search notes",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        }
+      },
+      "required": ["query"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "settings.get",
+    "title": "Read settings",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "settings.update",
+    "title": "Update settings",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "vim": {
+          "type": "boolean"
+        },
+        "editorMode": {
+          "type": "string"
+        },
+        "slash": {
+          "type": "boolean"
+        },
+        "leader": {
+          "type": "string"
+        },
+        "theme": {
+          "type": "string"
+        },
+        "keybindings": {
+          "type": "object"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.install",
+    "title": "Install declarative extension",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "manifest": {
+          "type": "object"
+        }
+      },
+      "required": ["manifest"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.remove",
+    "title": "Remove extension",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.list",
+    "title": "List extensions",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "vault.export",
+    "title": "Export consistent vault snapshot",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "commands.list",
+    "title": "List command contracts",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "vault.import",
+    "title": "Restore snapshot into a new vault",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "required": ["snapshot"],
+      "properties": {
+        "snapshot": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "folder.list",
+    "title": "List folder",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "folder.create",
+    "title": "Create folder",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "parentId": {
+          "type": "string"
+        }
+      },
+      "required": ["name"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "folder.update",
+    "title": "Update folder",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "name", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "folder.delete",
+    "title": "Delete folder",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "expectedRevision"],
+      "additionalProperties": false
+    }
+  }
+]

@@ -1,0 +1,16 @@
+[package]
+name = "foltra-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "foltra"
+path = "src/main.rs"
+
+[dependencies]
+foltra-core.workspace = true
+serde_json.workspace = true
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"

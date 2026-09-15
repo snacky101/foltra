@@ -1,0 +1,127 @@
+.editor-mode-switch {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.editor-mode-switch button {
+  padding: 4px 9px;
+  border-radius: 3px;
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.editor-mode-switch button[aria-pressed='true'] {
+  background: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 1px 3px #00000008;
+}
+.vim-command-dock {
+  flex: 0 0 auto;
+  background: var(--paper);
+}
+.vim-command-dock:empty {
+  display: none;
+}
+.vim-command-dock .cm-panels {
+  position: static;
+  color: var(--ink);
+  background: var(--panel);
+}
+.vim-command-dock .cm-panels-bottom {
+  border-top: 1px solid var(--line);
+}
+.vim-command-dock .cm-vim-panel {
+  display: flex;
+  align-items: center;
+  min-height: 0;
+  height: 30px;
+  padding: 0 16px;
+  font: 13px/24px var(--mono-font);
+  overflow: hidden;
+}
+.vim-command-dock .cm-vim-panel input {
+  min-width: 0;
+  height: 24px;
+  padding: 0 0 0 5px;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  box-shadow: none;
+  background: transparent;
+  color: var(--ink);
+  font: 13px/24px var(--mono-font);
+}
+.vim-command-dock .cm-vim-panel input:focus {
+  box-shadow: none;
+  outline: none;
+}
+.editor .cm-live-heading {
+  color: var(--ink);
+  font-family: var(--display-font);
+  font-weight: 500;
+  line-height: 1.55;
+  padding-top: 14px;
+  padding-bottom: 5px;
+}
+.editor .cm-live-h1 {
+  font-size: 29px;
+}
+.editor .cm-live-h2 {
+  font-size: 23px;
+}
+.editor .cm-live-h3 {
+  font-size: 19px;
+}
+.editor .cm-live-h4,
+.editor .cm-live-h5,
+.editor .cm-live-h6 {
+  font-size: 17px;
+}
+.editor .cm-live-strong {
+  font-weight: 650;
+}
+.editor .cm-live-emphasis {
+  font-style: italic;
+}
+.editor .cm-live-strike {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.editor .cm-live-code {
+  background: var(--panel);
+  border-radius: 3px;
+  color: var(--accent);
+  font: 0.87em/1.7 var(--mono-font);
+}
+.editor .cm-live-quote {
+  border-left: 2px solid var(--accent);
+  padding-left: 15px;
+  color: var(--muted);
+}
+.editor .cm-live-list-marker {
+  color: var(--accent);
+}
+.editor .cm-live-link {
+  color: var(--accent);
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
+  cursor: text;
+}
+.editor .cm-live-block {
+  margin: 10px 0;
+  cursor: text;
+}
+.editor .cm-live-block .markdown-preview {
+  font-size: 15px;
+}
+.editor .cm-live-block .markdown-preview > :first-child {
+  margin-top: 0;
+}
+.editor .cm-live-block .markdown-preview > :last-child {
+  margin-bottom: 0;
+}
+.editor .cm-live-block .embedded-query {
+  margin: 0;
+}

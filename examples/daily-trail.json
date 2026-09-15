@@ -1,0 +1,11 @@
+{
+  "kind": "plugin",
+  "id": "daily-trail",
+  "name": "Daily Trail",
+  "version": "1.0.0",
+  "description": "하루의 기록을 시작하고, 생각이 이어진 시간을 살펴보세요.",
+  "commands": [
+    { "id": "new-reflection", "title": "하루 돌아보기", "action": { "type": "template", "title": "하루 돌아보기", "body": "# 오늘의 기록\n\n## 배운 것\n\n\n## 이어갈 질문\n\n\n## 다음 한 걸음\n\n" } },
+    { "id": "open-trail", "title": "기록의 흐름 열기", "action": { "type": "view", "view": "timeline" } }
+  ]
+}
