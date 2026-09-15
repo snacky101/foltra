@@ -231,13 +231,6 @@
   flex: 0 0 44px;
   margin: 0 -15px;
 }
-.macos-overlay .welcome {
-  padding-top: 12px;
-}
-.macos-overlay .welcome-brand {
-  height: 34px;
-  padding-left: 45px;
-}
 [data-tauri-drag-region] {
   user-select: none;
 }
