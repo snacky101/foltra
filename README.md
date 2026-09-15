@@ -8,6 +8,12 @@
 
 ![Foltra 개발 화면](docs/preview.png)
 
+## macOS 설치
+
+[v0.1.0-preview.1 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.1)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 비공개 저장소이므로 다운로드하려면 접근 가능한 GitHub 계정으로 로그인해야 합니다.
+
+앱 무결성을 위한 ad-hoc 서명을 적용한 개인용 프리뷰이며 Apple Developer ID 서명·공증은 없습니다. 첫 실행이 차단되면 [Apple 안내](https://support.apple.com/guide/mac-help/mh40616/mac)에 따라 시스템 설정 → 개인정보 보호 및 보안에서 해당 앱의 ‘확인 없이 열기’를 선택합니다. 현재 설치 파일은 Apple Silicon용이며 Intel Mac용은 제공하지 않습니다.
+
 ## 실행
 
 Node.js 24와 Rust stable, 운영체제의 [Tauri 개발 요구사항](https://v2.tauri.app/start/prerequisites/)이 필요합니다. 현재 macOS에서 빌드했습니다.
@@ -25,6 +31,9 @@ npm run tauri dev
 # macOS에서 독립 실행 가능한 개발용 앱 빌드
 npm run tauri -- build --debug
 open target/debug/bundle/macos/Foltra.app
+
+# 현재 Mac 아키텍처의 최적화된 앱과 DMG 생성
+npm run release:mac
 
 # 브라우저로 UI 개발: 실제 파일 코어를 연결하는 로컬 개발 서버
 npm run dev
