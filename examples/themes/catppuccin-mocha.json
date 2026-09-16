@@ -1,0 +1,25 @@
+{
+  "kind": "theme",
+  "id": "catppuccin-mocha",
+  "name": "Catppuccin Mocha",
+  "version": "1.0.0",
+  "description": "보랏빛 파스텔과 짙은 청회색의 Mocha 팔레트.",
+  "tokens": {
+    "paper": "#1e1e2e",
+    "panel": "#181825",
+    "ink": "#cdd6f4",
+    "muted": "#a6adc8",
+    "line": "#45475a",
+    "accent": "#cba6f7",
+    "sidebar": "#11111b",
+    "sidebar-ink": "#cdd6f4",
+    "selection": "#45475a",
+    "danger": "#f38ba8",
+    "warning": "#f9e2af",
+    "success": "#a6e3a1",
+    "syntax-keyword": "#cba6f7",
+    "syntax-atom": "#fab387",
+    "syntax-literal": "#89b4fa",
+    "syntax-string": "#a6e3a1"
+  }
+}

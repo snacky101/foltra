@@ -1,3 +1,5 @@
+mod anki_bridge;
+mod attachments;
 mod backup;
 mod database_schema;
 mod databases;
@@ -5,8 +7,12 @@ mod extensions;
 mod folders;
 mod model;
 mod notes;
+mod plugin_manifest;
+mod plugin_runtime;
 mod query;
 mod storage;
+mod tags;
+mod topic_order;
 mod topics;
 mod validation;
 mod vault;
@@ -121,68 +127,90 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
     if plugin_command {
         return extensions::execute_command(&store, command, &args);
     }
+    dispatch(&store, command, args)
+}
+
+pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Value> {
+    validate_arguments(command, &args)?;
     match command {
-        "workspace.get" => vault::workspace(&store, info),
+        "workspace.get" => vault::workspace(
+            store,
+            serde_json::from_str(&store.read(".foltra/vault.json")?)?,
+        ),
         "note.list" => Ok(serde_json::to_value(
-            notes::notes(&store)?
+            notes::notes(store)?
                 .into_iter()
                 .map(|n| n.meta)
                 .collect::<Vec<_>>(),
         )?),
         "note.read" => Ok(serde_json::to_value(notes::read_note(
-            &store,
+            store,
             text(&args, "id")?,
         )?)?),
         "note.link" => {
-            let notes = notes::notes(&store)?;
-            let note = notes::read_note(&store, text(&args, "id")?)?;
+            let notes = notes::notes(store)?;
+            let note = notes::read_note(store, text(&args, "id")?)?;
             Ok(json!(wiki::note_link(&note, &notes)))
         }
-        "note.create" => notes::create_note(&store, &args),
-        "note.update" => notes::update_note(&store, &args),
-        "note.delete" => notes::delete_note(&store, &args),
-        "folder.list" => folders::list(&store),
-        "folder.create" => folders::create(&store, &args),
-        "folder.update" => folders::update(&store, &args),
-        "folder.delete" => folders::delete(&store, &args),
-        "trash.list" => vault::trash(&store),
-        "trash.restore" => vault::restore(&store, &args),
-        "database.create" => databases::create_database(&store, &args),
-        "database.list" => Ok(serde_json::to_value(databases::databases(&store)?)?),
-        "database.property.add" => databases::add_property(&store, &args),
-        "database.property.preview" => database_schema::preview(&store, &args),
-        "database.property.update" => database_schema::update(&store, &args),
-        "record.create" => databases::create_record(&store, &args),
-        "record.update" => databases::update_record(&store, &args),
-        "record.delete" => databases::delete_record(&store, &args),
-        "record.body" => databases::record_body(&store, &args),
-        "query.run" => query::run(&store, serde_json::from_value(args)?),
+        "note.create" => notes::create_note(store, &args),
+        "note.open-link" => notes::open_link(store, &args),
+        "note.update" => notes::update_note(store, &args),
+        "note.delete" => notes::delete_note(store, &args),
+        "attachment.import" => attachments::import(store, &args),
+        "attachment.read" => attachments::read(store, &args),
+        "folder.list" => folders::list(store),
+        "folder.create" => folders::create(store, &args),
+        "folder.update" => folders::update(store, &args),
+        "folder.delete" => folders::delete(store, &args),
+        "trash.list" => vault::trash(store),
+        "trash.restore" => vault::restore(store, &args),
+        "database.create" => databases::create_database(store, &args),
+        "database.list" => Ok(serde_json::to_value(databases::databases(store)?)?),
+        "database.property.add" => databases::add_property(store, &args),
+        "database.property.preview" => database_schema::preview(store, &args),
+        "database.property.update" => database_schema::update(store, &args),
+        "record.create" => databases::create_record(store, &args),
+        "record.update" => databases::update_record(store, &args),
+        "record.delete" => databases::delete_record(store, &args),
+        "record.body" => databases::record_body(store, &args),
+        "query.run" => query::run(store, serde_json::from_value(args)?),
         "links.list" => Ok(serde_json::to_value(query::links(
-            &notes::notes(&store)?,
-            &databases::records(&store)?,
+            &notes::notes(store)?,
+            &databases::records(store)?,
         )?)?),
         "backlinks.list" => {
             let target = text(&args, "target")?;
             Ok(serde_json::to_value(
-                query::links(&notes::notes(&store)?, &databases::records(&store)?)?
+                query::links(&notes::notes(store)?, &databases::records(store)?)?
                     .into_iter()
                     .filter(|l| l.target.as_deref() == Some(target))
                     .collect::<Vec<_>>(),
             )?)
         }
-        "search" => query::search(&store, text(&args, "query")?),
-        "topics.list" => topics::list(&store),
-        "topics.blocks" => topics::blocks(&store, &args),
-        "settings.get" => vault::settings(&store),
-        "settings.update" => vault::update_settings(&store, &args),
+        "search" => query::search(store, text(&args, "query")?),
+        "tags.list" => tags::list(store),
+        "tags.blocks" => tags::blocks(store, &args),
+        "topics.list" => topics::list(store),
+        "topics.blocks" => topics::blocks(store, &args),
+        "topics.reorder" => topics::reorder(store, &args),
+        "settings.get" => vault::settings(store),
+        "settings.update" => vault::update_settings(store, &args),
         "extension.install" => extensions::install(
-            &store,
+            store,
             args.get("manifest")
                 .ok_or_else(|| Error::new("invalid_arguments", "manifest is required"))?,
         ),
-        "extension.remove" => extensions::remove(&store, text(&args, "id")?),
-        "extension.list" => extensions::list(&store),
-        "vault.export" => vault::export(&store),
+        "extension.remove" => extensions::remove(store, text(&args, "id")?),
+        "extension.list" => extensions::list(store),
+        "extension.status" => plugin_runtime::statuses(store),
+        "extension.enable" => {
+            plugin_runtime::enable(store, text(&args, "id")?, text(&args, "digest")?)
+        }
+        "extension.disable" => plugin_runtime::disable(store, text(&args, "id")?),
+        "extension.invoke" => plugin_runtime::invoke(store, &args, false),
+        "extension.settings.get" => plugin_runtime::settings(store, text(&args, "id")?),
+        "extension.settings.update" => plugin_runtime::configure(store, &args),
+        "vault.export" => vault::export(store),
         _ => Err(Error::new(
             "unknown_command",
             format!("Unknown command: {command}"),
@@ -191,6 +219,12 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
 }
 
 fn validate_arguments(command: &str, args: &Value) -> Result<()> {
+    if !args.is_object() {
+        return Err(Error::new(
+            "invalid_arguments",
+            "Arguments must be an object",
+        ));
+    }
     let specs: Value = serde_json::from_str(include_str!("../commands.json"))?;
     let spec = specs
         .as_array()

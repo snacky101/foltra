@@ -2,12 +2,20 @@
   --paper: #f8f7f3;
   --panel: #f1f0e9;
   --ink: #303c35;
-  --muted: #969d90;
+  --muted: #667060;
   --line: #e3e5dc;
   --accent: #57785f;
   --sidebar: #213d35;
   --sidebar-ink: #e4eadd;
   --selection: #dce8d8;
+  --sidebar-muted: #aab6ab;
+  --danger: #a4553f;
+  --warning: #8b661e;
+  --success: #4c7147;
+  --syntax-keyword: #77508e;
+  --syntax-atom: #48689b;
+  --syntax-literal: #417a53;
+  --syntax-string: #a25940;
   --body-font: 'Avenir Next', 'Pretendard', 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif;
   --display-font: 'Iowan Old Style', 'Baskerville', 'Palatino Linotype', 'Apple SD Gothic Neo', serif;
   --mono-font: 'SFMono-Regular', 'Menlo', 'Consolas', monospace;
@@ -17,12 +25,20 @@
   --paper: #202827;
   --panel: #27312e;
   --ink: #dee5d8;
-  --muted: #93a395;
+  --muted: #a2b1a4;
   --line: #36443c;
   --accent: #b3c7a3;
   --sidebar: #17211f;
   --sidebar-ink: #d3dfd1;
   --selection: #405540;
+  --sidebar-muted: #9ba699;
+  --danger: #eea18c;
+  --warning: #e2c77b;
+  --success: #a8c99b;
+  --syntax-keyword: #d4b4e6;
+  --syntax-atom: #aabce9;
+  --syntax-literal: #afd0b2;
+  --syntax-string: #e3b59f;
   color-scheme: dark;
 }
 * {

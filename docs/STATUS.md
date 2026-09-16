@@ -1,40 +1,52 @@
-# 개발 현황 · 2026-09-15
+# 개발 현황 · 2026-09-16
 
 현재 결과물은 **Foltra 0.1.0-preview.1**입니다. `snack-note`와 독립된 Git 저장소이며, macOS Apple Silicon용 DMG와 headless CLI 배포 파일을 빌드했습니다. 제품 전체를 완료하거나 버그·보안 문제·지연이 없다고 보증하는 단계는 아닙니다.
+
+## 2026-09-16 프리뷰 교체 빌드
+
+기존 `v0.1.0-preview.1`을 교체할 배포 파일에 아래 누적 변경사항을 포함했습니다. 편집기·표·Vim/IME 보완, 태그 자동완성·이미지 첨부, 코드 플러그인 SDK와 AnkiConnect 이미지 동기화, 테마 관리, 주제 모음의 문단 수집·사용자 지정 정렬·드래그 삽입 표시가 포함됩니다. 아래 각 작업의 ‘GitHub 릴리스를 갱신하지 않았다’는 문장은 해당 작업 당시의 이력입니다.
+
+전체 테스트 **553개(core 104, CLI 4, frontend 445)**와 `npm run check`가 통과했습니다. 그 뒤 드래그 삽입 표시의 UI 테스트 7개·CSS 포맷 검사와 macOS debug 앱 재빌드도 통과했습니다. 이번 배포 준비에서 `npm run release:mac`과 `cargo build --release --locked -p foltra-cli`로 최적화된 앱·DMG·CLI를 다시 빌드했습니다.
+
+DMG 무결성·읽기 전용 마운트·Applications 바로가기·앱 복사 후 엄격한 서명 검사, arm64 아키텍처, npm/Cargo/Tauri/실제 번들의 버전 일치를 확인했습니다. CLI 배포 압축에서 추출한 실행 파일로 임시 vault 생성·한글 노트 저장/조회·주제 순서의 프로세스 간 보존·원문 revision 보존·오래된 순서 revision 거절을 확인하고 배포 파일의 SHA-256을 생성했습니다. 기존 릴리스 파일과 메타데이터는 교체 전에 로컬로 백업했습니다.
+
+Apple Developer ID 서명·공증과 자동 업데이트는 여전히 없습니다. 이번 패키징 검증은 사용자의 기존 vault를 조작하지 않았으며 native UI/IME 전체 동작이나 브라우저 다운로드 후 Gatekeeper 승인 흐름의 검증을 포함하지 않습니다. 검증 자료는 Git에서 제외한 `test-results/preview-refresh/`에 있습니다.
 
 ## 요구사항별 상태
 
 | 요구사항 | 현재 구현 | 남은 범위 |
 | --- | --- | --- |
-| Vault / local-first | 사이드바 맨 아래 Vault 메뉴, 폴더 생성·열기, 최근 vault 선택 팝업과 새 vault 메뉴, Markdown/JSON 원본 | 일반 Markdown 폴더 가져오기, 자동 백업 정책, 첨부파일 |
-| Vim | 기본 OFF, 설정에서 ON, 모드 표시, 하단 Ex 입력줄, `:w`·`:q`·`:wq`·`:x`·`:q!` | native 한글 IME·조합 취소·포커스 전환·다중 selection 검증 |
+| Vault / local-first | 사이드바 맨 아래 Vault 메뉴, 폴더 생성·열기, 최근 vault 선택 팝업과 새 vault 메뉴, Markdown/JSON 원본, 클립보드 이미지의 vault 첨부파일 저장 | 일반 Markdown 폴더 가져오기, 자동 백업 정책, 일반 파일 첨부·첨부파일 정리 UI |
+| Vim | 기본 OFF, 설정에서 ON, 모드 표시, 하단 Ex 입력줄, `:w`·`:q`·`:wq`·`:x`·`:q!`, macOS 한글 명령 키의 선행 문자 삽입 방지 | 다른 입력기·조합 취소·포커스 전환·다중 selection 전체 검증 |
 | Leader + 일반 단축키 | 공통 UI 명령 목록, 둘을 함께 지정, 중복·prefix 충돌 검사, Leader 키/조합 녹화, Ctrl+h/j/k/l 영역 이동과 파일 트리 Vim 탐색, leader r n 인라인 이름 변경, 시간 제한 없는 대기, 단축키 대소문자 구분 | context별 설정, 일반 단축키 조합 녹화, 전체 OS 조합, 모든 상세 UI 동작 명령화 |
 | 노트·폴더 관리 | 노트 우클릭 열기·이름 변경·복제·이동·링크 복사·휴지통, 사이드바 인라인 이름 변경, 새 폴더·하위 폴더·노트 즉시 생성/이름 입력, 빈 폴더 삭제, 노트 드래그 이동과 최상위로 꺼내기, 백업 포함 | 다중 선택, 폴더 재배치, 자동 펼침 상태 저장 |
 | 모든 노트 | 편집기와 분리된 전체 목록, 제목 검색·폴더 필터·수정일/생성일/제목 정렬, 열기·우클릭 관리, 방향키와 Vim j/k 이동 | 목록 가상화, 고급 필터, 저장된 뷰 |
 | 명령 팔레트 / 내용 검색 | 내장·확장 명령과 노트 탐색, 내용 검색 결과 ↑/↓·Enter 이동/열기 및 자동 스크롤 | 큰 목록 성능, 명령별 사용 가능 조건 |
-| 편집 모드 | Live Preview / 원문 / 읽기, 활성 줄·블록은 원문 표시, 표·쿼리 미리보기 | 전체 Markdown edge case, 대형 문서 편집 성능 |
+| 편집 모드 | Live Preview / 원문 / 읽기, focus와 선택을 따르는 활성 줄·블록 원문 표시, 표·쿼리 미리보기, 읽기와 공유하는 본문·헤딩 서체/간격, 한 줄 목록 이어쓰기, 편집 모드 전환 시 본문 focus | 전체 Markdown edge case, 대형 문서 편집 성능 |
 | 앱 UI | 좌우 사이드바 드래그·키보드 너비 조절과 기기별 저장, 공통 선택 메뉴·달력·체크박스, 사이드바 로고·검색 행 제거와 최소 창 버튼 여백, macOS titlebar overlay 구성 | native 제목 표시줄/드래그와 입력기의 실제 macOS 확인 |
 | Slash 메뉴 | Vim과 독립 on/off, 빈 줄에서 삽입 메뉴 | 모든 블록·미디어 종류, IME/접근성 전체 시나리오 |
-| 백링크 | 읽기 쉬운 제목 링크 저장과 선택적 alias, 이름 변경/삭제·복원 시 참조 유지, 문맥·원본 줄 탐색, 미해결 링크, 명시적 링크만 백링크/연결 수에 표시 | 블록 UUID/이동·embed, unlinked mentions, 제목 충돌 해결 UI, row 전체 탐색 |
+| 백링크 | 제목 링크와 alias, `[[` 자동완성과 괄호 닫기, 클릭 시 미생성 노트 생성, 미생성 링크 표시 설정(기본 ON), 이름 변경/삭제·복원 시 참조 유지, 문맥·원본 줄 탐색, 미해결 링크, 명시적 링크만 백링크/연결 수에 표시 | 블록 UUID/이동·embed, unlinked mentions, 제목 충돌 해결 UI, row 전체 탐색 |
 | Graph / timeline | 반발력·연결력·충돌 방지 배치, 전체 맞춤·확대·배경 드래그, 연결 강조와 제목 겹침 완화, 생성/수정 타임라인과 hover/focus 강조 | 노트·블록·행 통합 그래프, 힘 조절 UI, 큰 그래프, 외부 renderer API |
-| 주제 모음 | 위키링크를 기준으로 bullet과 하위 구조 수집, 주제 검색·생성일 정렬·페이지, 원본 행 이동, CLI 조회 | 안정적인 block UUID, 카드 직접 편집, 증분 인덱스·대형 vault 검증 |
+| 주제 모음 | 위키링크를 기준으로 문단·제목·인용문과 bullet/하위 구조 수집, 주제 검색·생성일/드래그 사용자 지정 정렬·페이지, 블록만 보기/원본 정보 토글, 원본 행 이동, CLI 조회 | 안정적인 block UUID, 카드 직접 편집, 증분 인덱스·대형 vault 검증 |
 | 독립 DB | schema/row 독립 생성, text/number/checkbox/date/select/status/url, 전체 행 검사 후 컬럼 타입 변경, revision 수정 | relation, multi-select, formula, rollup, 컬럼 삭제·이름 변경 UI, 범용 포맷 migration |
 | DB 본문 | 이름 셀 옆에서 본문 열기/생성/연결, 행과 노트의 독립 저장, 예제 본문 제공 | row page의 고급 편집, DB/노트 통합 탐색·권한 |
 | DB 뷰 | 표·보드·날짜 타임라인, 필터·정렬·페이지 이동, 컬럼 너비 드래그·저장, 헤더/행 세로선 정렬, 별도 삭제 열 없이 행 메뉴, 기본 행 키 이동 | calendar/gallery/list, 저장된 뷰 구성, 그룹화 고도화, 열 순서, 가상화 |
 | 노트 내부 쿼리 | `foltra-query` JSON을 실제 코어가 평가, 결과에서 본문 열기 | query builder, 집계/join, 실행 계획·취소·비용 제한 |
-| 플러그인 | 로컬 JSON 설치/제거, template/query/내장 view 명령, 팔레트·단축키·CLI 발견 | 임의 코드 격리 실행, 새 뷰·속성 SDK, 권한 승인, watchdog, 패키지 호환성/업데이트/marketplace |
-| 테마 | 로컬 JSON 색상 테마 설치/선택, Paper/Midnight 기본 제공 | 세밀한 UI token, 타이포·레이아웃 정책, theme SDK/배포 |
+| 플러그인 | 카탈로그·파일 설치·설치된 것만 필터, 기존 선언형 확장 + JS/TS 코드 SDK v1, QuickJS 제한 실행, 기기별 권한 승인, 사용자 뷰·설정·이벤트·노트/DB API·선택 영역 편집, 팔레트·단축키·headless CLI | 임의 DOM/CodeMirror 확장·새 DB 속성 타입, 네트워크/외부 파일 API, OS 프로세스 격리, 호환성 정책·자동 업데이트·공개 marketplace |
+| 태그 | Markdown #태그·한글·계층 태그 인식, Live Preview/읽기 칩, 태그 자동완성, 정확한 tag: 검색, CLI 목록·블록 조회 | 일괄 이름 변경·태그 관리 패널 |
+| Anki | 코드 플러그인의 DB 행/태그 블록 → AnkiConnect v6 동기화, vault 이미지 전송, 컬럼·덱 매핑, 자동 처리·중복 방지·충돌 비교/명시적 덮어쓰기 | Cloze·오디오/영상·양방향 학습 정보·여러 DB 매핑 |
+| 테마 | 설정 → 테마에서 카탈로그 검색·설치/제거, 로컬 JSON 파일 설치·선택, Paper/Midnight 기본 제공 | 세밀한 UI token, 타이포·레이아웃 정책, theme SDK/배포 |
 | CLI / agent | GUI와 같은 core, JSON/stdin/파일 입력, 발견 가능한 명령 계약, 조건부 수정·휴지통·백업 | dry-run, idempotency key, bulk transaction, 구독, API 버전 호환성 자동 검사 |
 | Git / cloud | 텍스트 원본, UUID와 revision, local/cache Git 제외 규칙 | **동기화 미구현**. Git adapter, 병합·충돌 UI, 인증·비밀 관리 |
 | Cross-platform | 공통 core + Tauri 구성 | Windows/Linux 빌드·파일 내구성·입력 검증, 모바일 storage adapter, 선택적 웹 모델 |
 | 신뢰성 | 잠금·조건부 변경·journal·삭제/복원 직후 갱신되는 휴지통·snapshot roundtrip, 오류 시 편집 초안 보존 | 실제 강제 종료/전원 장애, 손상 격리, 포맷 업그레이드/다운그레이드, 장시간 사용 |
 | 성능 | editor/preview 지연 로딩, 페이지 제한, 불변 snapshot 재사용 | 증분 색인/구독, 1만/10만 객체 벤치마크, UI 프레임·IME latency 측정 |
-| 보안 | 명령/필드/경로 검증, HTML 비활성, 자동 원격 이미지 차단, 제한된 테마 token | 독립 보안 검토, 변조·race 공격 테스트, 코드 확장 sandbox, vault 암호화 정책 |
+| 보안 | 명령/필드/경로 검증, HTML 비활성, 자동 원격 이미지 차단, 제한된 테마 token | 독립 보안 검토, 변조·race 공격 테스트, 코드 확장 OS sandbox, vault 암호화 정책 |
 | 유지보수 | GUI/CLI 공통 Rust core, 모듈별 책임, 공통 command metadata, 테스트·구조 문서 | API 타입 자동 생성, 버전 호환 fixture, 멀티플랫폼 CI |
 
 ## 확인한 결과
 
-macOS에서 `npm test`: **112개 통과** — core 계약 50개, 실제 CLI 프로세스 4개, 프런트엔드 58개. Vault 이름 기반 경로 제안, 한글/IME 명령 키 보정, 대소문자 구분·충돌, 기존 단축키 설정 호환 검증을 포함합니다. Vim 기본 설정과 editorMode 저장, 실제 Vim Ex parser의 무인자 명령·bang·범위 거절, 저장 실패 시 닫기 방지, Live Preview 원문 보존, 최근 vault 목록, 실제 CLI를 사용하는 예제 본문 연결 회귀 검증을 포함합니다.
+macOS에서 `npm test`: **133개 통과** — core 계약 56개, 실제 CLI 프로세스 4개, 프런트엔드 73개. Vault 이름 기반 경로 제안, 한글/IME 명령 키 보정, 대소문자 구분·충돌, 기존 단축키 설정 호환 검증을 포함합니다. Vim 기본 설정과 editorMode 저장, 실제 Vim Ex parser의 무인자 명령·bang·범위 거절, 저장 실패 시 닫기 방지, Live Preview 원문 보존, 최근 vault 목록, 실제 CLI를 사용하는 예제 본문 연결 회귀 검증을 포함합니다.
 
 테스트는 DB 행의 노트 비종속성, 본문 생성/삭제 관계, revision 충돌, 다중 writer, 링크 제목 변경, 코드 예제 보존, typed query, 검색 인덱스 재생성, 휴지통, 복구 journal, snapshot 복원, 잘못된 경로·설정·theme 입력, 플러그인 headless 실행을 포함합니다. 일부만 통과한 stub 결과가 아니라 실제 임시 디렉터리에 읽고 쓰는 계약 테스트입니다.
 
@@ -48,7 +60,7 @@ macOS 제목 표시줄은 기존 앱 헤더에 native 창 버튼을 겹치는 `O
 
 **키보드 검증의 한계:** 테스트 브라우저에서 Escape가 페이지 이벤트로 전달되지 않았고 브라우저 측 Vim 관련 HUD가 나타났습니다. 정확한 간섭 원인은 확정하지 않았습니다. Escape와 leader 명령 라우팅 일부는 페이지에 KeyboardEvent를 직접 보내 확인했습니다. 이것은 물리 키 입력이나 native 앱의 실제 IME 검증을 대체하지 않습니다. `insertText`로 한글을 넣은 결과도 조합 입력 검증으로 계산하지 않습니다.
 
-**성능 검증의 한계:** 대형 vault 벤치마크와 p95 지연 목표는 측정하지 않았습니다. 그래프 최대 120개, DB 화면 페이지 100행, 쿼리 최대 500행입니다. snapshot은 3초마다 전체 원본을 스캔하며 DB query는 메모리 필터입니다. editor chunk가 약 647KB(minified, gzip 약 221KB)여서 Vite의 500KB 경고가 남습니다. 경고를 숨기기 위해 기준값을 올리지 않았습니다.
+**성능 검증의 한계:** 대형 vault 벤치마크와 p95 지연 목표는 측정하지 않았습니다. 그래프 최대 120개, DB 화면 페이지 100행, 쿼리 최대 500행입니다. snapshot은 3초마다 전체 원본을 스캔하며 DB query는 메모리 필터입니다. editor chunk가 약 687KB(minified, gzip 약 234KB)여서 Vite의 500KB 경고가 남습니다. 경고를 숨기기 위해 기준값을 올리지 않았습니다.
 
 **출시 검증의 한계:** `0.1.0-preview.1`은 최적화된 macOS Apple Silicon 앱과 DMG를 제공합니다. 앱 전체에 ad-hoc 서명을 적용했으며 Apple Developer ID 서명·공증·자동 업데이트는 없습니다. macOS 26.6.2에서 DMG 무결성 검사·읽기 전용 마운트·Applications 바로가기·앱 복사 후 서명 검증과 native 프로세스가 5초 동안 시작 상태를 유지하는 것을 확인했습니다. 브라우저 다운로드 후 Gatekeeper 승인 흐름과 전체 native 상호작용은 별도 검증이 필요합니다. 번들의 최소 macOS 선언은 11.0이며 실제 OS별 호환성 검증을 의미하지 않습니다.
 
@@ -96,7 +108,7 @@ Windows에서도 HTML5 내부 드래그가 동작할 수 있도록 Tauri의 OS �
 
 ## 주제 모음
 
-목록 항목 첫 행의 위키링크를 기준으로 항목과 하위 구조를 카드로 수집합니다. 주제 노트가 없어도 사용할 수 있고, 기존 노트 대상은 UUID로 묶어 이름 변경 뒤에도 같은 주제를 유지합니다. 여러 주제·반복 링크·중첩 항목·체크박스·번호 목록을 처리하며 코드/일반 문장은 주제 카드가 되지 않습니다. [TOPICS.md](TOPICS.md)에 범위와 CLI 계약을 설명했습니다.
+일반 문단·제목·인용문에 있는 위키링크는 해당 블록을 카드로 수집하고, 목록 항목 첫 행의 위키링크는 항목과 하위 구조를 수집합니다. 주제 노트가 없어도 사용할 수 있고, 기존 노트 대상은 UUID로 묶어 이름 변경 뒤에도 같은 주제를 유지합니다. 여러 주제·반복 링크·중첩 항목·체크박스·번호 목록을 처리하며 코드/표 셀은 주제 카드가 되지 않습니다. [TOPICS.md](TOPICS.md)에 범위와 CLI 계약을 설명했습니다.
 
 `topics.list`/`topics.blocks`는 읽기 전용 공통 코어 명령이며 UI 명령은 `view.topics.open`(leader `v c`)입니다. 카드 50개씩 페이지를 나누고 검색·정렬·원본 행 이동을 제공합니다. 저장 파일 형식은 바꾸지 않았습니다. 카드의 쿼리 코드는 자동 실행하지 않습니다. 편집기 준비 알림을 mount effect 이후로 옮겨 개발 StrictMode에서 원본 행 이동이 초기화되던 문제도 수정했습니다.
 
@@ -177,3 +189,503 @@ DB 행의 bodyNoteId 소속 관계는 ‘연결된 생각’과 노트·타임�
 ## 시작 화면 로고 위치
 
 시작 화면에는 macOS 노트 화면의 압축된 헤더 배치를 적용하지 않습니다. `.macos-overlay .welcome`와 `.welcome-brand` 위치 덮어쓰기를 제거해 원래 왼쪽 55px·상단 36px 여백과 로고 높이를 복원했습니다. 노트 화면은 기존의 44px 창 버튼 영역과 로고 없는 사이드바를 유지합니다. 브라우저에 macOS 레이아웃 클래스를 적용해 1360×900과 900×620에서 로고 위치·가로 넘침·기존 드래그 영역 유지를 확인했습니다. 실제 macOS 창 버튼의 시각 검증은 포함하지 않습니다. 시작 화면 로고 수정이 포함된 DMG를 빌드해 `v0.1.0-preview.1` 프리릴리스를 같은 버전으로 다시 배포합니다.
+
+
+## Live Preview 포커스와 위키링크 입력
+
+읽기에서 Live Preview/원문으로 바꾸면 본문에 focus를 주고, 활성 줄 또는 표·코드 블록만 원문으로 드러냅니다. 본문을 떠나면 해당 위치도 미리보기로 돌아옵니다. 선택 범위 끝이 다음 줄 시작에 걸리는 경우 선택하지 않은 다음 줄은 원문으로 바뀌지 않습니다. 활성 줄에는 옅은 배경을 표시합니다.
+
+`[[` 자동완성에서 ↑/↓와 Enter/Tab으로 노트를 선택하면 닫는 괄호를 완성합니다. 기존 괄호·alias·블록 suffix를 보존하며 새 제목은 링크만 입력합니다. 읽기/연결 목록 클릭 또는 편집기의 Cmd/Ctrl+클릭에서 실제 노트를 만들고 백링크를 갱신합니다. `note.open-link`를 공통 코어/CLI 명령으로 추가했고 동시 요청도 하나만 생성합니다. 미생성 제목 노드는 그래프에 점선으로 표시하며, Vault별 ‘미생성 노트 표시’ 설정은 기존 Vault에서도 기본 ON입니다. 자세한 범위는 LINKS.md에 기록했습니다.
+
+임시 Live Preview QA vault에서 일반 줄의 원문/미리보기 전환, focus 이탈·모드 전환과 실행 취소 유지, 일반 입력과 Vim Insert의 자동완성·방향키·Enter/Tab, 읽기·원문·Live Preview의 클릭 생성, alias와 실제 대상 구분, 즉시 백링크 반영, 그래프 대상 합치기와 표시 OFF의 새로고침 유지, Midnight 팝업 가독성을 확인했습니다. 코어/프런트엔드 회귀 검사는 128개 통과했습니다. 한글 문자열 삽입은 브라우저 insertText로 검증했으며 native macOS IME 조합 검증은 포함하지 않습니다. 대형 vault의 자동완성 지연은 측정하지 않았습니다.
+
+이 변경은 로컬 소스와 새 macOS 앱 빌드에 반영했습니다. GitHub의 기존 프리릴리스/DMG는 이번 작업에서 교체하지 않았습니다.
+
+
+## 커서 모양·애니메이션·이동 효과
+
+설정 → 편집에서 모양(세로선·블록·밑줄), 제자리 애니메이션(고정 Steady·깜빡임 Blink·숨쉬기 Breath), 점멸 간격(400/600/800/1200ms), 이동 효과(없음·부드럽게·Smear 잔상)를 각각 선택합니다. 미리보기는 실제 커서와 같은 CSS를 사용합니다. Breath와 Smear를 함께 사용할 수 있으며 효과는 노트 본문 편집기에 적용됩니다. [WezTerm의 모양](https://wezterm.org/config/lua/config/default_cursor_style.html)과 [점멸 완급](https://wezterm.org/config/lua/config/cursor_blink_ease_in.html)을 참고했습니다. Breath는 Foltra의 ease-in-out 점멸 프리셋입니다.
+
+모양 목록의 ‘자동’을 없애고 ‘Vim 모드별 커서’로 분리했습니다. 켜면 Normal/Visual은 블록, Replace는 밑줄, Insert는 선택한 모양을 사용하고, 끄면 모든 모드에 선택한 모양을 사용합니다. Vim이 켜져 있을 때 해당 옵션을 표시합니다. 기존 auto 설정과 직접 지정한 모양은 각각 이전 동작을 유지하도록 읽으며 읽기만으로 Vault 파일을 쓰지 않습니다. 기본값은 세로선·Vim 모드별 커서 ON·Blink 600ms·이동 효과 없음이며 Vim 자체의 기본 OFF는 유지합니다.
+
+CodeMirror 확장과 순수 모양/이동 계산을 분리했습니다. 이동이 끝나면 requestAnimationFrame을 중단하며 제자리 점멸은 CSS로 처리합니다. 선택 위치·문서·undo history를 효과가 변경하지 않습니다. 입력이나 선택 이동 시 커서를 밝게 표시하고 점멸을 다시 시작합니다. 한글 조합 중과 여러 커서를 선택한 경우 기본 렌더러로 복귀합니다. 스크롤 시 좌표를 다시 맞추고 시스템 동작 줄이기가 활성화되면 점멸과 이동 효과를 모두 생략합니다.
+
+설정 호환·허용 값·잘못된 patch의 원자적 거절·기존 auto/명시적 모양 이전과 Vim 모드별 모양을 회귀 검사합니다. 전체 `npm test` 136개(core 57, CLI 4, frontend 75), `npm run check`, macOS debug `.app` 빌드가 통과했습니다. 실제 CLI 연결 브라우저의 임시 Breath QA Vault에서 설정 선택, 미리보기와 실제 본문의 Breath/Blink 밝기 변화, 점멸 간격, Steady, Smear와 조합, 같은 위치 선택 후 점멸 재개, Vim Normal/Insert 모양 전환과 고정 옵션, 본문/미리보기 동작 줄이기, 설정 재실행 유지, 조합 입력 fallback과 설정 변경 후 실행 취소 유지를 확인했습니다. 기존 좌표·IME fallback·undo·유휴 프레임 검증은 `test-results/cursor-QA.md`, 이번 보완 기록은 `test-results/breath-QA.md`에 있습니다. 브라우저 검증은 native macOS WebView의 실제 한국어 입력 소스 검증을 대신하지 않습니다. 이 변경은 아직 GitHub 프리릴리스에 배포하지 않았습니다.
+
+
+## 왼쪽 사이드바 접기와 컴팩트 탐색
+
+상단 다섯 탐색 메뉴(모든 노트·검색·그래프·타임라인·주제 모음)를 아이콘 한 줄로 줄이는 버튼을 추가했습니다. 기본 목록 모드에서는 모든 노트 오른쪽에, 컴팩트 모드에서는 아이콘 줄 끝에 표시하며 다시 누르면 목록으로 돌아옵니다. 아이콘은 접근성 이름과 제목 도움말을 유지하고, 현재 뷰는 배경과 아래 표시선으로 구분합니다.
+
+사이드바 맨 위 오른쪽에 아이콘만 표시하고, 접은 뒤에는 본문 상단 왼쪽의 같은 아이콘으로 다시 펼칩니다. 우측 패널의 PanelRight를 반전한 PanelLeft를 사용하며 아이콘 크기와 버튼 영역도 동일합니다. 기능 설명은 툴팁과 접근성 이름으로 제공합니다. macOS에서는 기존 44px 창 버튼 줄에 접기 버튼을 배치해 탐색 영역 높이를 늘리지 않습니다. 사이드바와 편집기를 다시 생성하지 않고 숨겨 너비·폴더 접기 상태·편집기를 유지하며, 이름 변경을 시작하면 필요한 사이드바가 자동으로 펼쳐집니다. 접기 상태와 컴팩트 모드는 사이드바 너비처럼 기기별로 저장됩니다. 공통 명령 `sidebar.toggle`(기본 leader `s b`)과 `sidebar.navigation.compact`를 팔레트·단축키 설정에 등록했습니다. macOS 접기 상태에서는 창 버튼 자리에 맞춰 상단 도구를 96px 오른쪽에서 시작합니다. 접기/펼치기 버튼 조작 시 새로 보이는 버튼으로 키보드 포커스를 옮깁니다.
+
+임시 Sidebar QA Vault의 실제 CLI 연결 브라우저에서 메뉴 이동·검색, 목록/컴팩트 복원, 접기 상태의 재실행 복원, 드래그한 302px 너비와 폴더 상태 유지, 같은 편집기 인스턴스 유지, 팔레트 접기 후 보이는 버튼으로 포커스 이동, Ctrl+h 트리 이동, 숨긴 상태의 F2 인라인 이름 변경을 확인했습니다. 메뉴 자체 높이는 185px → 36px, 노트 트리 공간은 158px 증가했습니다. 900×620 창에서 macOS 레이아웃을 적용해 상단 넘침 없이 복원 버튼이 x=96px에 위치함을 확인했습니다. 실제 native 창 버튼·창 드래그 조작 검증을 대신하지 않습니다. `npm test` 133개와 `npm run check`, macOS debug 앱 빌드가 통과했습니다. 로컬 QA 기록은 `test-results/sidebar-QA.md`에 있습니다.
+
+
+## 라인 번호
+
+설정 → 편집에 라인 번호 ‘없음·일반 번호·상대 번호’를 추가했습니다. 기본은 없음이며 Vault별로 저장합니다. Live Preview와 Markdown 원문에서 원본 줄 번호를 표시하고 읽기 화면에는 표시하지 않습니다. 상대 번호는 현재 줄에 실제 번호, 나머지 줄에는 현재 줄까지의 거리를 표시하며 커서 이동·본문 변경에 맞춰 갱신합니다. 자동 줄바꿈으로 접힌 시각적 줄은 별도 번호를 만들지 않습니다. 번호는 본문 왼쪽의 기존 여백에 표시하며, 번호를 켜거나 모드를 바꿔도 본문 시작점·너비·줄바꿈은 유지됩니다.
+
+CodeMirror의 gutter와 독립 compartment로 구현해 설정 변경 시 편집기·선택·undo history를 유지합니다. 기존 Vault 읽기는 기본값을 병합하며 파일을 수정하지 않습니다. CLI의 settings.get/settings.update에서도 같은 옵션을 조회·설정할 수 있습니다. 잘못된 값이 포함된 patch는 전체를 거절합니다.
+
+
+임시 Sidebar Button QA Vault의 실제 CLI 연결 브라우저에서 목록/컴팩트 모드의 접기, 펼치기 후 같은 편집기·트리 유지, 버튼 포커스 이동, 재실행 복원, 900×620 macOS 레이아웃의 창 버튼 영역 여유를 확인했습니다. 상대 번호의 방향키/Vim j 이동 갱신, 일반 번호 1–9 표시, 본문 줄 추가, 원문/Live Preview 전환, 번호 없음과 읽기 화면의 gutter 제거, 설정 변경 후 undo로 원문 복원, 재실행 시 상대 번호 설정 유지도 확인했습니다. `npm test` 137개(core 58, CLI 4, frontend 75), `npm run check`, macOS debug 앱 빌드가 통과했습니다. native 창 버튼 조작·실제 한글 입력 소스 검증은 포함하지 않습니다. 기록은 `test-results/sidebar-button-line-numbers-QA.md`에 있습니다.
+
+
+라인 번호 여백 배치를 107줄의 임시 노트로 재검증했습니다. 1360px/900px 창에서 원문·Live Preview 각각 없음/일반/상대 번호를 비교한 12가지 조합 모두 본문·제목의 좌표와 너비, 본문 높이, 앞 12줄의 배치가 동일했습니다. 숫자와 본문 사이 간격은 일반 창에서 24px, 1180px 이하 창에서는 기존 여백에 맞춰 16px입니다. `npm test` 137개, `npm run check`, macOS debug 앱 빌드가 통과했습니다. 비교 수치는 `test-results/line-margin-metrics.json`, 스크린샷은 `test-results/line-margin-narrow.png`에 기록했습니다.
+
+
+## 커서 위치의 링크 열기 단축키
+
+Live Preview와 원문에서 커서 위치의 노트 링크를 Cmd+Enter(macOS)/Ctrl+Enter(그 외) 또는 Vim Normal의 `g d`로 엽니다. `g d` 앞에는 Leader가 필요 없으며 Insert에서는 일반 문자입니다. 공통 명령 `note.follow-link`를 설정/팔레트에 등록해 일반 단축키 변경과 Leader 조합 추가를 지원합니다. 별칭은 실제 대상으로 해석하고 기존 저장·미생성 노트 열기 경로를 재사용합니다. 코드 예제·일반 텍스트·링크 뒤 공백에서는 이동하지 않습니다. 단축키 파서도 Enter 조합을 인식하고 충돌 검사·설정 저장을 허용하도록 보완했습니다.
+
+
+임시 Follow Link QA Vault의 실제 CLI 연결 브라우저에서 원문/Vim OFF의 Cmd+Enter, Live Preview/Vim Normal의 gd, Insert의 Cmd+Enter, 별칭 해석, 없는 노트 생성과 즉시 백링크 반영, 원문 저장 후 이동을 확인했습니다. Insert의 gd는 문자로 입력되고 코드 예제에서는 두 명령 모두 이동하지 않습니다. 한국어 Process/KeyG·KeyD 합성 이벤트도 같은 Vim 경로를 통과했습니다. 설정 UI에서 Mod+Shift+Enter와 Leader l o를 저장한 뒤 두 조합의 실제 이동도 확인했습니다. 단축키 Enter 인식과 링크 범위 회귀 검사를 포함해 `npm test` 140개(core 58, CLI 4, frontend 78), `npm run check`, macOS debug 앱 빌드가 통과했습니다. native macOS 한글 입력 소스 검증은 포함하지 않습니다. 기록은 `test-results/follow-link-QA.md`에 있습니다.
+
+
+## Leader 표기를 사용하는 단축키 설정
+
+단축키 표를 ‘기능 / 키 조합 / 일반 단축키’ 구성으로 정리하고 조합별 Leader 체크박스를 제거했습니다. 키 조합에는 `gd`, `<leader>f`, `<leader>rn`처럼 공백 없이 입력합니다. 일반 단축키에는 Mod+Enter·Ctrl+h·F2 등을 별도로 입력하며 별도 옵션을 붙이지 않습니다. 각 입력란의 +로 여러 조합을 추가할 수 있고, 빈 값 저장·추가 조합 삭제·기본값 복원도 유지합니다.
+
+텍스트 표기는 기존 `{ keys, leader }` 저장 값으로 변환합니다. 저장 포맷이나 기존 키 라우팅은 변경하지 않으며, 이전 설정의 일반·Normal·Leader 조합을 모두 유지합니다. 불완전한 `<leader>` 토큰, 잘못된 입력란, 대소문자·중복·접두어 충돌을 검사합니다. 내장 기능과 확장 명령은 같은 설정 경로를 사용합니다.
+
+임시 Leader Text QA Vault의 실제 CLI 연결 브라우저에서 기존 조합의 표시·재저장·재실행 유지, `<leader>f` 지정과 실제 Leader 후 f 실행, g d로 변경 시 기존 Leader 매핑 해제, 일반 Cmd+Enter와 기존 Leader l o 유지, 확장 명령의 `<leader>z` 실행을 확인했습니다. 불완전한 `<leader>` 입력은 저장하지 않습니다. 900×620 창에서 키 조합/일반 단축키 입력란이 가로 넘침 없이 표시되며 단축키 행의 체크박스는 0개입니다. `npm test` 150개(core 62, CLI 4, frontend 84), `npm run check`가 통과했습니다. native macOS IME는 이번 변경에서 재검증하지 않았습니다. 기록은 `test-results/leader-text-QA.md`에 있습니다.
+
+텍스트 입력 방식을 반영한 macOS debug 앱 빌드도 완료했습니다: `target/debug/bundle/macos/Foltra.app`.
+
+
+설정의 연속 키 표기를 Vim 방식으로 정리했습니다. 기본값·입력 예시·설정값·팔레트·Leader 안내에서 fg, rn, gd처럼 붙여 표시합니다. 이전 f g 입력은 호환해서 읽고 설정 UI에서 다시 저장할 때 fg로 정리합니다. 일반 단축키와 대소문자는 유지합니다.
+
+임시 Compact Keys QA Vault에서 이전 `f g` 설정이 `<leader>fg`로 표시되고 `fg`로 저장되는 것, 같은 설정에 공백을 다시 넣어 저장해도 입력란이 정리되는 것, Leader 이후 fg로 검색 열기, 이전 gd·lo 조합의 공백 없는 표시와 gd 링크 열기, 재실행 후 표기 유지를 확인했습니다. `npm test` 151개(core 62, CLI 4, frontend 85)와 `npm run check`가 통과했습니다. 기록은 `test-results/compact-keys-QA.md`에 있습니다.
+
+## 설정 그룹 전환과 탐색 위치 복원
+
+설정 진입 시 왼쪽 사이드바 내부를 편집기·커서·Vim 및 단축키·테마 메뉴로 전환합니다. 창 버튼·사이드바 폭·하단 Vault 표시는 유지하고, 내용은 8–12px 이동과 fade로 약 260ms 동안 전환합니다. 본문은 40ms 늦게 시작하며 그룹 변경은 100ms fade를 사용합니다. CSS transition이 중간 상태에서 반전되고, 시스템 동작 줄이기에서는 이동·fade를 생략합니다. 비활성 영역은 inert/aria-hidden으로 키보드·마우스 접근을 막습니다. 작업 뷰와 노트 트리를 유지해 노트 편집기·커서·스크롤·폴더 상태를 보존하며, 접혀 있던 사이드바는 설정에서만 펼칩니다. 설정의 숨긴 그룹도 입력 초안을 유지하며 설정이 닫힌 동안에는 설정 뷰의 불필요한 재렌더링을 생략합니다.
+
+기존 공통 키 라우터와 포커스 탐색에 설정 그룹을 연결했습니다. Vim의 j/k로 그룹을 선택하고 Ctrl+h/l로 메뉴와 설정 본문을 이동합니다. 한글 조합의 Dead·빈 key·복수 코드포인트를 물리 키로 해석하고, 조합 이벤트가 이전 편집기를 가리켜도 실제 포커스가 놓인 사이드바로 라우팅합니다. 문자 입력 필드·인라인 이름 변경·키 기록·Vim Insert의 조합 입력은 그대로 보호합니다.
+
+파일 클릭·링크 열기·gd·Cmd+Enter 이후 새 편집기가 준비되면 본문으로 포커스를 옮깁니다. 이미 열린 노트는 다음 프레임에 포커스를 복원합니다. 읽기 모드에서는 읽기 영역으로 이동합니다. 기기별 localStorage에 Vault ID와 노트 ID로 커서 선택 범위와 스크롤을 저장하며, 입력 중 쓰기는 지연하고 편집기 해제·pagehide에 최종 저장합니다. 다음 열기·브라우저 재실행에서 복원하고, 본문이 짧아졌을 때 선택 범위를 문서 길이 안으로 제한합니다. 원본 노트와 Vault 설정 파일에는 탐색 상태를 기록하지 않습니다.
+
+네이티브에는 Tauri window-state 플러그인을 등록해 창 크기·위치·최대화 상태를 앱 설정 디렉터리에 저장합니다. Vault 전환과 독립적이며 창 표시 여부와 장식은 복원 대상에서 제외합니다. 별도 앱 식별자 `app.foltra.window-state-qa`를 쓰는 네이티브 probe에서 1040×710 논리 픽셀, (80,90) 위치를 저장하고 프로세스를 재실행해 동일한 물리 크기 2080×1420, 위치 (160,180), 배율 2.0 복원을 확인했습니다. 사용자의 실행 중인 앱/Vault는 이 테스트에 사용하지 않았습니다. 다중 모니터·배율 변경·강제 종료 복원은 검증하지 않았습니다. 플러그인 사용 계약은 https://v2.tauri.app/plugin/window-state/ 를 참고했습니다.
+
+검증: 전체 테스트 154개(core 62, CLI 4, frontend 88), `npm run check`, macOS debug 앱 빌드 통과. 실제 CLI에 연결한 임시 Navigation QA Vault에서 설정 왕복 중 동일 편집기 인스턴스, 노트별 서로 다른 커서·스크롤 복원, 재실행 복원, gd/Cmd+Enter 포커스, 설정 그룹의 합성 한글 키와 Ctrl 이동, 접기 상태 복원을 확인했습니다. 합성 IME 이벤트 검증은 실제 macOS 한글 입력기로 누르는 검증을 대신하지 않습니다. 로컬 검증 자료는 `test-results/settings-navigation-qa.json`, `test-results/window-state-restore.log`에 있으며 GitHub 릴리스에는 아직 배포하지 않았습니다.
+
+
+## Live Preview 서체, 목록 Enter와 실제 한글 입력기
+
+읽기 모드의 본문·H1–H6 크기/두께/행간을 `typography.css`에서 Live Preview와 공유합니다. CodeMirror 기본 헤딩의 밑줄·굵기 재정의를 제거했고, 문단·헤딩 사이의 빈 소스 줄은 선택하지 않을 때 접어 읽기 모드의 여백과 맞춥니다. 선택한 빈 줄은 다시 편집할 수 있으며 원본 줄·Vim 행 번호·저장 내용은 그대로입니다. 임시 Typography IME QA vault에서 두 모드의 H1–H6 글자 영역 y 좌표, 크기, 글꼴, 두께가 일치함을 브라우저에서 확인했습니다. 표·중첩 목록 등 모든 Markdown 배치가 동일하다는 의미는 아닙니다.
+
+빈 줄을 포함하는 목록에서 CodeMirror가 다음 Enter에도 빈 줄을 추가하는 동작을 재현했습니다. `markdownEditing.ts`는 기존 들여쓰기·체크리스트·번호 처리에 맡기면서 새 목록 항목에 자동 추가되는 빈 구분 줄만 제거합니다. 기존 본문 빈 줄은 변경하지 않습니다. 빈 bullet에서 Enter는 목록을 끝냅니다. 영어/한글, 중첩·번호·체크·인용 목록, 중간 줄 분할 회귀 검사와 원문/Vim OFF의 Enter·한 번의 실행 취소를 확인했습니다.
+
+별도 Tauri 앱 식별자·WebKit 저장소·임시 vault에서 macOS 두벌식과 실제 CGEvent 키 입력을 사용했습니다. Ctrl+h, j/l 사이드바 이동을 확인했고, Normal의 `i`에서 macOS가 keydown보다 먼저 `insertText(ㅑ)`를 전달하는 문제를 재현했습니다. `vimInput.ts`의 beforeinput 처리로 Normal의 선행 문자 삽입을 막고 Insert/literal 인수는 유지합니다. 수정 후 `i`가 문자를 남기지 않고 Insert로 진입하는 것, 실제 키 조합으로 `한글` 입력, Enter와 Escape, Vim ON/OFF의 영어 bullet Enter가 한 줄만 생성되는 것을 native WebKit과 저장된 본문에서 확인했습니다. native 화면 캡처는 실패하여 시각 비교는 브라우저에서 수행했습니다. 다른 입력기, 조합 취소의 모든 경우, 다중 커서와 장시간 입력은 검증하지 않았습니다. QA 전용 IPC와 도구는 `test-results/`에만 두며 제품 빌드에는 넣지 않습니다.
+
+주제 모음은 기본적으로 파일명·행 번호·날짜 없이 블록만 표시합니다. 제목 우측 문서 아이콘으로 원본 정보를 켜고 끄며 기기별로 기억합니다. 공통 `topics.sources.toggle` 명령을 등록해 설정에서 일반/Vim/Leader 단축키를 지정할 수 있습니다. 블록만 보는 중에도 hover/focus의 화살표로 원본 행을 엽니다. 표시 전환·재실행 유지·원본 25행 이동과 편집기 focus를 실제 UI에서 확인했습니다.
+
+검증: `npm test` 177개(core 62, CLI 4, frontend 111), `npm run check`, macOS debug `.app` 빌드 통과. 상세 자료는 `test-results/typography-ime-QA.md`, `typography-measurements.json`, `native-ime-events.jsonl`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### Live Preview bullet 표시 보완
+
+비활성 줄의 Markdown 목록 기호 `-`·`*`·`+`를 점으로 표시합니다. 기존 구현은 기호에 색만 적용하고 있었습니다. 원래 기호 폭과 중첩 들여쓰기를 유지하며, 편집 중인 줄/선택 범위는 원문 기호를 보여줍니다. 번호 목록·코드·구분선은 이 처리에서 제외합니다. 임시 Bullet Preview QA vault에서 점의 실제 렌더링, 중첩 bullet 클릭 후 해당 줄만 원문 표시, focus 이탈 시 복원, 원문 모드 전환, 저장 본문/revision 불변을 확인했습니다. `npm test` 180개(core 62, CLI 4, frontend 114)와 `npm run check` 통과. 시각 확인은 브라우저에서 수행했으며, macOS debug 앱에도 포함해 다시 빌드했습니다. 증거는 `test-results/live-bullet-*.png`와 검사 로그에 있습니다.
+
+
+### Live Preview 헤딩의 편집 영역과 줄 번호
+
+문단 간격을 글자 줄의 padding으로 표현해 H2의 활성 줄 배경이 69px 높이로 커지고, 접힌 빈 줄의 번호가 이웃 번호와 겹쳤습니다. 간격을 별도 CodeMirror block widget으로 분리하여 H2는 실제 글자 줄 높이(약 33px)만 강조합니다. 접힌 줄의 gutter는 함께 숨기며, 해당 원본 줄로 이동하면 줄과 번호를 복원합니다. 헤딩 번호는 첫 번째 시각 줄의 높이에 정렬하므로 긴 헤딩이 여러 줄로 접혀도 번호가 중간으로 밀리지 않습니다. 표·코드 미리보기의 외부 margin도 내부 padding으로 바꿔 다음 줄 위치 측정에서 여백이 누락되지 않도록 했습니다.
+
+임시 Heading Layout QA vault에서 relative/absolute 번호, H2 클릭·커서, Vim 2G로 빈 줄 편집/번호 복원, 긴 H1 줄바꿈, 표·코드 뒤 일반 줄 정렬을 확인했습니다. H1–H3의 위치와 높이는 읽기 모드와 동일하며 저장 본문·revision은 변하지 않았습니다. 실제 시각 확인 자료는 `test-results/heading-field-before.png`, `heading-field-after.png`, `heading-wrapped-blocks.png`입니다. `npm test` 181개(core 62, CLI 4, frontend 115), `npm run check` 통과 및 macOS debug 앱 재빌드 완료. 이번 레이아웃 검증은 브라우저에서 수행했습니다.
+
+### 편집기 저장·레이아웃·입력 회귀 점검
+
+입력 후 650ms 유휴 자동저장에 최대 2초 대기를 추가해 연속 입력 중에도 저장합니다. 창 이탈/숨김 시에도 저장을 시도하며, 진행 중인 저장 뒤 추가된 초안까지 저장해야 노트 전환·닫기를 허용합니다. 늦게 도착한 외부 변경 조회는 그 사이 작성한 초안을 덮어쓰지 않습니다. 저장 실패·revision 충돌은 초안을 보존하며 최신 revision으로 강제 재시도하지 않습니다. 저장 결과의 링크 정규화는 문서 전체 교체 대신 변경 부분만 반영하고 별도 undo 항목을 만들지 않습니다.
+
+앞선 빈 줄 접기 방식은 고정 높이 구분 줄로 대체했습니다. 선택·focus 이동으로 빈 줄 높이가 바뀌지 않으며 구분 줄 높이는 문단 여백에서 차감합니다. 저장 때마다 코드·표의 React 미리보기를 파괴하여 높이가 잠깐 0으로 줄어들던 동작을 고쳤습니다. DOM과 React root를 재사용하고 실제 높이 변경을 CodeMirror 측정에 반영합니다. 읽기 모드는 일반 줄바꿈도 표시하며, 읽기 화면을 왕복해도 편집기의 undo/redo 기록을 유지합니다.
+
+`- `·`* `·`+ `는 편집 중에도 점으로 보입니다. 읽기/Live Preview의 목록 들여쓰기·점 크기·항목 간격·중첩과 긴 문장의 hanging indent를 공유합니다. 빈 줄이 있는 목록의 소스 구분 줄도 간격에 포함합니다. 원문 모드와 저장 Markdown은 목록 문법을 그대로 유지합니다. 실제 브라우저에서 일반/중첩/느슨한 목록, 문단 줄바꿈, 코드 뒤 문장의 글자 위치를 대조했습니다. 모든 Markdown 구조의 레이아웃 일치를 뜻하지는 않습니다.
+
+위키링크 자동완성은 입력·삭제에 맞춰 열린 결과를 동기적으로 갱신하며, 기존 노트 후보를 새 링크 생성보다 앞에 표시합니다. 한글 자모와 조합 중인 음절을 분해하여 검색하므로 `ㅎ → 하 → 한 → 한ㄱ → 한그 → 한글` 동안 후보가 유지됩니다. 실제 macOS 두벌식에서 검색, 방향키 선택, Enter로 `[[한글 생각]]` 완성과 자동저장을 확인했습니다. 한글 조합 직후 WebKit이 Enter keydown을 건너뛰는 경로도 재현했으며, 실제 `beforeinput` 줄바꿈 요청을 조합 확정 뒤 기존 키맵에 전달하여 목록을 한 줄만 이어 씁니다. IME 자체의 조합 확정 이벤트는 가로채지 않습니다.
+
+추가로 WebKit이 조합 중인 음절을 선택했다가 커서를 접는 별도 `select` transaction을 보내 자동완성을 닫는 문제를 재현했습니다. 조합 범위도 검색에 포함하고 조합 중의 해당 선택 변경을 IME 입력으로 분류합니다. 일반 선택/마우스 이동과 실제 조합 확정 키는 기존 처리에 맡깁니다.
+
+검증: 전체 테스트 198개(core 62, CLI 4, frontend 132), `npm run check`, macOS debug `.app` 빌드 통과. 별도 식별자의 native WebKit 앱과 임시 vault에서 Vim ON/OFF의 한글 bullet Enter, 조합 중 16개 transaction 모두의 자동완성 활성 상태, Enter 완성 후 실제 파일 저장을 확인했습니다. 브라우저에서는 연속 입력 2초 시점 저장, 저장 후 블록 DOM/높이 유지, 빈 줄 선택 전후 위치 유지, 읽기 모드 왕복 undo/redo, 목록 줄바꿈, 노트 전환 focus를 확인했습니다. 시각 증거와 로그는 `test-results/editor-audit-*`, `native-editor-final.json`, `native-editor-audit-events.jsonl`에 있습니다. QA 전용 코드/IPC는 제품에 포함하지 않습니다. 전체 입력기·대형 vault·모든 Markdown 조합의 무결함을 보증하는 검증은 아니며 GitHub 릴리스는 갱신하지 않았습니다.
+
+### Live Preview 표의 불필요한 재생성 제거
+
+표와 무관한 문장을 편집할 때 바깥 블록은 유지되어도 내부 Markdown renderer 함수가 새 컴포넌트로 취급되어 데이터베이스 쿼리 표가 매번 재생성됐습니다. 임시 vault에서 표 위 문장을 입력하는 동안 쿼리가 18회 실행되고 표 높이가 약 132px에서 로딩 표시의 29px로 줄어드는 현상을 재현했습니다. Markdown renderer의 컴포넌트 identity를 고정하고 최신 workspace/링크 동작은 React context로 전달합니다. 쿼리 갱신은 배열 참조가 아닌 데이터베이스 스키마·레코드 내용 변경에 반응하므로 노트 자동저장으로는 재조회하지 않습니다. 같은 쿼리 갱신 중에는 기존 결과를 유지하며, 다른 쿼리나 vault로 바뀌면 이전 결과와 늦게 도착한 응답을 표시하지 않습니다.
+
+검증: 전체 테스트 202개(core 62, CLI 4, frontend 136), `npm run check` 통과. 실제 CLI와 연결한 임시 Table stability QA vault의 브라우저에서 표 위·사이·아래 입력, 줄 추가, 자동저장 동안 일반 Markdown 표와 쿼리 표의 DOM이 유지되고, 표 제거·로딩 표시·불필요한 쿼리 호출이 모두 0회인 것을 확인했습니다. 레코드 변경과 컬럼 추가는 각각 한 번씩 재조회하여 반영했고, 응답을 지연시켜도 표가 유지됐습니다. 편집기 본문과 저장 파일도 일치했습니다. 이번 대화형 검증은 Chromium에서 수행했으며 native WebKit에서는 재검증하지 않았습니다. 자료는 `test-results/table-stability-qa.json`, `table-stability-after.png`, `table-stability-tests.log`, `table-stability-check.log`에 있습니다.
+
+macOS debug `.app` 재빌드를 완료했습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 입력 위치와 한글 조합 표시
+
+목록 접두사 전체를 고정 너비의 투명 mark로 꾸미던 방식은 빈 `- `의 커서를 본문 시작점보다 약 8px 왼쪽에 표시했습니다. Chromium의 실제 composition 경로에서는 조합 중인 `ㅎ`·`하`도 같은 투명 span에 들어가 보이지 않는 현상을 재현했습니다. 기호와 뒤 공백을 편집 불가능한 인라인 widget으로 표시해 native 입력 지점을 분리했습니다. 본문과 같은 글자 높이로 widget 경계의 커서를 측정하므로 첫 글자를 입력해도 커서의 기준 위치·높이가 바뀌지 않습니다. `-`·`*`·`+` 뒤 공백부터 점으로 표시하고 번호 목록에도 같은 입력 경계 처리를 적용합니다. 원본 Markdown 접두사, 중첩 들여쓰기, Backspace·undo는 유지합니다.
+
+검증: 전체 테스트 208개(core 62, CLI 4, frontend 142)와 `npm run check` 통과. 브라우저에서 일반·중첩·번호 목록 5가지의 빈 항목 커서와 첫 글자의 x/y/높이 차이가 모두 0px였고, `ㅎ → 하 → 한` composition 중 본문색 표시와 입력 위치 유지, Enter 한 줄 생성, 자동저장을 확인했습니다. 별도 식별자의 native WebKit 앱과 임시 vault에서도 실제 macOS 두벌식/Vim ON·OFF로 `ㅎ → 하 → 한 → 한ㄱ → 한그 → 한글` 각 단계의 표시·저장과 커서 위치 일치를 확인했습니다. 이 native 경로는 DOM composition 이벤트 대신 문자 교체 이벤트를 전달했으며, composition 유지 상태의 재현·시각 확인은 Chromium에서 수행했습니다. 자료는 `test-results/bullet-cursor-positions.json`, `bullet-ime-final-browser.json`, `bullet-ime-visible-after.png`, `bullet-native-summary.json`에 있습니다. QA 도구와 로그는 제품에 포함하지 않습니다.
+
+macOS debug `.app` 재빌드 완료. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 종료와 빈 편집 줄의 높이
+
+빈 목록 항목에서 Enter를 누르면 기호만 삭제되어 `- First\n`가 남았고, 다음 문장을 입력하는 순간 Markdown의 목록 이어쓰기로 해석되어 들여쓰기가 붙었습니다. 목록을 종료할 때 이전 항목과 새 문단 사이에 빈 줄을 남깁니다. 이미 구분 줄이 있으면 추가하지 않으며, 중첩 목록은 먼저 상위 목록으로 돌아가고 인용문 내부에서는 인용 접두사를 유지합니다. 읽기 모드와 저장 Markdown에서도 새 문단이 목록 밖에 놓입니다.
+
+Live Preview의 빈 구분 줄 높이를 본문 한 줄 높이로 맞췄습니다. 끝 여백 widget도 마지막 내용 뒤가 아닌 문서의 최종 편집 줄 뒤에 배치합니다. 문서 끝의 줄바꿈·빈 줄과 문단 사이 빈 줄에 첫 글자를 입력할 때 줄 높이가 15px에서 약 27px로 커지거나, 여백 이동으로 위아래로 움직이던 현상을 수정했습니다. 읽기 모드의 서체·여백 설정은 그대로입니다.
+
+검증: 전체 테스트 215개(core 62, CLI 4, frontend 149), `npm run check`, macOS debug `.app` 재빌드 통과. 임시 List exit QA vault의 브라우저에서 네 가지 빈 줄 사례의 입력 전후 높이·y 좌표 차이가 모두 0px였고, 스크린샷으로 빈 줄과 입력한 줄의 강조 영역을 비교했습니다. 실제 native WebKit/Vim ON·OFF에서 `- foo` → Enter → Enter → `bar`를 입력하여 `- foo\n\nbar` 저장과 일반 문단 표시를 확인했습니다. 이번 native 검증의 문자는 영문이며 새 입력기 검증을 포함하지 않습니다. 자료는 `test-results/list-exit-after.json`, `empty-line-after-empty.png`, `empty-line-after-typed.png`, `bullet-native-list-exit-*.json`, `list-exit-tests.log`, `list-exit-check.log`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 일반 줄 정렬·항목 편집 높이와 이전 위치 복귀
+
+앞선 목록 종료 수정은 Enter 경로만 다뤘습니다. 이미 `- item\nplain`처럼 작성된 본문에서 Markdown의 lazy continuation 범위 전체에 목록 들여쓰기를 적용하던 처리를 수정했습니다. Live Preview는 원문에 목록 기호나 충분한 들여쓰기가 있는 줄만 목록 위치에 정렬합니다. 의도적인 들여쓰기·중첩 목록은 유지하며 저장 본문이나 읽기 모드의 Markdown 해석은 변경하지 않습니다.
+
+빈 줄이 섞인 목록에서는 항목 간 여백을 줄의 padding으로 넣어 일부 bullet 편집 영역이 약 61px로 커졌습니다. 이 간격을 줄 앞 block widget으로 분리해 목록 간격은 유지하면서 편집 영역·줄 번호는 본문 한 줄 높이(약 27px)에 맞춥니다. 앞서 수정한 빈 줄 높이와 목록 입력 위치를 유지합니다.
+
+`note.back` 명령과 기본 `Ctrl+o`를 추가했습니다. `gd`, `Cmd+Enter`, 클릭 등으로 노트를 열기 전 커서·스크롤을 출발 기록에 보관하고, 이전 버튼과 같은 경로로 복귀합니다. 여러 번 방문한 같은 노트도 각 출발 위치가 유지됩니다. 기존 단축키 설정에서 일반 조합·Leader 조합으로 변경하거나 해제할 수 있습니다. Vim ON/OFF에서 사용하며 기록은 현재 세션의 Vault에 한정됩니다. 저장 충돌 시 현재 초안과 탐색 기록을 보존합니다.
+
+검증: 전체 테스트 224개(core 62, CLI 4, frontend 158), `npm run check`, macOS debug `.app` 재빌드 통과. 임시 vault와 실제 CLI를 연결한 Chromium에서 스크린샷 본문의 일반 줄 입력·정렬, 느슨한 목록의 줄 높이와 줄 번호를 확인했습니다. `gd`/`Cmd+Enter`로 A→B→C 후 A를 재방문하고 `Ctrl+o`로 C→B→A의 각 커서·스크롤·포커스를 복원했으며, Vim OFF의 복귀 전 저장과 revision 충돌 시 이동 중단을 확인했습니다. 이번 변경은 native WebKit·실제 한글 입력기로 재검증하지 않았습니다. 자료는 `test-results/lazy-list-after.png`, `list-row-after.png`, `jump-back-browser.json`, `list-alignment-tests.log`, `list-alignment-check.log`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 Enter의 추가 여백 제거와 설정 사이드바 버튼
+
+앞선 수정은 bullet 편집 줄 내부의 여백을 밖으로 옮겼을 뿐, 새 항목까지의 과도한 간격을 줄이지 못했습니다. `- aal\n\n- 다음 생각`에서 첫 항목 뒤 Enter를 누르면 원문은 `- aal\n- \n\n- 다음 생각`으로 한 줄만 추가됐지만, 다른 위치의 빈 줄 때문에 목록 전체를 loose로 판단해 새 항목 앞에도 빈 줄 높이를 더했습니다. Live Preview는 각 항목의 기본 간격만 추가하고 실제 빈 원문 줄이 자신의 높이를 차지하도록 수정했습니다. 읽기 모드도 목록 전체의 loose 여부 대신 각 항목의 원문 위치 차이로 간격을 계산합니다. 빈 항목도 한 줄 높이를 유지하며 원문을 변경하지 않습니다.
+
+설정에서는 왼쪽 사이드바 접기 버튼을 렌더링하지 않습니다. 상단 drag 영역 높이는 유지하며 설정 종료 후에는 이전 접힘 상태로 돌아갑니다. 작업 화면의 같은 버튼은 공통 hover 색상이 어두운 본문색으로 덮어쓰지 않도록 sidebar 색상을 유지합니다.
+
+검증: 전체 테스트 228개(core 62, CLI 4, frontend 162), `npm run check` 통과. Chromium에서 실제 Enter 입력 전후 원문, 새 항목의 줄 간 거리(약 61px → 33px), 빈 항목·입력 후 항목 위치 유지와 읽기 모드의 동일한 항목 간격을 확인했습니다. 의도적인 빈 줄은 별도 한 줄 높이로 남습니다. 별도 식별자의 native WebKit 앱과 임시 vault에서도 실제 macOS 영문 키 입력으로 Vim ON/OFF의 Enter → `foo` 입력을 수행해 추가 줄 수, 약 33px의 항목 간 거리, 줄 높이, 저장 파일을 검증했습니다. 이번 검증은 한글 조합 입력을 포함하지 않습니다. 설정 진입·hover 시 버튼 부재, 정상 화면의 접기·펼치기와 hover 대비, 접힌 상태에서 설정 진입 후 상태 복원도 브라우저에서 확인했습니다. 자료는 `test-results/list-enter-spacing-{before,after}.json`, `list-enter-spacing-after.png`, `list-spacing-native-summary.json`, `settings-sidebar-browser.json`, `sidebar-toggle-hover-after.png`에 있습니다. QA 도구는 제품에 포함하지 않습니다.
+
+macOS debug `.app` 재빌드를 완료했습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### Ctrl+i 앞으로 이동
+
+공통 명령 `note.forward`와 기본 `Ctrl+i`를 추가했습니다. 뒤로 이동하며 떠난 노트·커서·스크롤을 앞으로 기록에 보관해 `Ctrl+o`/`Ctrl+i`로 왕복합니다. 새 노트를 열면 기존 앞으로 기록을 초기화하고, 삭제된 목적지는 양방향으로 건너뜁니다. 저장 성공 후에만 기록을 이동하며 Vault 전환 시 양쪽 기록을 비웁니다. 기존 설정에서 일반 단축키·Leader 조합으로 바꾸거나 해제할 수 있고 일반 Tab은 이 명령에 연결하지 않습니다. 상태 전이 규칙은 `noteHistory.ts`에 두고 화면은 저장과 위치 복원을 연결합니다.
+
+검증: 전체 테스트 235개(core 62, CLI 4, frontend 169), `npm run check`, macOS debug `.app` 재빌드 통과. Chromium에서 A→B→C의 뒤로/앞으로 왕복 시 노트·커서·스크롤·포커스 복원, 새 경로에서 앞으로 기록 초기화, 일반 Tab 구분, Vim OFF의 앞으로 이동 전 초안 저장, 읽기 모드 왕복과 설정 항목을 확인했습니다. 별도 native WebKit 앱과 임시 vault에서 실제 macOS Ctrl+o/Ctrl+i 입력을 Vim ON/OFF 및 ABC·두벌식 입력 소스로 검증했습니다. 한글 입력 소스의 Ctrl+i는 `key: ㅑ`, `code: KeyI`인 실제 이벤트로도 앞으로 이동했습니다. 조합 중 문자 편집 검증은 포함하지 않습니다. 자료는 `test-results/jump-forward-browser.json`, `jump-forward-native-summary.json`, `jump-forward-tests.log`, `jump-forward-check.log`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 빈 bullet의 Backspace 종료
+
+추가 재현에서 `- ccc` → Enter → Backspace → `안녕`은 `- ccc\n  안녕`을 만들었습니다. CodeMirror의 기본 Backspace가 두 번째 이후 항목의 기호를 공백으로 치환해, 글자를 입력하면 이전 항목의 들여쓴 이어쓰기 문장으로 표시됐습니다. 빈 목록 기호 뒤의 Backspace를 기존 Enter 종료 처리에 연결했습니다. 최상위에서는 일반 문단으로 분리하고 중첩 목록은 한 단계만 빠져나옵니다. 본문이 있는 항목의 기호 삭제, 명시적인 들여쓰기, 기존 저장 내용은 변경하지 않습니다. 사용자 스크린샷의 실제 입력 경로는 아직 확인되지 않았으며, 같은 모양이 재현되는 Backspace 경로를 수정한 것입니다.
+
+검증: 수정 전 실패하는 Vim ON/OFF 키 이벤트 회귀 테스트를 확인한 뒤 전체 245개 테스트(core 62, CLI 4, frontend 179), `npm run check`, macOS debug `.app` 재빌드 통과. 순서 목록·체크리스트·인용문·중첩 목록·Undo·코드 블록과 선택 영역을 검사했습니다. 임시 vault를 사용한 Chromium에서 실제 Enter/Backspace와 한글 문자열 삽입으로 재현하고, 새 문단의 왼쪽 정렬 및 저장 후 읽기 모드의 독립 문단을 스크린샷으로 확인했습니다. macOS native QA는 준비 알림의 background animation-frame 대기 문제를 제거했으나, 이후 창 활성화 확인에서 입력 도구가 중단되어 실제 한글 조합 입력 검증을 완료하지 못했습니다. 자료는 `test-results/indent-backspace-{before-tests,focused-tests,tests,check}.log`, `indent-backspace-browser.json`, `indent-exit-backspace-{before,after,reading}.png`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 뒤 일반 문단의 읽기 모드 정렬과 양쪽 여백
+
+`문단\n- 항목\n일반 문장`에서 Live Preview는 마지막 줄을 왼쪽에 표시했지만, Markdown의 lazy continuation 범위 안에 있어 목록 종료 여백을 넣지 않았습니다. 읽기 모드는 계속 같은 목록 항목으로 묶었습니다. 원문 기반 목록 줄 분석을 `markdownListLayout.ts`로 공유해, 기호·들여쓰기 없이 시작하는 일반 줄에 문단 경계를 적용합니다. Live Preview는 편집 줄 밖에 목록 종료 여백을 추가하고, 읽기 모드는 렌더링할 문자열에만 구분 줄을 넣어 독립 문단으로 파싱합니다. 저장 본문과 원문 모드는 변경하지 않습니다. 명시적인 이어쓰기·중첩 목록·코드·표 및 여러 줄에 걸친 인라인 서식은 유지합니다. 문단 사이에서 다시 시작하는 목록에도 같은 경계 기준을 적용합니다.
+
+검증: 회귀 테스트 8개가 수정 전 실패하고 수정 후 통과했습니다. core 62, CLI 4, frontend 201개 테스트와 `npm run check` 통과. 임시 vault의 스크린샷과 실제 화면 측정에서 목록 위/아래 여백이 Live Preview의 15px/0px에서 15px/15px로 바뀌었으며, 읽기 모드도 15px/15px와 동일한 문단 왼쪽 정렬을 확인했습니다. 기존 일반 문단에 글자를 추가할 때 줄 위치·높이가 유지되고 Undo 및 저장 후 원문이 보존됨을 확인했습니다. 이번 검증은 Chromium에서 수행했으며 macOS native 한글 조합 입력 재검증은 포함하지 않습니다. 자료는 `test-results/list-boundary-{before,after,input}.json`, `list-boundary-{live,reading}-after.png`, `list-boundary-tests.log`, `list-boundary-frontend-final.log`, `list-boundary-check.log`에 있습니다.
+
+macOS debug `.app` 재빌드를 완료했습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 목록 해제 시 같은 줄 유지와 빈 문단의 선행 여백
+
+빈 bullet의 Enter/Backspace는 이제 기호만 제거하고 현재 줄을 일반 문단으로 전환합니다. 읽기 모드 분리를 위해 이전에 추가하던 원문 빈 줄 삽입을 제거했습니다. 문단 구분은 양쪽 미리보기에 공유된 표시 규칙이 처리하며, 순서 목록·체크리스트·인용문과 중첩 단계 해제도 현재 줄 번호를 유지합니다. 이미 사용자가 넣은 빈 줄은 보존합니다.
+
+목록 바로 뒤 문서 끝의 빈 편집 줄에도 첫 글자가 있는 문단과 같은 여백을 미리 배치합니다. 명시적으로 들여쓴 이어쓰기에는 이 여백을 적용하지 않습니다. 문자를 입력하거나 마지막 문자를 지울 때 문단 경계 여백이 뒤늦게 생기거나 사라지지 않습니다.
+
+검증: 수정 전 실패하는 회귀 테스트 17개를 확인한 뒤 전체 275개 테스트(core 62, CLI 4, frontend 209) 및 `npm run check` 통과. 임시 vault의 Chromium에서 Vim ON/OFF 각각 빈 bullet → 실제 Enter → 빈 문단 → `ㅎ`/`하` 조합 → `한` 확정 → Backspace를 수행했습니다. 3번 줄이 계속 3번 줄로 유지됐고, 각 단계의 편집 줄 top=371.289px·height=27.297px가 동일했습니다. 저장 본문은 `- 가나다\n- 라마마\n안녕`이며 읽기 모드의 일반 문단 정렬도 확인했습니다. 조합 입력은 CDP의 composition 이벤트로 검증했으며 실제 macOS 입력기 재검증은 포함하지 않습니다. 자료는 `test-results/list-exit-row-{before-tests,focused-tests,tests,check}.log`, `list-exit-row-browser.json`, `list-exit-row-{empty,typed}.png`에 있습니다.
+
+macOS debug `.app` 재빌드 완료. 기본 Xcode 경로의 라이선스 미동의로 첫 링크가 실패해, 이번 빌드 프로세스에만 기존 Command Line Tools 경로를 지정하여 완료했습니다. 시스템 개발 도구 선택이나 라이선스 동의는 변경하지 않았고 GitHub 릴리스도 갱신하지 않았습니다.
+
+### gd는 기존 노트 이동, Cmd+Enter는 열기 / 만들기로 분리
+
+`note.follow-existing-link`의 기본 Vim Normal 조합은 `gd`이며 기존 노트만 엽니다. 없는 대상·모호한 제목·본문 없는 record 링크에서는 저장이나 생성 API를 호출하지 않고 현재 노트와 커서, 이동 기록을 유지합니다. `note.follow-link`의 기본 Mod+Enter는 기존 atomic 열기/생성 경로를 유지합니다. 같은 커서 링크 해석과 저장·Vault 전환 방어를 사용하며, 두 동작을 설정에서 독립적으로 변경할 수 있습니다.
+
+단축키 설정 버전 4에서 이전 `note.follow-link`에 저장된 Leader 없는 소문자 `gd`만 새 명령으로 옮깁니다. 다른 사용자 조합과 명시적 해제를 보존하고, 버전 4에서 다시 지정한 조합은 재변환하지 않습니다. 읽기는 원본 설정을 변경하지 않으며 다음 명시적 설정 저장 때 반영합니다.
+
+검증: 전체 289개 테스트(core 63, CLI 4, frontend 222), `npm run check`, macOS debug `.app` 재빌드 통과. 임시 vault의 Chromium에서 실제 `gd`와 Cmd+Enter 입력으로 미생성 링크의 무동작/생성을 구분했고, 이미 있는 링크와 alias에서 이동, 노트 중복 생성 방지, 에디터 포커스 및 Ctrl+o의 원래 커서 복원을 확인했습니다. 이전 버전 설정의 자동 분리와 설정 화면의 독립 입력란도 확인했습니다. 자료는 `test-results/gd-existing-{tests,check,app-build}.log`, `gd-existing-browser.json`에 있습니다. macOS native IME 재검증과 GitHub 릴리스 갱신은 포함하지 않습니다.
+
+### macOS 창 닫기와 앱 종료 분리
+
+Cmd+W와 빨간 닫기 버튼으로 마지막 창을 닫아도 macOS 앱을 계속 실행하도록 수정했습니다. Tauri event loop에서 창 소멸에 따른 종료 요청만 막고, Dock/Finder의 Reopen 이벤트에서는 main 창이 없으면 기존 설정으로 다시 만들고 있으면 복원·표시·포커스합니다. 창을 다시 만드는 경우에도 기존 window-state 플러그인을 사용합니다. Cmd+Q와 명시적 종료 코드는 유지하며 Windows/Linux에는 이 정책을 적용하지 않습니다. 기존 초안 저장 후 닫기 및 저장 실패 시 창 유지 처리는 변경하지 않았습니다.
+
+검증: 수정 전 별도 식별자의 macOS 앱에서 실제 Cmd+W 입력 후 프로세스 종료를 재현했습니다. 수정 후 같은 테스트 앱의 시작 화면에서 Cmd+W → 창 0개/프로세스 유지, macOS 앱 재열기 요청 → 같은 PID/창 1개, 열린 앱 재열기 → 중복 창 없음, 빨간 닫기 버튼 → 창 0개/프로세스 유지, 창이 있을 때와 없을 때 Cmd+Q → 프로세스 종료를 확인했습니다. 네이티브 UI 도구의 실행 환경 오류로 이전에 허용된 Swift/Accessibility/CGEvent 대체 도구를 사용했습니다. 창 활성화 직후의 테스트 입력 누락을 방지하도록 테스트 도구에 입력 간격을 적용한 후 전체 시나리오가 통과했습니다. 이 시나리오는 노트 편집 중 저장 실패나 창 위치/크기의 재검증을 포함하지 않습니다.
+
+전체 289개 테스트(core 63, CLI 4, frontend 222), `npm run check`, 제품 식별자의 macOS debug `.app` 재빌드 통과. 자료는 `test-results/window-close-before.json`, `window-close-native.json`, `window-close-{tests,check,app-build}.log`에 있습니다. 테스트 앱은 정상 종료했으며 GitHub 릴리스는 갱신하지 않았습니다.
+
+### Cmd+W로 현재 노트만 닫기
+
+Cmd+W(macOS)/Ctrl+W(그 외)의 기본 연결을 `note.close`에 추가했습니다. 현재 노트를 저장한 뒤 편집 화면만 닫으며 사이드바와 앱 창을 유지합니다. 열린 노트가 없거나 다른 뷰·설정·대화상자에서는 노트를 닫지 않습니다. 저장 실패 시 초안을 그대로 열어 두고, 노트 닫기 버튼에도 같은 저장 흐름을 적용합니다. Vim `:q`의 기존 미저장 변경 거절 동작은 유지합니다. 단축키는 공통 설정에서 변경·해제할 수 있습니다.
+
+macOS 메뉴는 별도 `src-tauri/src/menu.rs`에서 구성해 기본 CloseWindow의 Cmd+W 예약을 제거했습니다. 따라서 키가 웹뷰의 기존 명령 라우터로 전달됩니다. File → Close Window와 빨간 닫기 버튼은 기존 창 닫기 절차를 사용하며, 앞서 구현한 창을 모두 닫은 뒤 프로세스 유지와 재열기도 유지합니다. Cmd+Q는 앱 종료입니다.
+
+검증: 전체 293개 테스트(core 63, CLI 4, frontend 226), `npm run check`, macOS debug `.app` 재빌드 통과. 새 회귀 테스트는 편집 필드의 Cmd+W 라우팅, 저장 완료 전 닫기 보류, 저장 실패 보존, 단축키 변경/해제와 대화상자 보호를 확인합니다. 별도 식별자의 실제 macOS 앱과 임시 vault에서 본문 교체 직후 Cmd+W를 입력하여 마지막 본문이 저장되고 노트 편집기만 사라지며 창 1개와 사이드바가 유지됨을 확인했습니다. 노트 없이 재입력해도 창 유지, 같은 노트 재열기 시 저장 내용 복원, File → Close Window의 창 닫기, 같은 PID로 재열기 및 Cmd+Q 종료도 확인했습니다. 한글은 Unicode 키 입력으로 확인했으며 실제 IME 조합 검증은 포함하지 않습니다. 자료는 `test-results/note-close-native.json`, `note-close-{tests,check,app-build}.log`에 있습니다. 테스트 앱은 정상 종료했습니다.
+
+사용 중이던 수정 전 앱은 기존 저장 후 창 닫기 절차를 거쳐 종료하고, 새 제품 빌드로 다시 열어 적용했습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 확장 관리를 설정으로 통합
+
+작업 사이드바의 확장 항목과 별도 작업 뷰를 제거하고, 설정 그룹에 확장을 추가했습니다. 기존 `extensions.open` 명령과 `<leader>se`는 현재 노트를 저장한 뒤 설정 → 확장을 직접 엽니다. 설정을 이미 열어 둔 경우에도 해당 그룹과 키보드 포커스를 함께 이동합니다. 작업 뷰와 편집기 인스턴스는 그대로 유지하고, 기존 설정 전환 애니메이션을 공유합니다. 로컬 플러그인·테마 설치와 제거는 확장에서, 설치된 테마 선택은 기존 테마 그룹에서 처리합니다.
+
+검증: `npm test` 293개(core 63, CLI 4, frontend 226), `npm run check`, macOS debug `.app` 빌드 통과. 임시 Extensions Settings QA vault와 실제 CLI를 사용하는 브라우저에서 설정 메뉴 진입, 실제 Space→s→e와 명령 팔레트로 직접 진입, 다른 설정 그룹에서의 직접 이동·포커스, Daily Trail/Terracotta 설치·제거, 설치된 명령의 단축키 설정 노출, 테마 선택 및 제거 후 목록 갱신, 설정 왕복 시 동일 편집기와 본문 유지, 화면 배치를 확인했습니다. 사용자 앱은 저장 보호를 거쳐 새 빌드로 다시 열었으며 네이티브 설정 → 확장 페이지의 설치 버튼 표시도 확인했습니다. 브라우저의 임시 vault 선택 기록을 복원하고 검증 공간을 종료했습니다. 자료는 `test-results/extensions-settings.png`, `extensions-settings-applied.json`, `extensions-settings-{tests,check,app-build}.log`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+설정으로 확장 화면을 옮긴 뒤 패키지 설치 버튼이 안내 박스에 붙던 간격을 보완했습니다. 안내 박스 위에 16px 여백을 추가했고, 임시 vault의 실제 화면에서 분리된 배치를 확인했습니다. TypeScript/Vite 및 macOS debug 앱 빌드, CSS 포맷 검사를 통과했습니다. 화면은 `test-results/extensions-spacing.png`에 있습니다.
+
+### 앱 내 확장 카탈로그
+
+설정 → 확장을 둘러보기 / 설치됨으로 구성하고 이름·설명·명령 검색, 전체/플러그인/테마 필터, 설치 상태와 처리 중 표시를 추가했습니다. 기본 카탈로그는 Daily Trail, 회의 노트, 독서 기록과 Terracotta, Mist, Inkstone 테마 6종입니다. 테마는 색상 견본을, 플러그인은 추가되는 명령을 표시합니다. 카탈로그는 앱에 포함되어 서버·계정 없이 동작하며 앱 업데이트로 갱신됩니다. 사용자 JSON 파일 설치도 유지하고, 파일 설치가 성공하면 설치됨 목록으로 이동합니다. 같은 ID의 사용자 확장은 덮어쓰지 않으며 제거 후 재설치할 수 있습니다.
+
+모든 설치·제거는 기존 코어 명령으로 처리하고 설치 정보는 현재 vault에만 저장합니다. 동시 클릭을 막고 실패 후 재시도를 허용하며, vault 변경 중 완료된 이전 설치가 새 화면을 갱신하지 않도록 컴포넌트 수명을 확인합니다. 공개 업로드, 온라인 저장소와 패키지 자동 업데이트는 이번 범위에 포함하지 않았습니다.
+
+검증: 전체 테스트 300개(core 64, CLI 4, frontend 232), `npm run check`, macOS debug 앱 빌드 통과. 새 테스트는 기본 패키지 전부의 코어 설치·명령 실행·제거·생성 노트 보존과 UI 중복 클릭, 실패/재시도, 같은 ID의 파일 확장 보존, 잘못된 JSON/과대 파일, vault 변경 중 늦은 완료를 확인합니다. 임시 vault의 실제 CLI 연결 브라우저에서 검색·필터, 카탈로그 및 사용자 파일 설치, Inkstone 선택, 900px 어두운 테마 배치, 단축키 저장, 팔레트로 양쪽 확장의 노트 생성, 제거 후 재설치 표시와 생성 노트 보존을 확인했습니다. Leader 실행 시도는 브라우저 자체 Vim 확장의 간섭이 있어 이번 검증의 성공 항목으로 계산하지 않았습니다. 사용자 macOS 앱은 저장 보호 후 새 빌드로 교체했고 카탈로그의 설치 버튼·검색·파일 설치 표시를 확인했습니다. 자료는 `test-results/extension-catalog-{verification,applied}.json`, `extension-catalog-{browse,dark-small}.png`, `extension-catalog-{tests,check,app-build}.log`에 있습니다. 브라우저 임시 선택 기록과 검증 공간은 정리했으며 GitHub 릴리스는 갱신하지 않았습니다.
+
+### 테마 설치 위치 분리
+
+테마 검색·카탈로그 설치·제거·JSON 파일 설치를 설정 → 테마로 옮겼습니다. 위쪽에서 사용할 테마를 선택하고 아래쪽에서 테마를 추가하며, 설치·제거하면 선택 목록이 바로 갱신됩니다. 설정 → 확장에는 플러그인만 표시합니다. 각 탭의 설치 개수·검색·빈 상태도 해당 종류만 기준으로 하며, 다른 종류의 파일을 고르면 올바른 탭을 안내하고 설치하지 않습니다. 공통 설치 컴포넌트와 기존 코어 경로를 그대로 사용합니다.
+
+검증: 전체 304개 테스트(core 64, CLI 4, frontend 236), `npm run check`, macOS debug 앱 빌드 통과. 추가 회귀 테스트는 플러그인/테마별 카탈로그·설치 목록·개수 분리와 파일 종류 검사 후 재시도를 확인합니다. 임시 Theme Catalog QA vault의 실제 UI에서 확장 탭의 플러그인만 표시, 테마 탭에서 Mist 설치·선택, Terracotta 파일 설치, 테마 제거 후 선택 목록 즉시 갱신, 플러그인 설치 목록 보존을 확인했습니다. 화면은 `test-results/theme-catalog.png`, 검증 로그는 `theme-catalog-{tests,check,app-build}.log`에 있습니다. 임시 브라우저 상태와 검증 공간은 정리했습니다.
+
+실행 중인 앱은 File → Close Window의 저장 보호를 거친 뒤 정상 종료하고 새 빌드로 다시 열었습니다. 적용 기록은 `test-results/theme-catalog-applied.json`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 설치된 확장 필터와 현재 지원 범위
+
+둘러보기/설치됨 탭을 ‘설치된 것만’ 스위치로 바꿨습니다. 카탈로그와 사용자 파일 패키지가 같은 목록에 나오고, 검색어를 유지한 채 설치 여부로 필터링합니다. 같은 ID는 실제 설치된 manifest의 이름·버전·내용으로 표시하며 덮어쓰지 않습니다. 설치 상태와 제거 버튼은 전체 목록에서도 제공하고, 설치·제거 직후 목록과 개수를 갱신합니다. 플러그인은 확장 그룹, 테마는 테마 그룹에서 각각 관리합니다.
+
+이 단계의 샘플은 템플릿 중심이며 코드 SDK가 없었습니다. 이후 구현한 범위와 남은 제약은 아래 코드 플러그인 SDK v1 항목 및 `PLUGIN_SDK.md`를 기준으로 합니다. 카탈로그 개선 자체와 코드 확장은 별개의 작업입니다.
+
+검증: `npm test` 306개(core 64, CLI 4, frontend 238), `npm run check`, macOS debug 앱 빌드 통과. 임시 Theme Catalog QA vault의 실제 CLI 연결 브라우저에서 클릭/Space 토글, 검색어 유지, 카탈로그·파일 설치, 제거 직후 필터 목록·개수 갱신, 테마/플러그인 분리와 900px 화면 배치를 확인했습니다. 동일 ID의 사용자 manifest 보존과 실제 설치 버전 표시는 회귀 테스트로 확인했습니다. 브라우저 선택 기록과 검증 공간을 정리했습니다. 자료는 `test-results/installed-filter-{all,only,small}.png`, `installed-filter-verification.json`, `installed-filter-{tests,check,app-build}.log`에 있습니다.
+
+실행 중인 macOS 앱은 저장 보호를 거쳐 정상 종료한 후 새 빌드로 다시 열었습니다. 적용 기록은 `test-results/installed-filter-applied.json`에 있습니다.
+
+
+### 코드 플러그인 SDK v1
+
+앱 코드와 분리된 JavaScript/TypeScript 패키지를 실행합니다. Rust core의 QuickJS 컨텍스트에서 권한 검사 후 공통 명령을 호출하므로 노트·독립 DB·revision 저장 계약을 재사용합니다. 실행마다 JS 메모리·스택·시간·호출 수·출력 크기를 제한하며, 오류가 난 확장은 UI 세션을 중지합니다. 설치만으로 실행하지 않고 정확한 패키지 해시와 vault 경로에 대한 기기별 승인을 받습니다. 승인은 vault 밖에 보관하고 백업에 포함하지 않습니다. 플러그인 데이터는 revision 조건으로 저장하고 백업에 포함하며, 제거해도 생성 노트/레코드와 설정은 유지합니다.
+
+공통 레이아웃·카드·입력·버튼으로 사용자 뷰를 만들고, 노트/DB API·변경 이벤트·플러그인 설정·전용 저장소·선택 영역 편집을 사용할 수 있습니다. 코드 명령도 기존 팔레트, Leader/일반 단축키에 연결하며 headless 명령은 CLI에서 실행합니다. 캘린더, 독립 DB 칸반, 편집 도구를 별도 소스와 설치 파일로 제공하고 카탈로그에 추가했습니다. `packages/plugin-sdk`의 타입과 `npm run plugin:pack`으로 외부 패키지를 작성합니다. 뷰 입력 직후 버튼 클릭이 누락되던 비동기 blur 처리와 작은 화면에서 긴 버튼 제목이 넘치던 스타일도 수정했습니다.
+
+검증: 전체 **326개 테스트(core 75, CLI 4, frontend 247)** 및 `npm run check` 통과. 권한 거절·패키지 변경 시 승인 무효화·revision 충돌·기존 데이터 보존·무한 루프/메모리 제한·렌더 중 쓰기 거절·손상된 확장 데이터 격리·백업에서 신뢰 제외·편집기의 오래된 결과 거절/undo를 검사했습니다. 실제 CLI에 연결한 임시 vault의 Chromium에서 세 패키지 설치/승인, 캘린더 월 이동, 칸반 DB/행 생성·상태 변경·본문 노트 생성, 편집 변환과 실행 취소, 외부 파일 플러그인의 이벤트 수신·설정 저장·오류 격리, CLI 데이터 변경의 뷰 반영을 확인했습니다. 일반 단축키는 실제 키 입력, Leader는 브라우저 키 가로채기를 피한 DOM 키 이벤트로 라우팅만 확인했습니다. 900px 화면도 확인했습니다.
+
+이 버전은 Obsidian 플러그인 호환 계층이 아닙니다. 임의 DOM/HTML/CSS, CodeMirror extension, 새로운 DB 속성 타입, 네트워크·외부 파일 접근은 아직 제공하지 않습니다. 이벤트/렌더/lifecycle에서는 데이터를 읽고 세션 상태만 갱신하며, 저장과 화면 이동은 명령/뷰 액션에서 수행합니다. 각 core 저장은 원자적이지만 여러 SDK 호출 전체의 rollback은 지원하지 않습니다. 인터프리터 제한은 OS 프로세스 sandbox나 독립 보안 감사의 대체물이 아닙니다. 대형 vault·native IME·다른 플랫폼의 신규 SDK 동작은 이번에 검증하지 않았습니다. 자료는 `test-results/code-plugin-*`에 있습니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+macOS debug `.app` 재빌드와 저장 보호를 거친 재시작을 완료했습니다. 프로세스가 새 빌드로 바뀌고 창이 다시 열린 것을 확인했으며, 신규 SDK 전체의 native WebKit UI 검증으로 계산하지 않습니다. 임시 vault의 확장 실행 승인을 해제하고 브라우저 선택 기록을 복원한 뒤 검증 공간을 종료했습니다. 적용 기록은 `test-results/code-plugin-applied.json`에 있습니다.
+
+
+### 태그 칩과 실제 AnkiConnect 플러그인
+
+`#anki`, `#개발/rust`처럼 한글·계층 태그를 읽기와 Live Preview에서 칩으로 표시합니다. Live Preview에서는 태그 안에 커서가 있을 때 원문 표시를 유지하고, 문서/선택을 교체하지 않는 mark를 사용합니다. 읽기에서는 클릭, Live Preview에서는 Cmd/Ctrl+클릭으로 같은 태그를 정확히 검색합니다. 코드·주석·기존 링크·URL·이스케이프는 제외하며 Rust/TypeScript가 공유 fixture로 같은 규칙을 검증합니다. 코어 `tags.list`, `tags.blocks`, `search`의 `tag:` 쿼리도 CLI와 SDK에 제공합니다.
+
+Anki 연결은 별도 TS 코드 패키지로 카탈로그/파일 설치, 팔레트, Leader/일반 단축키, CLI를 사용합니다. AnkiConnect 127.0.0.1:8765로만 통신하는 제한된 host API와 별도 권한을 추가했습니다. 임의 URL·프록시·리디렉션·미디어 다운로드·삭제·프로필 전환은 노출하지 않습니다. 자동 명령은 manifest 선언과 automation 권한을 필요로 하며 앱이 실행 중일 때 변경 후/주기적으로 처리합니다. 데이터 전송은 작은 묶음으로 직렬 처리합니다.
+
+사용자가 선택한 DB의 앞면·뒷면 컬럼, 지정한 태그의 첫 줄·하위 bullet/문단으로 기본 카드를 생성합니다. UUID 기반 원본 태그와 내용 해시를 추적해 중복을 막고, 블록은 revision 조건을 지켜 식별 주석을 추가합니다. 다시 동기화하거나 블록을 이동·수정해도 같은 카드 ID를 갱신합니다. Anki에서도 변경했으면 멈추고 양쪽 내용을 비교한 뒤 명시적 덮어쓰기를 지원합니다. 원본 삭제/태그 제거로 Anki 카드나 학습 기록을 삭제하지 않습니다. 기존 카드의 덱도 임의로 옮기지 않습니다. 기본 앞면/뒷면의 Foltra → Anki 단방향이며 Cloze·미디어·학습 상태 가져오기는 미구현입니다.
+
+검증: 전체 **343개(core 80, CLI 4, frontend 259)**, `npm run check` 통과. 소스 변경, 같은 앞면의 서로 다른 원본, 중복 방지, 생성 응답 유실 후 복구, Anki 수정 충돌·검토 후 덮어쓰기·선택한 충돌 우선 처리, 프로필 변경·삭제된 카드 재생성 거절, 네트워크 권한/리디렉션/HTML 제한, 여러 묶음 처리와 백그라운드 갱신 중 입력 초안 보존을 검사했습니다.
+
+실행 중인 실제 AnkiConnect에 고유 이름의 테스트 덱을 만들어 UI로 DB 카드 1개와 태그 블록 2개를 생성했습니다. CLI 재동기화/원본 수정/블록 순서 변경 후 ID 유지, Anki의 직접 수정 충돌과 UI 명시적 해결, 추가 DB 행 7개의 자동 분할 처리, 편집기에서 입력·저장한 새 태그 블록의 자동 생성을 확인했습니다. 실제 QA 카드 총 12개를 확인했고 개인 기존 카드는 대상으로 삼지 않았습니다. Chromium에서는 태그 칩·클릭 검색·원문 유지·긴 플러그인 화면의 실제 휠 스크롤을 확인했습니다. SDK의 긴 화면 스크롤 누락과 자동 갱신 시 입력 초안을 잃을 수 있던 부분도 고쳤습니다. 자료는 `test-results/anki-*`, 사용법/제약은 `docs/ANKI.md`에 있습니다.
+
+이번 검증은 실제 AnkiConnect와 Chromium + native core 조합입니다. Native WebKit의 전체 IME, 대형 vault/장시간 실행, 독립 보안 감사는 완료했다고 주장하지 않습니다. HTTP 대기 중에는 기존 core 잠금을 유지하며 요청 제한 1.2초와 invocation wall time 8초가 적용됩니다. AnkiConnect는 조건부 쓰기 API가 없어 외부 동시 편집의 검사/쓰기 전체를 원자적으로 만들지 못합니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+macOS debug `.app` 빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. 임시 vault의 확장을 비활성화하고 브라우저 선택 기록을 복원한 뒤 검증 공간을 종료했습니다. QA 카드 12개의 ID와 원본 vault 태그를 확인한 후 전용 테스트 덱만 삭제했습니다. 새로 만든 빈 `Foltra` 노트 유형은 유지했습니다(AnkiConnect의 빈 유형 정리는 다른 유형까지 대상으로 삼으므로 실행하지 않음). 적용·정리 기록은 `test-results/anki-applied.json`, `anki-cleanup.json`에 있습니다.
+
+### 확장별 설정 화면
+
+설정 항목을 제공하는 설치된 확장에 `설정` 버튼을 표시합니다. 확장 목록 안에서 전용 설정 페이지로 이동하며, 목록으로 돌아오면 검색과 설치 필터를 유지합니다. 기존 `runtime.settings`의 텍스트·숫자·체크박스·선택 항목은 별도 폼에서 수정하고 revision 조건으로 저장합니다. 이 폼은 확장을 실행하지 않으므로 비활성 상태에서도 사용할 수 있습니다. 저장 충돌에서는 초안을 유지하고 자동 재시도하지 않습니다.
+
+동적 설정은 새 `runtime.settingsView`로 선언합니다. 반드시 `ui` 권한이 있는 기존 뷰 ID를 참조해야 하며, 활성화한 확장의 공통 세션·직렬 실행 큐·권한 검사를 재사용합니다. 설정이 가려지거나 확장을 비활성화하면 설정 뷰 렌더링을 멈춥니다. Anki 1.0.1은 확장 화면 안에서 덱, DB/컬럼, 태그, 자동 동기화를 설정하고 동기화 뷰와 같은 저장값을 사용합니다. 기존 설치 패키지는 자동 교체하지 않습니다. Anki 1.0.0은 기존 sync 뷰의 설정을 연결해 재설치 없이 설정 버튼으로 접근합니다. 기존 플러그인 데이터는 유지됩니다.
+
+검증: 전체 **351개(core 81, CLI 4, frontend 266)** 및 `npm run check` 통과. 선언된 설정 뷰/권한 검증, 활성화 직후 같은 세션으로 첫 화면 렌더링, 설정 값 저장·재열기·충돌 시 초안 보존, 확장 목록의 검색/필터 유지, Anki 두 화면의 공통 설정을 검사했습니다. 실제 임시 vault + CLI 연결 Chromium에서 캘린더 설정과 Anki DB/컬럼/덱/태그 저장 및 재열기를 확인하고 별도 CLI 프로세스로 저장값을 검증했습니다. 이 확인에서는 자동 동기화를 끄고 Anki 카드를 보내지 않았습니다. 입력 직후 선택 컨트롤의 첫 클릭이 사라지던 문제를 수정하고 실제 입력과 회귀 테스트로 확인했습니다. 900px 화면의 스크롤·가로 넘침과 저장 버튼 접근을 확인했습니다. 검증 확장을 비활성화하고 브라우저 선택 기록을 복원한 뒤 검증 공간을 종료했습니다. 자료는 `test-results/extension-settings-*`에 있습니다. 신규 설정 화면 전체의 native WebKit/IME 동작은 별도로 검증하지 않았습니다.
+
+macOS debug `.app` 재빌드 후 저장 보호를 거쳐 실행 중인 앱을 정상 종료하고 새 빌드로 다시 열었습니다. 프로세스 교체와 창 재생성을 확인했습니다. 적용 기록은 `test-results/extension-settings-applied.json`에 있습니다. GitHub 릴리스는 변경하지 않았습니다.
+
+### 기존 Anki 설치에서 설정 버튼 누락 수정
+
+설정 화면 선언을 추가한 새 패키지만 검증해 기존 Anki 1.0.0의 설정 버튼이 숨겨지는 경우를 놓쳤습니다. UI와 실행 라우터가 같은 설정 뷰 선택 함수를 사용하며, Anki 1.0.0의 기존 선언된 sync 뷰에만 호환 연결을 제공합니다. 설치된 코드·승인·데이터를 바꾸지 않으며, 다른 확장의 임의 뷰를 설정으로 추측하지 않습니다.
+
+검증: 전체 **353개(core 81, CLI 4, frontend 268)**, `npm run check`, macOS debug `.app` 빌드 통과. 구버전 manifest의 버튼 표시, 같은 세션의 설정 액션 실행을 회귀 테스트에 추가했습니다. 별도 임시 vault에 실제 1.0.0 패키지를 설치하여 Chromium에서 카드 하단 설정 버튼, 활성화, 덱 이름 저장·재열기와 별도 CLI의 저장값을 확인했습니다. 패키지 파일 해시가 그대로임을 확인했고 자동 동기화는 끈 상태로 검증했습니다. 검증 승인을 해제하고 브라우저 선택 기록을 복원한 뒤 검증 공간을 종료했습니다. 자료는 `test-results/legacy-settings-*`에 있습니다.
+
+저장 보호를 거쳐 실행 중인 macOS 앱을 새 빌드로 다시 열었습니다. 프로세스와 창 재생성 기록은 `test-results/legacy-settings-applied.json`에 있습니다.
+
+### 편집기의 Tab 들여쓰기와 Shift+Tab 내어쓰기
+
+공통 Markdown 키맵에 Tab/Shift+Tab을 연결했습니다. 현재 줄이나 선택한 여러 줄을 두 칸씩 들여쓰고 내어쓰며 커서·선택·편집기 포커스와 실행 취소를 유지합니다. 원문·Live Preview와 Vim Insert에서 동작하고, Vim Normal과 진행 중인 IME 조합은 가로채지 않습니다. 링크 자동완성이 열려 있으면 Tab 선택을 우선하며, 자동완성의 짧은 선택 대기 시간에도 의도치 않은 들여쓰기가 발생하지 않도록 했습니다.
+
+검증: 전체 **362개(core 81, CLI 4, frontend 277)**, `npm run check`, macOS debug `.app` 빌드 통과. 새 회귀 테스트 9개로 모드별 실제 키 이벤트, 여러 줄 선택, 빈 불릿·체크박스, 실행 취소, 한글 입력 뒤 내어쓰기, 조합 보호와 자동완성 우선순위를 확인했습니다. 임시 vault의 CLI 연결 Chromium에서 Tab/Shift+Tab 입력으로 원문·Live Preview·Vim Insert의 계층 변경, 커서·포커스 유지와 저장된 본문을 확인했습니다. Chromium의 IME 프로토콜로 조합 중 글자 표시와 확정 직후 들여쓰기도 확인했으며, 실제 macOS 입력기의 전체 동작 검증을 의미하지는 않습니다. 브라우저의 임시 선택·커서 기록을 정리하고 검증 공간을 종료했습니다. 자료는 `test-results/bullet-tab-{verification,browser-cleanup}.json`, `bullet-tab-indented.png`, `bullet-tab-{tests,check,app-build}.log`에 있습니다.
+
+실행 중인 macOS 앱은 저장 보호를 거쳐 정상 종료하고 새 빌드로 다시 열었습니다. 프로세스와 창 재생성 기록은 `test-results/bullet-tab-applied.json`에 있습니다.
+
+### 반복 Tab 입력 시 불릿이 원문으로 돌아오는 문제
+
+위 초기 구현은 목록에서도 공백만 두 칸씩 추가해 반복 입력 시 Markdown의 ListItem 판정을 잃었습니다. 한 번의 들여쓰기만 확인했던 검증을 보완하고, 목록의 Tab/Shift+Tab을 실제 부모 단계 이동으로 바꿨습니다. Tab은 앞 항목 아래로 이동하며 들어갈 부모가 없으면 현재 단계를 유지합니다. Shift+Tab은 부모와 같은 단계로 돌아오고 최상위에서는 멈춥니다. 부모 항목의 하위 목록·명시적인 이어지는 문단·인용문·코드 블록을 함께 옮기며, 선택한 연속 항목은 같은 단계에 유지합니다. 번호 목록은 부모 번호의 폭을 반영하고, 일반 문단과 코드 내부에서는 기존 공백 들여쓰기를 유지합니다.
+
+검증: 추가 회귀 테스트 14개를 포함한 전체 **376개(core 81, CLI 4, frontend 291)** 및 `npm run check` 통과. 수정 전 반복 입력·하위 항목 보존 등의 실패를 재현했습니다. 별도 임시 vault의 실제 Chromium 키 입력으로 Tab 8회와 Shift+Tab 반복, 최대 4단계 이동, 원문·Live Preview·Vim Insert의 불릿과 포커스 유지, 읽기 모드의 같은 계층을 확인했습니다. 별도 CLI에서 최종 저장 본문도 확인했습니다. 브라우저 임시 선택·커서 기록을 복원하고 검증 공간을 종료했습니다. 이번 검증은 Chromium + native core이며 native WebKit의 편집 동작과 macOS IME 전체 검증은 포함하지 않습니다. 자료는 `test-results/bullet-repeat-{before,tests,check}.log`, `bullet-repeat-{browser,persisted,browser-cleanup}.json`, `bullet-repeat-{live,reading}.png`에 있습니다.
+
+macOS debug `.app` 재빌드 후 저장 보호를 거쳐 실행 중인 앱을 정상 종료하고 새 빌드로 다시 열었습니다. 빌드와 프로세스·창 재생성 기록은 `test-results/bullet-repeat-app-build.log`, `bullet-repeat-applied.json`에 있습니다.
+
+### 태그 칩 디자인 정리
+
+태그 칩의 배경 농도를 낮추고 가는 윤곽선과 부드러운 모서리, 테마에 맞춘 글자색을 적용했습니다. 호버·키보드 포커스에서는 배경과 윤곽선을 강조합니다. 글꼴·가로 폭·패딩을 유지하며, 읽기 모드의 버튼에 문단 행간이 포함되어 칩이 더 높게 보이던 차이를 줄였습니다. 여러 줄에 걸친 태그에도 배경과 윤곽선을 이어 적용합니다. 변경은 공통 타이포그래피 CSS에 한정됩니다.
+
+검증: TypeScript/Vite 및 macOS debug `.app` 빌드, Prettier, `git diff --check` 통과. 임시 vault의 Chromium에서 Live Preview·읽기 모드, Paper·Inkstone 테마, 호버, 키보드 포커스 표시와 태그 클릭 검색을 확인했습니다. 편집 전환 시 인접 글자의 세로 위치·행 높이는 동일했고 가로 위치 차이는 0.008px 미만의 소수점 반올림 수준이었습니다. 태그의 가로 폭은 기존과 동일하며 두 모드의 표시 높이는 19px입니다. 별도 기능 테스트를 추가하지 않았습니다. 자료는 `test-results/tag-style-{before,live,reading,dark}.png`, `tag-style-verification.json`, `tag-style-app-build.log`에 있습니다. 브라우저의 임시 선택·커서 기록을 복원하고 검증 공간을 종료했습니다. native WebKit 화면의 별도 시각 검증은 포함하지 않습니다.
+
+실행 중인 macOS 앱은 저장 보호를 거쳐 새 빌드로 재시작했습니다. 적용 기록은 `test-results/tag-style-applied.json`에 있습니다.
+
+### 태그 칩을 가로로 긴 알약 형태로 조정
+
+사용자 피드백에 따라 글자를 본문의 86%(기본 약 12px)로 줄이고 좌우 8px 여백과 완전히 둥근 모서리를 적용했습니다. 읽기·Live Preview의 칩 크기를 통일하고 목록의 내어쓰기가 칩 안쪽 글자에 상속되지 않도록 했습니다. 태그를 편집할 때도 동일한 표시 크기와 원래 텍스트 노드를 유지하며, 배경·테두리만 강조합니다. 원문 모드의 Markdown은 그대로입니다.
+
+검증: 전체 **376개(core 81, CLI 4, frontend 291)**, `npm run check`, macOS debug `.app` 빌드, Prettier 및 `git diff --check` 통과. 임시 vault의 Chromium에서 두 모드의 동일한 칩 크기, 커서 진입 전후의 인접 글자 위치·행 높이 유지, Paper·Night 화면, 키보드 포커스와 Enter로 태그 검색을 확인했습니다. Chromium 조합 입력 프로토콜로 한글 조합 표시·확정 후 태그 중간 글자 수정과 저장을 확인하고 별도 CLI에서 본문을 대조했습니다. 실제 macOS 입력기와 native WebKit의 전체 편집 동작 검증은 포함하지 않습니다. 브라우저 임시 기록과 검증 공간을 정리했습니다. 자료는 `test-results/tag-pill-{live,reading,dark}.png`, `tag-pill-{verification,persisted,browser-cleanup}.json`, `tag-pill-{tests,check,app-build}.log`에 있습니다.
+
+실행 중인 macOS 앱을 저장 보호 후 정상 종료하고 새 빌드로 다시 열었습니다. 적용 기록은 `test-results/tag-pill-applied.json`에 있습니다.
+
+### Vim Normal의 Tab 들여쓰기와 Anki 출처 표시 제거
+
+Vim Normal에서도 Tab/Shift+Tab으로 목록 단계를 이동하며 Normal 모드와 커서·포커스를 유지합니다. 반복 입력은 기존 목록의 부모 단계 규칙을 따릅니다. `Ctrl+i`의 앞으로 이동은 별도로 유지합니다. Vim에서 Escape 직후 CodeMirror가 Tab을 포커스 이동으로 넘기던 충돌도 해소했습니다. Vim을 끈 경우에는 기존 Escape → Tab 포커스 이동을 유지합니다.
+
+Anki 1.0.2의 기본 카드 뒷면에서 `Foltra · 노트 제목` 출처 표시를 제거했습니다. Source 필드와 동기화 추적 데이터는 유지합니다. 호스트는 설치된 1.0.0/1.0.1 패키지가 보내는 정확한 구형 기본 템플릿의 생성 요청도 새 형식으로 변환하며, 설치 코드·승인·데이터를 교체하지 않습니다. 사용자 정의 템플릿에는 이 변환을 적용하지 않습니다.
+
+검증: 전체 **382개(core 82, CLI 4, frontend 296)**, `npm run check`, macOS debug `.app` 빌드 및 `git diff --check` 통과. Escape 직후 Normal의 Tab/Shift+Tab, Ctrl+i 구분, Vim을 끈 상태의 포커스 이동, 신규·기존 패키지의 모델 생성 계약을 회귀 테스트로 확인했습니다. 임시 vault의 Chromium에서 Normal 상태의 Tab 8회·Shift+Tab 8회, 최대 4단계의 불릿 유지, 원문 모드 들여쓰기와 저장 본문을 확인했습니다. 브라우저는 실제 Escape와 Ctrl+[를 페이지 keydown 전에 가로채므로 이 전환은 편집기의 DOM 이벤트 회귀 테스트로 검증했습니다. native WebKit의 전체 키 입력·macOS IME 검증은 포함하지 않습니다. 검증 vault의 브라우저 선택·커서 기록을 복원하고 검증 공간을 종료했습니다.
+
+사용자가 보고한 실제 Anki의 Foltra 템플릿이 수정되지 않은 구형 기본값임을 확인하고 백업 후 뒷면 템플릿만 변경했습니다. 카드 1개의 ID·필드·학습 일정과 모델 CSS가 유지되며 AnkiConnect가 렌더링한 답에서 출처 문구가 사라졌음을 확인했습니다. 검증 기록은 `test-results/normal-tab-anki-{browser,persisted,template-backup,template-applied,browser-cleanup}.json`과 `normal-tab-anki-{tests,check,app-build}.log`에 있습니다.
+
+실행 중인 macOS 앱을 저장 보호 후 정상 종료하고 새 빌드로 다시 열었습니다. 적용 기록은 `test-results/normal-tab-anki-applied.json`에 있습니다. GitHub 릴리스는 변경하지 않았습니다.
+
+### 클립보드 이미지 붙여넣기와 vault 첨부파일
+
+편집기의 Cmd/Ctrl+V로 클립보드 이미지 파일을 붙여넣을 수 있습니다. PNG/JPEG/GIF/WebP를 원본 바이트 그대로 `vault/attachments/<sha256>.<확장자>`에 저장하고 노트에는 `![이미지](../attachments/…)` 상대 링크를 삽입합니다. 같은 이미지는 파일을 재사용합니다. 원문·Live Preview·Vim Normal/Insert에서 붙여넣으며, 읽기와 Live Preview에서 이미지를 표시합니다. Vim의 텍스트 붙여넣기 리스너가 이미지 붙여넣기 전에 커서·모드를 바꾸지 않도록 편집기 내부의 이미지 이벤트만 먼저 처리합니다.
+
+이미지를 저장한 다음 링크를 삽입하므로 실패할 때 선택한 텍스트를 잃지 않습니다. 대기 중 편집에 맞춰 삽입 위치를 이동하고 노트 전환·대상 교체·실행 취소 시 늦은 삽입을 취소합니다. 연속 붙여넣기는 입력 순서를 유지하며, 저장 중 시작한 한글 조합은 완료를 기다립니다. 링크 삽입은 한 번에 실행 취소됩니다. 파일은 다른 노트나 편집 이력에서 참조할 수 있어 링크 삭제·실행 취소 시 자동 삭제하지 않습니다.
+
+실제 파일 형식·10 MiB 크기·픽셀 수·경로·해시를 검증합니다. 원격 이미지·SVG·임의 로컬 경로는 자동 로드하지 않고 파일 쓰기는 기존 vault 잠금과 원자적 저장을 사용합니다. 바이너리 복구 journal v2, 이미지 포함 snapshot v2를 추가했으며 기존 v1 복구·백업 가져오기를 유지합니다. 이미지 포함 복원은 모든 항목을 검증한 뒤 같은 journal로 저장합니다. 큰 snapshot의 기존 CLI 입력 제한과 첨부파일 정리 UI 미구현은 `ARCHITECTURE.md`에 기록했습니다.
+
+검증: 전체 **402개(core 89, CLI 4, frontend 309)**, `npm run check`, macOS debug `.app` 빌드 통과. 파일 바이트 보존·중복·변조 충돌·symlink/경로 탈출·지원 형식·백업 왕복·중단된 바이너리 저장 복구를 검사했습니다. 프런트엔드는 Vim Normal·실행 취소·비동기 순서와 커서·노트 전환·실패·조합 대기·이미지 로드 실패 표시·외부 URL 차단을 검사했습니다.
+
+실제 macOS PNG 클립보드로 Chromium의 Cmd+V → 파일 생성 → Live Preview/읽기 표시 → 재붙여넣기와 실행 취소를 확인하고 CLI에서 원본 바이트·저장된 본문을 대조했습니다. 별도의 비영구 WKWebView 검증 앱에서도 실제 Cmd+V, Vim Normal 유지와 두 모드의 이미지 표시를 확인했습니다. 이 검증 앱은 개발 CLI bridge를 사용하며 Tauri IPC 전체나 모든 macOS 입력기 조합을 검증한 것은 아닙니다. 원래 클립보드를 복원하고 Chromium의 임시 vault 선택·커서 기록과 검증 공간을 정리했습니다. 자료는 `test-results/image-paste-{browser,webkit,browser-cleanup}.json`, `image-paste-{live,reading,webkit}.png`, `image-paste-{tests,check,app-build}.log`에 있습니다.
+
+실행 중인 macOS 앱은 저장 보호를 거쳐 새 빌드로 다시 열었습니다. 적용 기록은 `test-results/image-paste-applied.json`에 있습니다. GitHub 릴리스는 변경하지 않았습니다.
+
+
+### Anki 카드의 vault 이미지 전송
+
+Anki 패키지 1.1.0은 DB 앞면·뒷면과 태그 블록의 관리 이미지 Markdown을 파싱해 Anki 미디어로 전송한 뒤 `<img>`로 연결합니다. 코드 예시·외부 URL·임의 경로·원시 HTML은 이미지로 실행하지 않습니다. 같은 카드의 중복 참조는 한 번만 전송하고 파일명은 콘텐츠 해시로 재사용합니다. 기존 패키지가 텍스트로 전송한 이미지는 원본 revision이 같아도 다음 동기화에서 갱신하며, Anki에서 수정된 내용은 기존 충돌 검사를 유지합니다. 이미지 저장 실패 시 카드 필드는 변경하지 않습니다.
+
+호스트의 `storeVaultImage`는 `notes.read`와 `anki.connect` 권한을 모두 요구하며 command/action에서만 실행됩니다. 기존 첨부파일 검증을 재사용하고 활성 Anki 프로필을 확인한 뒤 원본 바이트를 전송합니다. 기존 미디어를 삭제하지 않고 이름 충돌 시 중단합니다. 임의 파일·URL·원시 미디어 API·삭제 API는 플러그인에 노출하지 않습니다. 이미지 데이터는 JS 힙을 거치지 않으며 카드당 20개, 파일당 10 MiB, 기존 전체 실행/요청 시간 제한을 적용합니다. 여러 파일 중 일부만 전송된 뒤 실패하면 사용되지 않는 미디어가 남을 수 있으며 자동 삭제하지 않습니다.
+
+검증: 전체 **410개(core 92, CLI 4, frontend 314)** 통과. 이미지 변환/이스케이프, 중복 참조, 기존 카드 마이그레이션, Anki 편집 충돌, 이미지 실패 후 재시도, 권한·경로·프로필·미디어 충돌 보호를 검사했습니다. 실제 AnkiConnect와 임시 vault에서 1.0.1 패키지로 DB/태그 카드 2개를 만든 뒤 1.1.0으로 갱신해 검증했습니다. 300 KiB 이상의 실제 PNG 바이트 일치, 앞면/뒷면 이미지 태그와 Anki가 렌더링한 답, 카드 ID·학습 일정 보존, 중복 카드/미디어 방지, 누락 이미지에서 이전 카드 보존을 확인했습니다. QA 카드·덱·고유 이미지와 임시 플러그인 승인을 정리했습니다. 자료는 `test-results/anki-media-{live,cleanup}.json` 및 `anki-media-tests.log`에 있습니다. AnkiWeb/다른 기기로의 미디어 동기화는 검증하지 않았습니다.
+
+`npm run check`와 macOS debug `.app` 빌드도 통과했습니다. 저장 보호를 거쳐 실행 중인 앱을 정상 재시작하고, 사용 중인 sample vault의 Anki 1.0.1을 동일 권한의 1.1.0으로 갱신했습니다. 기존 패키지와 데이터를 백업하고 설정·동기화 기록·노트·DB·첨부파일의 바이트 보존 및 활성화 상태를 확인했습니다. 사용자 카드 동기화는 실행하지 않았으며 기존 자동 동기화 꺼짐 설정을 유지합니다. 기존 이미지 카드는 다음 수동 동기화에서 갱신됩니다. 적용 기록은 `test-results/anki-media-applied.json`, 검사·빌드 로그는 `anki-media-{check,app-build}.log`입니다. GitHub 릴리스는 변경하지 않았습니다.
+
+
+### 태그 자동완성
+
+노트 본문에서 `#`를 입력하면 현재 vault의 기존 태그 목록을 띄우고, 이어 쓰는 글자로 즉시 검색합니다. 대소문자·한글 자모/조합 중인 음절·`#개발/rust` 형태의 하위 태그를 지원합니다. 방향키로 선택하고 Enter/Tab으로 확정하며 Escape로 닫습니다. 아직 저장되지 않은 현재 노트의 다른 태그도 포함합니다. 태그 중간에서 선택해도 기존 이름 전체를 교체하고 뒤 문장과 문장부호는 유지합니다. 목록에 없는 새 태그는 그대로 입력할 수 있습니다.
+
+링크와 태그는 `noteCompletion.ts`의 한 자동완성 팝업/키 처리/조합 추적을 공유하며, 문법별 후보 처리는 `wikiCompletion.ts`와 `tagCompletion.ts`에 분리했습니다. 기존 `tags.list` 명령을 팝업 시작 시 조회하고 열린 동안 검색에는 추가 vault 조회가 없습니다. 코드·주석·URL·Markdown 링크·위키 링크 내부는 제외하고, `# ` 헤딩 문법으로 넘어가면 닫힙니다. Vim에서는 Insert 모드에서 작동하며 Normal 모드 명령과 Tab 목록 들여쓰기를 유지합니다.
+
+검증: 전체 **423개(core 92, CLI 4, frontend 327)** 및 `npm run check` 통과. 입력 문맥 제외, 한글 조합/marked selection, 후보 필터링, 중간 이름 교체, 미저장 태그, Enter/Tab과 Vim, API 실패에서 초안 보존, 기존 위키 자동완성과 목록 들여쓰기를 검사했습니다. 임시 vault와 실제 CLI에 연결한 Chromium에서 `#` 목록, `#an` 검색, CDP 조합 입력에 따른 한글 필터링, 방향키/Enter 확정, 하위 태그 Tab 선택, `[[` 자동완성을 확인하고 저장된 Markdown과 대조했습니다. 목록의 실제 화면은 `test-results/tag-completion-live.png`, 결과는 `tag-completion-browser.json`, 검사 로그는 `tag-completion-{tests,check}.log`에 있습니다. CDP 조합 입력은 실제 macOS 한글 입력기 전체의 검증을 의미하지 않습니다.
+
+원문 모드의 Vim Insert에서도 후보 선택 후 `#anki`가 저장됨을 별도 CLI 읽기로 확인했습니다. macOS debug `.app` 빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. 브라우저의 기존 vault 선택과 최근 목록을 복원하고 검증 공간을 종료했습니다. 적용·저장 확인은 `test-results/tag-completion-{applied,persisted,browser-cleanup}.json`, 빌드 로그는 `tag-completion-app-build.log`에 있습니다. GitHub 릴리스는 변경하지 않았습니다.
+
+
+### 기본 확장 정리
+
+기본 플러그인 카탈로그에서 Daily Trail·Meeting Notes·Reading Notes·캘린더·칸반·편집 도구를 제외하고 Anki만 제공합니다. 테마 카탈로그와 파일을 통한 사용자 확장 설치는 계속 지원합니다. 사용 중인 sample vault에는 Anki만, Personal vault에는 확장이 없어 기존 설치 패키지나 데이터는 변경하지 않았습니다.
+
+배포 예제 및 production 패키지 빌드에서 샘플 플러그인을 제거했습니다. SDK 동작을 검증하던 캘린더·칸반·편집 도구·기존 선언형 템플릿은 `tests/fixtures/plugins/`로 옮겨 테스트에서만 사용하고, 필요 없는 회의/독서 템플릿은 삭제했습니다. SDK·설정·명령·테마 기능은 유지하며 관련 설치/작성 문서를 Anki 중심으로 갱신했습니다.
+
+검증: 전체 **424개(core 92, CLI 4, frontend 328)**, `npm run check` 통과. Anki만 기본 확장으로 제공되는지, 테마·로컬 파일 설치·검색/설정/제거가 유지되는지 검사했습니다. 실제 임시 vault의 Chromium 설정 화면에서 확장 1종(Anki)과 테마 3종을 확인했으며 production JS에서 제거한 6개 패키지가 포함되지 않는 것도 확인했습니다. 검증용 패키지의 뷰·설정·DB/편집기 효과·CLI와 생성 데이터 보존 테스트도 계속 통과합니다. 브라우저 선택 기록을 복원하고 검증 공간을 종료했습니다. 자료는 `test-results/extension-prune-{browser,browser-cleanup}.json`, `extension-prune-catalog.png`, `extension-prune-{tests,check}.log`에 있습니다.
+
+### 기본 테마 정리, 설치형 팔레트와 테마 삭제
+
+기본 제공은 Paper & Pine·Midnight 두 가지로 유지하고 Terracotta·Mist·Inkstone을 배포 목록/예제에서 제거했습니다. 설정 → 테마에서 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula를 선택 설치할 수 있으며, 사용자 JSON 파일 설치도 유지합니다. 테마 선택 카드 옆에 삭제 버튼을 두고, 현재 테마를 삭제하면 manifest 삭제와 Paper 복귀를 코어의 한 트랜잭션으로 저장합니다. 실패하면 기존 선택을 유지하며, 같은 ID의 사용자 manifest를 덮어쓰지 않습니다.
+
+어두운 사용자 테마에도 밝은 선택 배경과 light color-scheme이 남던 문제를 수정했습니다. 배경 밝기에 맞는 기본값을 적용하고 본문·보조 글자·사이드바·선택·상태·코드 색상을 보정합니다. 기존 8개 색상 token은 유지하고 선택/상태/문법 강조 token을 선택적으로 허용하며, 여전히 #RRGGBB만 검증합니다. 임의 CSS/코드/외부 리소스를 로드하지 않습니다. 팔레트 출처와 배포 라이선스는 `docs/THEMES.md`, `public/third-party/theme-licenses/`에 기록했습니다. 원본 프로젝트의 공식 포트는 아닙니다.
+
+### 코드 울타리 자동 완성과 문법 강조
+
+Live Preview와 원문에서 ``` 또는 ```go 같은 시작 울타리 뒤 Enter를 누르면 빈 코드 줄과 닫는 울타리를 만들고 커서를 코드 안에 둡니다. 이미 닫힌 블록·닫는 울타리·일반 문장·코드 내용에서는 중복 생성하지 않습니다. 목록/인용 안의 접두부를 보존하고 한 번의 undo로 생성 동작을 되돌릴 수 있습니다. Vim Insert에서 사용하며 Normal의 Enter는 가로채지 않습니다.
+
+언어 이름은 Markdown에 그대로 저장합니다. CodeMirror의 언어 패키지를 필요할 때 로드해 Go 등 지원 언어를 강조하며, 읽기/Live Preview 위젯/편집 화면은 같은 테마 문법 색상을 사용합니다. 알 수 없는 언어는 원문을 그대로 표시합니다. 코드 문자열을 HTML로 실행하지 않습니다. 기존 foltra-query 블록은 기존 쿼리 경로를 유지합니다.
+
+검증: **464개(core 94, CLI 4, frontend 366)**, `npm run check`, macOS debug `.app` 빌드, `git diff --check` 통과. 테마 설치/삭제/실패/중복 클릭/늦은 응답, 활성 테마 삭제 후 다른 설정·노트 보존, 6개 팔레트의 본문/패널/사이드바/선택 대비, 코드블록 접두부·선택·Vim·undo·안전한 읽기 강조를 검사했습니다. 테스트 병렬 실행 중 태그 팝업의 키 입력 대기 시간이 비동기 응답 전에 시작되던 테스트 불안정성도 수정했습니다.
+
+실제 CLI를 연결한 임시 vault의 Chromium에서 기본 두 테마, 새 네 테마의 설치·적용, 활성 테마 삭제 후 즉시 Paper 복귀, 어두운 사용자 파일의 가독성 보정/삭제, 900×650 화면, 키보드로 Go 울타리 생성·입력·저장과 읽기 강조를 확인했습니다. 브라우저 선택 기록을 복원하고 검증 공간을 종료했습니다. 사용자 sample vault의 기존 stock 테마 세 파일은 백업 후 코어 명령으로 제거했으며, 노트·DB·Anki 패키지와 전용 데이터의 해시가 유지됨을 확인했습니다. macOS 앱은 저장 보호를 통한 정상 종료/재실행으로 적용했습니다. native WebKit의 별도 입력기 검증과 GitHub 릴리스 갱신은 이번 범위에 포함하지 않습니다.
+
+자료: `test-results/themes-code-{tests,check,app-build}.log`, `themes-code-browser.json`, `themes-custom-browser.json`, `themes-*.png`, `code-block-{editing,reading}.png`, `themes-code-{applied,final-applied}.json`.
+
+### Live Preview 코드블록 커서 진입
+
+일반 fenced code의 전체 범위를 `contenteditable=false` 블록 위젯으로 교체하던 동작을 제거했습니다. 문법 강조가 적용된 실제 편집기 줄을 유지하고 줄별 코드 패널 스타일을 입힙니다. 블록 밖에서는 울타리를 감추고, 선택/커서가 들어오면 여닫는 울타리와 언어 표시를 드러냅니다. 울타리 공간과 코드 줄 높이는 동일하게 유지하므로 진입/이탈에 따른 위치 변화가 없습니다. 코드 높이에 맞춘 gutter marker로 라인 번호도 정렬합니다. 실행 결과를 보여주는 foltra-query, 표와 구분선의 기존 미리보기 경로는 유지합니다.
+
+검증: **472개(core 94, CLI 4, frontend 374)**, `npm run check`, `git diff --check`, macOS debug `.app` 빌드 통과. 코드 본문에 전체 교체 위젯이 없고 DOM 위치가 원문 위치에 대응하는지, 울타리/빈 코드/미완성 블록/인용·목록 속 코드, 편집·undo·블러·라인 번호를 검사했습니다. 수정 전 실제 Chromium에서 바로 위 빈 줄의 ArrowDown이 코드 전체를 건너뛰어 10번째 줄로 이동하는 현상을 재현했습니다. 수정 후 ArrowDown/ArrowUp과 Vim j/k가 3–9번째 코드 줄을 순서대로 지나가며, 안쪽 마우스 클릭 위치, 일반 입력과 Vim Insert 편집·자동 저장, 진입/이탈 전후 코드 행 좌표 유지, 상대 라인 번호 정렬을 확인했습니다.
+
+검증에는 임시 vault를 사용했으며 브라우저 선택/커서 기록을 복원하고 검증 공간을 종료했습니다. 사용자 앱은 정상 저장 보호 후 새 빌드로 재실행했습니다. 실제 macOS 한글 입력기를 통한 추가 검증이나 GitHub 릴리스 갱신은 포함하지 않습니다. 자료는 `test-results/code-navigation-{before,arrows,vim,gutter,persisted,applied,cleanup}.json`, `code-navigation-{preview,editing,vim,numbers}.png`, `code-navigation-{tests,check,app-build}.log`에 있습니다.
+
+### 코드블록 이탈 시 배경 경계
+
+코드블록 바로 위·아래 빈 줄의 활성 줄 배경이 코드 패널과 붙는 화면을 재현했습니다. 패널 안쪽 위아래에 3px의 종이색 간격을 그려 경계를 구분하고, 코드 안의 활성 줄 강조는 기존 패널색 위에 적용합니다. margin/padding이나 편집 가능한 줄 높이는 바꾸지 않습니다.
+
+임시 vault의 짧은 Go 코드로 Chromium과 비영구 macOS WKWebView에서 Vim j/k·방향키 진입/이탈을 검사했습니다. 수정 전후 모두 이 fixture의 실제 행 좌표·높이는 동일했으므로, 실제 블록 높이 증가까지 재현·해결한 것으로 보지는 않습니다. 이번 수정은 스크린샷처럼 빈 줄 강조와 패널 배경이 연결되어 보이는 현상에 해당합니다. 자료는 `test-results/code-exit-{focused-before,browser,webkit-before,webkit-after}.json`과 `code-exit-{adjacent,after}.png`에 있습니다. `npm test` **472개(core 94, CLI 4, frontend 374)**와 `npm run check`를 통과했습니다.
+
+macOS debug `.app` 빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. WKWebView의 위/아래 이탈 화면은 `code-exit-webkit-after-{above,below}.png`, 앱 적용 기록은 `code-exit-applied.json`입니다. 브라우저 선택·임시 커서 기록을 복원하고 검증 공간을 종료했습니다. 실제 사용자 노트는 수정하지 않았습니다.
+
+### Live Preview 표의 키보드 편집
+
+표 위아래에서 방향키 또는 Vim j/k로 진입하면 렌더링된 표 안의 셀을 선택합니다. 방향키·Vim hjkl로 셀을 이동하고 Enter·Vim i/a·더블클릭으로 선택 셀을 편집합니다. Tab/Shift+Tab은 다음/이전 셀, 편집 중 Enter는 같은 열의 다음 행으로 이동하며 마지막에서 다음으로 이동하면 빈 행 하나를 추가합니다. Escape는 편집 → 셀 선택 → 표 밖 본문으로 돌아갑니다. 셀 내용의 Markdown 표기는 편집할 때만 해당 셀에 표시하고 나머지 표는 렌더링을 유지합니다. 열 추가·삭제·정렬 문법 변경은 원문 모드에서 수행합니다.
+
+Lezer GFM의 실제 셀 범위만 CodeMirror transaction으로 수정하며 정렬 구분선·주변 본문·다른 셀은 보존합니다. 파이프를 이스케이프하고 붙여넣은 개행은 공백으로 바꿔 표 구조가 깨지지 않도록 합니다. 짧은 행의 누락 셀은 그 셀을 편집할 때만 채웁니다. 자동 저장과 실행 취소/다시 실행은 기존 노트 이력을 공유합니다. 네이티브 입력을 미리보기 React root의 형제 요소로 유지하여 조합 중 DOM 교체를 피하고, 셀 입력에서 Leader/Vim 본문 처리기가 문자를 가로채지 않도록 했습니다.
+
+검증: 전체 **496개(core 94, CLI 4, frontend 398)**와 `npm run check` 통과. 셀 소스 보존·빈/짧은 행·파이프/역슬래시·인용 접두부, 입력 포커스·공백·composition·undo/redo·행 추가·나가기와 Leader 격리를 검사했습니다. 임시 vault의 Chromium에서 Vim OFF 방향키 진입·셀 입력·Tab·행 추가를 확인했습니다. 별도 비영구 macOS WKWebView에서 실제 Vim j/l/i, 공백 포함 입력, 실제 두벌식 `가나`, Tab과 두 번의 Escape 후 본문 포커스, 자동 저장을 확인했습니다. WKWebView 검증은 개발 CLI bridge를 사용하며 Tauri IPC 전체나 모든 입력기 조합을 검증한 것은 아닙니다. 자료는 `test-results/table-webkit.json`, `table-webkit.png`, `table-edit-first.png`, `table-vault-{tests,check}.log`입니다.
+
+### Vault 등록 목록에서 제거
+
+Vault 선택창의 각 항목 오른쪽에 목록 제거 버튼을 추가했습니다. 기기의 최근 vault 등록만 제거하며 실제 디렉터리·노트·설정·첨부파일은 삭제하지 않습니다. 현재 열린 vault는 기존 저장 보호를 통과한 후 닫고 시작 화면으로 돌아갑니다. 저장에 실패하면 등록과 초안을 유지합니다. 다른 vault의 등록을 제거할 때는 현재 작업과 선택창을 유지합니다. 같은 폴더를 다시 열면 재등록됩니다.
+
+hook 테스트로 등록 제거의 지속성·명시적 재등록·진행 중이던 조회의 늦은 응답을 검사했습니다. 실제 Chromium UI에서 다른 vault 제거, 새로고침 후 제거 유지, 활성 vault 제거 후 시작 화면, 기존 폴더 재열기를 확인했습니다. 두 임시 vault의 제거 전후 모든 파일 해시가 동일했습니다. 자료는 `test-results/vault-registration-{browser,preserved}.json`, `vault-registration-menu.png`입니다.
+
+macOS debug `.app` 빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. 브라우저의 기존 vault 선택·최근 목록을 복원하고 임시 커서 기록과 검증 공간을 정리했습니다. 자료는 `test-results/table-vault-{app-build,applied,browser-cleanup}` 로그/JSON입니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 표의 Vim 행 삭제와 기존 디자인 유지
+
+Live Preview 표의 셀 선택 상태에서 Vim `dd`로 해당 데이터 행을 삭제합니다. 다음 행의 같은 열을 선택하고, 마지막 행이면 이전 행으로 이동합니다. 데이터 행이 없어져도 GFM에 필요한 헤더와 정렬 구분선은 유지합니다. `u`/`Cmd+z`로 삭제만 복구하고 `Ctrl+r`로 다시 실행할 수 있습니다. 셀 입력 중의 `dd`는 그대로 글자로 입력됩니다. 단일 `d`·키 자동 반복으로는 삭제하지 않으며, Escape·다른 키·마우스 선택·포커스 이탈·문서 변경은 대기 중인 `d`를 취소합니다.
+
+표에 추가했던 세로 구분선과 균등 열 너비를 제거하여 기존 읽기 표의 가로 구분선·내용에 따른 열 비율을 사용합니다. 선택/입력 중인 셀만 1px 테두리로 표시하고, 표 밖으로 이동하면 강조를 제거합니다. 빈 행은 입력 전후 높이가 달라지지 않도록 기존 최소 높이를 유지합니다.
+
+임시 vault를 연 별도 비영구 macOS WKWebView에서 실제 `dd`, `u`, `Ctrl+r`, 두벌식 상태의 물리 `dd`, 입력 중 `dd` 보존과 저장을 확인했습니다. 선택/편집/비활성 화면을 직접 검토했으며 native 입력 소스를 복원하고 검증 앱을 종료했습니다. 이 경로는 개발 CLI bridge를 사용합니다. 자료는 `test-results/table-dd-webkit{,.selected,.editing}.png`, `table-dd-webkit.json`, `table-dd-persisted.json`입니다.
+
+검증: `npm test -- --maxWorkers=2` **505개(core 94, CLI 4, frontend 407)**, `npm run check`, `git diff --check`, macOS debug `.app` 빌드 통과. 추가 테스트는 삭제 범위·주변 본문/인용 보존·EOF·헤더 보호·선택 유지·undo/redo·prefix 취소·입력/Vim OFF 격리를 다룹니다. 앞선 전체 실행에서는 기존 Anki 루프백 테스트와 원문 목록 구문 트리 검사에서 각각 한 차례 실패했습니다. 해당 코드를 변경하지 않고 Anki 개별 재실행 및 worker 수를 제한한 전체 재실행을 통과했으며 최초 실패 원인을 확정한 것은 아닙니다. 로그는 `test-results/table-dd-{before,focused,tests-first,tests-second,anki-recheck,tests,check,app-build}.log`입니다.
+
+저장 보호를 거쳐 실행 중인 macOS 앱을 새 debug 빌드로 정상 재시작했습니다. 적용 기록은 `test-results/table-dd-applied.json`이며 GitHub 릴리스는 갱신하지 않았습니다.
+
+### 표 편집 확정, 행·열 추가/삭제와 마우스 조작
+
+선택 상태의 Enter는 셀 편집을 시작하고, 편집 중 Enter는 같은 셀의 선택 상태로 돌아갑니다. 마지막 행에서도 자동으로 다음 행을 만들지 않습니다. Vim의 `o`/`O`는 선택 행 아래/위에 데이터 행을 만들며, Vim ON/OFF 공통 `Option/Alt+Enter`는 아래 행을 추가합니다. 새 행의 같은 열에서 바로 편집을 시작합니다. 헤더 위에 행을 추가하려는 경우에는 정렬 구분선 뒤 첫 데이터 행으로 추가합니다.
+
+선택 상태의 Tab/Shift+Tab은 오른쪽/왼쪽 셀로 이동하고, 마지막 열의 Tab만 새 열을 추가합니다. 편집 중 Tab/Shift+Tab은 기존 셀 사이에서 편집을 이어가며 표를 확장하지 않습니다. 마지막 셀의 Tab은 해당 셀의 선택 상태로 돌아갑니다. Enter/Tab 키 자동 반복으로 행·열이 연속 생성되지 않도록 했습니다. Vim `dd`는 행, `dc`는 열을 삭제합니다. 헤더와 마지막 한 열은 보존하고, 셀 입력 중의 문자는 그대로 입력합니다.
+
+마우스로 셀을 우클릭하면 공통 디자인의 메뉴에서 셀 편집, 위/아래 행 추가, 왼쪽/오른쪽 열 추가, 행/열 삭제를 할 수 있습니다. 헤더 삭제와 마지막 열 삭제는 메뉴에 표시하지 않습니다. 표 위에 마우스를 올렸을 때만 아래쪽·오른쪽 끝에 작은 `+` 버튼을 표시하며 표 크기나 본문 배치는 바꾸지 않습니다. 추가한 열은 헤더를 바로 편집하도록 포커스합니다. 메뉴가 닫히거나 노트가 바뀌면 메뉴 root와 이벤트를 정리합니다.
+
+행·열 변경은 기존 CodeMirror transaction과 자동 저장/undo를 공유합니다. 열 추가/삭제 시 헤더·정렬 구분선·모든 행을 한 번에 바꾸며 기존 셀 값, 이스케이프된 파이프, 인용 접두부와 표 밖 본문을 보존합니다. 짧은 행·표시되지 않는 여분 셀·헤더만 있는 표도 처리합니다. 한 열이 남으면 명시적인 파이프로 헤더를 감싸 Markdown 제목으로 오인되지 않도록 하고, 짧은 행의 마지막 값을 삭제해도 표가 빈 줄에서 분리되지 않게 합니다.
+
+검증: `npm test -- --maxWorkers=2` **536개(core 94, CLI 4, frontend 438)**, `npm run check`, `git diff --check` 통과. 표 변경·공백/파이프/역슬래시·정렬·짧은/빈 행·컨테이너·단일 열 보호, 키보드 모드/한글 물리 키/조합 중 Enter, 메뉴 클릭과 포커스 복귀, 버튼과 undo/redo를 검사했습니다. Chromium의 실제 우클릭/클릭으로 Vim OFF 행·열 추가/삭제·새 헤더 입력·Enter 확정·호버 버튼 표시/숨김을 확인하고 화면을 검토했습니다. 기존 브라우저 vault 선택/최근 목록을 복원하고 검증 공간을 종료했습니다.
+
+별도 비영구 macOS WKWebView에서 Vim ON/OFF의 실제 Enter 편집/확정, `o/O` 또는 Option+Enter, Tab 열 추가, undo/redo, 두벌식 입력 후 같은 셀 확정과 자동 저장을 확인했습니다. Vim ON에서는 한글 모드의 `dc`와 `u` 복구도 확인했습니다. 앞선 Vim OFF 시도는 검증 창의 foreground가 바뀌어 입력 보호 장치가 중단했으며, 최종 두 모드 검증은 통과했습니다. 두 임시 vault의 최종 본문은 CLI로 별도 읽어 화면 상태와 일치함을 확인했습니다. 검증은 개발 CLI bridge를 사용하며 모든 OS/입력기·전체 Tauri IPC 검증을 의미하지 않습니다.
+
+자료는 `test-results/table-navigation-{focused,tests,check}.log`, `table-navigation-webkit-{on,off}.{json,png}`, `table-navigation-persisted.json`, `table-navigation-browser-cleanup.json`, `table-mouse-{browser.json,hover.png,menu.png,idle.png}`입니다.
+
+macOS debug `.app`를 재빌드하고 저장 보호를 거쳐 실행 중인 앱을 정상 재시작했습니다. 빌드/적용 기록은 `test-results/table-navigation-app-build.log`, `table-navigation-applied.json`입니다. GitHub 릴리스는 변경하지 않았습니다.
+
+### 주제 모음의 일반 문단 수집
+
+불릿 첫 줄만 수집하던 제한을 넓혀 일반 문단·제목·인용문에 있는 `[[주제]]`도 해당 블록의 카드로 모읍니다. 일반 문단은 두 번째 줄 이후의 링크도 포함하고, 같은 대상의 반복 링크·alias·UUID 링크는 한 카드로 합칩니다. 빈 줄로 구분한 이웃 문단이나 제목 아래 섹션 전체는 포함하지 않습니다. 기존 목록은 항목과 하위 구조를 유지하며 자식의 링크로 부모를 선택하지 않습니다. 코드·HTML 주석·이스케이프·표 셀은 제외합니다.
+
+목록 뒤에서 들여쓰기를 해제한 문단은 빈 구분 줄이 없어도 편집기/읽기 모드처럼 별도로 수집하며 목록 카드에서 제외합니다. 들여쓴 연속 문장과 여러 줄의 인라인 문법은 보존합니다. UI 설명·빈 화면 예시·공통 명령 설명과 TOPICS 문서를 갱신했습니다. 저장 원문·revision·API 응답 형식은 바꾸지 않습니다.
+
+검증: 수정 전 문단/제목/인용 누락과 목록 직후 문단 누락을 재현하고, 주제 코어 테스트 12개를 포함한 전체 **541개(core 99, CLI 4, frontend 438)** 및 `npm run check`, `git diff --check`를 통과했습니다. 임시 vault를 연결한 Chromium에서 두 노트의 다섯 카드(문단·목록·목록 직후 문단·제목·인용)를 확인하고 화면을 검토했습니다. 원본 열기로 문단 시작 행의 첫 위치에 커서와 편집기 포커스가 놓이고, CLI로 새 문단을 추가한 뒤 여섯 카드로 갱신되는 것을 확인했습니다. 조회/원본 열기 후 기존 노트 body와 revision은 동일했습니다. 기존 브라우저 vault 선택·최근 목록을 복원하고 임시 커서 기록 및 검증 공간을 정리했습니다. 이번 검증은 Chromium + 공통 native core이며 새로운 macOS IME 검증을 포함하지 않습니다.
+
+macOS debug `.app` 재빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. 자료는 `test-results/topic-paragraphs-{before,list-before,focused,tests,check,app-build}.log`, `topic-paragraphs-{browser,preserved,browser-cleanup,applied}.json`, `topic-paragraphs-cards.png`입니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+
+### 주제별 카드 사용자 지정 순서
+
+주제 모음의 카드 왼쪽에 호버/포커스로 나타나는 드래그 손잡이를 추가했습니다. 위/아래 삽입선을 표시하고 놓은 위치에 따라 순서를 저장하며, 날짜 정렬에서 옮겨도 해당 순서를 바탕으로 사용자 지정으로 전환합니다. 손잡이의 Alt+↑/↓도 같은 저장 경로를 사용하고 이동 후 키보드 포커스를 복원합니다. 본문 선택·링크 클릭은 그대로 사용할 수 있습니다. 드래그 중 이전/다음 페이지 버튼에 650ms 머무르면 페이지를 넘기며, 원래 드래그 DOM을 유지해 다른 페이지의 카드 앞/뒤에도 놓을 수 있습니다.
+
+공통 코어 `topics.reorder`가 `.foltra/topic-order.json`에 주제별 순서를 journal transaction으로 저장합니다. 원본 노트는 변경하지 않고 백업/복원에 메타데이터를 포함합니다. 앱을 다시 열면 저장된 사용자 지정 정렬을 사용하며 날짜 정렬로 전환해도 이 순서를 보존합니다. 새 카드는 뒤에 추가합니다. workspace의 순서 파일 revision을 통해 외부 CLI/다른 창 변경을 감지합니다. 드래그 시작 시 원본/순서 snapshot을 함께 잡고 달라졌으면 conflict로 거절합니다. 저장 중 중복 요청을 막고 실패하면 화면 순서를 유지하며 재시도를 제공합니다.
+
+카드 대응은 노트 ID·내용/첫 줄 해시·일치한 이웃 사이의 원문 순서를 사용합니다. 제목/alias 링크 변화는 해시에서 정규화하고, 주제 노트 생성/이름 변경 시 이름 키를 UUID 키로 옮기는 작업은 노트 쓰기와 원자적으로 처리합니다. 앞쪽 문단 추가·동일 위치 편집·중복 내용·삭제 후 새 카드 추가를 검사했습니다. 영구 블록 UUID는 아니므로 대량 재작성이나 동일 내용의 삽입/삭제 등 모호한 경우 완벽한 식별을 보장하지 않습니다. 대응되지 않는 카드는 뒤에 추가합니다. 상세 계약은 TOPICS.md에 기록했습니다.
+
+검증: 전체 **553개(core 104, CLI 4, frontend 445)** 및 `npm run check` 통과. 새 코어 테스트는 지속성·주제 분리·원문 보존·날짜 정렬 왕복·백업 복원·잘못된 앵커 차단·편집/이름 변경·중복·페이지 간 이동·stale revision 거절을 다룹니다. UI 테스트는 드래그 삽입선·취소·외부 드롭 무시·저장 실패·중복 요청·저장 중 표시 설정 유지·키보드 포커스·원본 이동·페이지 전환 시 source DOM 유지를 확인했습니다.
+
+임시 vault의 Chromium에서 실제 드래그로 마지막 인용 카드를 맨 앞에 옮기고, 날짜/사용자 지정 왕복 및 페이지 재실행 뒤 순서 복원을 확인했습니다. 55개 카드에서는 두 번째 페이지의 마지막 카드를 이전 페이지 버튼 호버로 넘겨 맨 앞으로 옮겼으며 CLI로 저장된 전체 순서를 별도 확인했습니다. 첫 페이지 간 드래그 시도는 목표 진입 직후 dragover 없이 놓여 저장되지 않았고, 다음 시도에서 dragover/drop 이벤트와 저장 성공을 기록했습니다. 원본 파일 전체는 변경 전후 동일했습니다. 화면의 손잡이·카드 배치를 직접 검토했습니다. 이 검증은 Chromium + native CLI/core이며 macOS WebKit의 전체 드래그/접근성 동작 검증은 포함하지 않습니다.
+
+자료는 `test-results/topic-order-{before,focused,ui-tests,tests,check}.log`, `topic-order-{browser,persisted}.json`, `topic-order-{before,after,pages}.png`입니다.
+
+macOS debug `.app`를 재빌드하고 저장 보호를 거쳐 기존 앱을 정상 재시작했습니다. 브라우저의 기존 vault 선택/최근 목록을 복원하고 임시 커서 기록 및 검증 공간을 정리했습니다. 적용과 정리 기록은 `test-results/topic-order-{app-build.log,applied.json,browser-cleanup.json}`입니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+### 주제 카드 드래그 삽입 표시
+
+드래그 대상 카드의 테두리를 강조하던 표시를 카드 사이 여백의 독립된 가로선과 시작점의 작은 점으로 바꿨습니다. 카드의 크기·간격과 평상시 테두리는 유지합니다. 임시 vault의 Chromium에서 실제 드래그로 위/아래 삽입 표시를 확인하고 화면을 검토했으며 드래그 전후 카드 좌표가 동일했습니다. 주제 UI 테스트 7개와 CSS 포맷 검사를 통과했고 macOS debug `.app` 재빌드와 저장 보호를 거친 정상 재시작을 완료했습니다. 자료는 `test-results/topic-marker-{browser.json,before.png,after.png,tests.log,app-build.log,applied.json}`입니다.

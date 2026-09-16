@@ -1,8 +1,0 @@
-{
-  "kind": "theme",
-  "id": "terracotta",
-  "name": "Terracotta",
-  "version": "1.0.0",
-  "description": "따뜻한 흙빛과 부드러운 종이색.",
-  "tokens": { "paper": "#fbf3e9", "panel": "#f5e8d9", "ink": "#493328", "muted": "#927763", "line": "#e7d6c4", "accent": "#a65036", "sidebar": "#5a382b", "sidebar-ink": "#f2e5d7" }
-}

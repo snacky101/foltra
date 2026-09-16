@@ -1,0 +1,209 @@
+.plugin-view {
+  min-height: 0;
+  overflow-y: auto;
+  padding: 40px;
+  width: 100%;
+  max-width: 1320px;
+  margin: 0 auto;
+}
+.plugin-view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+}
+.plugin-view-header h1 {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 25px;
+  margin: 10px 0 0;
+}
+.plugin-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.plugin-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.plugin-grid {
+  display: grid;
+  gap: 12px;
+}
+.plugin-card {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--panel);
+  overflow-wrap: anywhere;
+}
+.plugin-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+.plugin-text.muted {
+  color: var(--muted);
+}
+.plugin-text.accent {
+  color: var(--accent);
+}
+.plugin-text.danger,
+.plugin-button.danger {
+  color: var(--danger);
+}
+.plugin-heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+.plugin-button {
+  min-width: 0;
+  max-width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.plugin-card > .plugin-button {
+  display: block;
+  padding: 8px 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.plugin-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+}
+.plugin-field input {
+  width: 100%;
+  min-width: 0;
+}
+.plugin-field .select {
+  min-width: 0;
+}
+.plugin-checkbox {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+.plugin-error {
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.plugin-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0 0 18px;
+  border-top: 1px solid var(--line);
+  padding-top: 16px;
+}
+.plugin-controls > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.plugin-permissions {
+  font-size: 11px;
+  line-height: 1.7;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.plugin-permissions ul {
+  padding-left: 16px;
+  margin: 8px 0;
+}
+.plugin-permissions p {
+  margin: 0 0 8px;
+}
+.plugin-permissions .plugin-row {
+  gap: 8px;
+}
+.plugin-settings-form form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.plugin-view.plugin-view-embedded {
+  padding: 0;
+  overflow: visible;
+}
+.extension-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.extension-settings-back {
+  margin-bottom: 24px;
+}
+.extension-settings-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.extension-settings-header .extension-icon {
+  flex-shrink: 0;
+}
+.extension-settings-header > div:nth-child(2) {
+  flex: 1;
+  min-width: 0;
+}
+.extension-settings-header h2 {
+  margin: 0 0 8px;
+  font-size: 19px;
+}
+.extension-settings-header h2:focus {
+  outline: none;
+}
+.extension-settings-header p,
+.extension-settings-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.extension-settings-page .plugin-controls {
+  margin-bottom: 24px;
+}
+.extension-settings-page .plugin-settings-form + .plugin-view {
+  margin-top: 28px;
+}
+.extension-settings-page .plugin-heading {
+  margin: 0;
+}
+@media (max-width: 1050px) {
+  .plugin-view {
+    padding: 28px 22px;
+  }
+  .plugin-grid {
+    gap: 8px;
+  }
+  .plugin-card {
+    padding: 10px;
+  }
+}

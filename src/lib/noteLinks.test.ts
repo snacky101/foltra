@@ -12,6 +12,7 @@ const note = (id: string): NoteSummary => ({
 const link = (source: string, target: string | null, label = '같은 제목'): Link => ({
   source,
   target,
+  name: target ?? label,
   label,
   block: null,
   line: source === 'row' ? 0 : 1,

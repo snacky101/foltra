@@ -25,3 +25,12 @@ test('Latin layouts, dead keys and unknown physical keys are not remapped', () =
   expect(commandKey({ key: 'Dead', code: 'Quote', shiftKey: false })).toBe('Dead');
   expect(commandKey({ key: 'Process', code: '', shiftKey: false })).toBe('Process');
 });
+
+test('IME composition command events resolve empty, dead and multi-codepoint keys', () => {
+  for (const key of ['', 'Dead', '하', '한글']) {
+    expect(commandKey({ key, code: 'KeyJ', shiftKey: false, isComposing: true, keyCode: 229 })).toBe('j');
+    expect(commandKey({ key, code: 'KeyK', shiftKey: true, isComposing: true })).toBe('K');
+  }
+  expect(commandKey({ key: 'Dead', code: 'Quote', shiftKey: false })).toBe('Dead');
+  expect(commandKey({ key: 'a', code: 'KeyQ', shiftKey: false, isComposing: true })).toBe('a');
+});

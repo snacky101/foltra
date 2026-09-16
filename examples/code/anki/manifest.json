@@ -1,0 +1,48 @@
+{
+  "kind": "plugin",
+  "id": "anki",
+  "name": "Anki 연결",
+  "version": "1.1.0",
+  "description": "데이터베이스 행과 #anki 블록을 Anki 카드로 연결합니다. 수정 사항을 동기화하고 중복과 충돌을 확인하세요.",
+  "commands": [
+    {
+      "id": "open",
+      "title": "Anki 동기화 열기",
+      "action": {
+        "type": "script"
+      }
+    },
+    {
+      "id": "sync",
+      "title": "Anki 카드 동기화",
+      "headless": true,
+      "action": {
+        "type": "script"
+      }
+    },
+    {
+      "id": "status",
+      "title": "Anki 동기화 상태",
+      "headless": true,
+      "action": {
+        "type": "script"
+      }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": ["notes.read", "notes.write", "databases.read", "anki.connect", "automation", "ui"],
+    "backgroundCommand": "sync",
+    "views": [
+      {
+        "id": "sync",
+        "title": "Anki 연결"
+      },
+      {
+        "id": "settings",
+        "title": "Anki 설정"
+      }
+    ],
+    "settingsView": "settings"
+  }
+}

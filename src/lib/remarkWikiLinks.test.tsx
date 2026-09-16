@@ -20,6 +20,14 @@ test('malformed user-authored link targets cannot crash the renderer', () => {
   expect(wikiTarget('#foltra-%ED%95%9C%EA%B8%80%23%5Eanchor')).toBe('한글');
 });
 
+test('escaped and entity-generated brackets remain literal and cannot create notes', () => {
+  const html = renderToStaticMarkup(
+    <ReactMarkdown remarkPlugins={[remarkWikiLinks]}>{'\\[[Foo]] [[Foo]] &#91;&#91;Other]]'}</ReactMarkdown>,
+  );
+  expect(html.match(/href=/g)).toHaveLength(1);
+  expect(html).toContain('[[Foo]] <a href="#foltra-Foo">Foo</a> [[Other]]');
+});
+
 test('read-mode aliases preserve their text and keep the note name as destination', () => {
   const html = renderToStaticMarkup(
     <ReactMarkdown remarkPlugins={[remarkWikiLinks]}>{'[[노트이름|foo | bar]]'}</ReactMarkdown>,

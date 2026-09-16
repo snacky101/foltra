@@ -1,25 +1,36 @@
-import { useEffect, useState } from 'react';
-import ReactMarkdown from 'react-markdown';
+import { HighlightedCode } from './HighlightedCode';
+import { remarkTags } from '../lib/remarkTags';
+import { AttachmentImage } from './AttachmentImage';
+import { TagNavigation } from '../lib/tagNavigation';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import remarkBreaks from 'remark-breaks';
 import { ArrowUpRight, Table2 } from 'lucide-react';
 import { call } from '../lib/api';
-import { resolveWikiNote } from '../lib/wikiLinks';
+import { canCreateWikiNote, resolveWikiNote } from '../lib/wikiLinks';
 import { remarkWikiLinks, wikiTarget } from '../lib/remarkWikiLinks';
+import { remarkListSpacing } from '../lib/remarkListSpacing';
+import { separateListParagraphs } from '../lib/markdownListLayout';
 import type { QueryResult, Workspace } from '../lib/types';
 
 function EmbeddedQuery({
   source,
-  vault,
-  revision,
+  workspace,
   openNote,
 }: {
   source: string;
-  vault: string;
-  revision: unknown;
+  workspace: Workspace;
   openNote: (id: string) => void;
 }) {
   const [result, setResult] = useState<QueryResult | null>(null);
   const [error, setError] = useState('');
+  const vault = workspace.path;
+  // Note saves replace workspace arrays too; only changed query data should refetch.
+  const revision = useMemo(
+    () => JSON.stringify([workspace.databases, workspace.records]),
+    [workspace.databases, workspace.records],
+  );
   useEffect(() => {
     let active = true;
     try {
@@ -83,66 +94,103 @@ function EmbeddedQuery({
     </div>
   );
 }
+interface NotePreviewProps {
+  body: string;
+  workspace: Workspace;
+  openNote: (id: string) => void;
+  openLink: (target: string) => void;
+  executeQueries?: boolean;
+  openTag?: (tag: string) => void;
+}
+
+const PreviewContext = createContext<Omit<NotePreviewProps, 'body'> | null>(null);
+// Stable component identities preserve query state when a block moves or its context updates.
+const markdownComponents: Components = {
+  a: function PreviewLink({ href, children }) {
+    const { workspace, openLink, openTag } = useContext(PreviewContext)!;
+    if (href?.startsWith('#foltra-tag:')) {
+      const tag = decodeURIComponent(href.slice('#foltra-tag:'.length));
+      return openTag ? (
+        <button className="tag-chip" onClick={() => openTag(tag)} title={`#${tag} 노트 찾기`}>
+          {children}
+        </button>
+      ) : (
+        <span className="tag-chip">{children}</span>
+      );
+    }
+    if (href?.startsWith('#foltra-')) {
+      const target = wikiTarget(href);
+      const note = resolveWikiNote(workspace.notes, target);
+      const record = target?.startsWith('record:')
+        ? workspace.records.find((r) => r.id === target.slice(7))
+        : undefined;
+      const noteId = note?.id ?? record?.bodyNoteId;
+      const creatable = target && canCreateWikiNote(workspace.notes, target);
+      return (
+        <button
+          className={`wiki-link ${noteId ? '' : 'unresolved'}`}
+          onClick={() => target && openLink(target)}
+          title={
+            noteId
+              ? '연결된 노트 열기'
+              : creatable
+                ? `클릭하여 “${target}” 노트 만들기`
+                : '연결 대상을 확인할 수 없습니다'
+          }
+        >
+          {children}
+          <ArrowUpRight size={12} />
+        </button>
+      );
+    }
+    return (
+      <a href={href} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    );
+  },
+  img: function PreviewImage({ src, alt }) {
+    const { workspace } = useContext(PreviewContext)!;
+    return <AttachmentImage vault={workspace.path} source={typeof src === 'string' ? src : ''} alt={alt} />;
+  },
+  pre: ({ children }) => <div className="code-container">{children}</div>,
+  code: function PreviewCode({ className, children }) {
+    const { workspace, openNote, executeQueries } = useContext(PreviewContext)!;
+    return executeQueries && className === 'language-foltra-query' ? (
+      <EmbeddedQuery
+        key={JSON.stringify([workspace.path, String(children)])}
+        source={String(children)}
+        workspace={workspace}
+        openNote={openNote}
+      />
+    ) : (
+      <HighlightedCode className={className} source={String(children)} />
+    );
+  },
+};
+
 export function NotePreview({
   body,
   workspace,
   openNote,
+  openLink,
   executeQueries = true,
-}: {
-  body: string;
-  workspace: Workspace;
-  openNote: (id: string) => void;
-  executeQueries?: boolean;
-}) {
+  openTag,
+}: NotePreviewProps) {
+  const navigateTag = useContext(TagNavigation);
+  const previewBody = useMemo(() => separateListParagraphs(body), [body]);
   return (
     <div className="markdown-preview">
-      <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkWikiLinks]}
-        components={{
-          a: ({ href, children }) => {
-            if (href?.startsWith('#foltra-')) {
-              const target = wikiTarget(href);
-              const note = resolveWikiNote(workspace.notes, target);
-              const record = target?.startsWith('record:')
-                ? workspace.records.find((r) => r.id === target.slice(7))
-                : undefined;
-              const noteId = note?.id ?? record?.bodyNoteId;
-              return (
-                <button
-                  className={`wiki-link ${noteId ? '' : 'unresolved'}`}
-                  onClick={() => noteId && openNote(noteId)}
-                  title={noteId ? '연결된 노트 열기' : '대상을 찾을 수 없는 링크'}
-                >
-                  {children}
-                  <ArrowUpRight size={12} />
-                </button>
-              );
-            }
-            return (
-              <a href={href} target="_blank" rel="noopener noreferrer">
-                {children}
-              </a>
-            );
-          },
-          img: ({ alt }) => (
-            <span className="blocked-image">이미지: {alt || '외부 이미지'} (자동 로드하지 않음)</span>
-          ),
-          pre: ({ children }) => <div className="code-container">{children}</div>,
-          code: ({ className, children }) =>
-            executeQueries && className === 'language-foltra-query' ? (
-              <EmbeddedQuery
-                source={String(children)}
-                vault={workspace.path}
-                revision={workspace.records}
-                openNote={openNote}
-              />
-            ) : (
-              <code className={className}>{children}</code>
-            ),
-        }}
+      <PreviewContext
+        value={{ workspace, openNote, openLink, executeQueries, openTag: openTag ?? navigateTag }}
       >
-        {body || '*아직 작성한 내용이 없습니다.*'}
-      </ReactMarkdown>
+        <ReactMarkdown
+          remarkPlugins={[remarkGfm, remarkTags, remarkWikiLinks, remarkBreaks, remarkListSpacing]}
+          components={markdownComponents}
+        >
+          {previewBody || '*아직 작성한 내용이 없습니다.*'}
+        </ReactMarkdown>
+      </PreviewContext>
     </div>
   );
 }

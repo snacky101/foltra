@@ -1,28 +1,70 @@
-import { useEffect, useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
+import { editorHighlightStyle } from '../lib/codeHighlighting';
+import { useContext } from 'react';
+import { TagNavigation } from '../lib/tagNavigation';
+import { pluginEditorSnapshot, applyPluginEditorEdit } from '../lib/pluginEditor';
+import type { PluginEditorSnapshot } from '../lib/pluginTypes';
+import { tags } from '@lezer/highlight';
+import { useEffect, useLayoutEffect, useRef, useImperativeHandle, forwardRef, type RefObject } from 'react';
 import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, highlightActiveLine, panels } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
-import { syntaxHighlighting, defaultHighlightStyle } from '@codemirror/language';
+import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { vim, getCM } from '@replit/codemirror-vim';
+import { languages } from '@codemirror/language-data';
 import { GFM } from '@lezer/markdown';
 import { livePreviewExtension, refreshLivePreview } from '../lib/livePreview';
 import { bindVimCommands } from '../lib/vimCommands';
+import { bindVimKeybindings, type VimBinding } from '../lib/vimKeybindings';
 import { bindVimInput } from '../lib/vimInput';
+import { noteCompletionExtension } from '../lib/noteCompletion';
+import { followWikiLink, wikiLinkNavigation } from '../lib/wikiLinkNavigation';
+import { editorCursorExtension, refreshEditorCursor } from '../lib/editorCursor';
+import { editorLineNumbers } from '../lib/lineNumbers';
+import { markdownEditing } from '../lib/markdownEditing';
+import { imagePasteExtension } from '../lib/imagePaste';
+import {
+  captureEditorLocation,
+  restoreEditorLocation,
+  readEditorLocation,
+  trackEditorLocation,
+  type EditorLocation,
+} from '../lib/editorLocation';
+import { externalDocumentChange } from '../lib/editorDocument';
 import type { NoteCommand } from '../lib/noteCommands';
 import type { Workspace } from '../lib/types';
 
+const previewHighlightStyle = HighlightStyle.define(
+  editorHighlightStyle.specs.map((spec) =>
+    spec.tag === tags.heading
+      ? { tag: tags.heading, fontWeight: 'inherit', textDecoration: 'none' }
+      : spec.tag === tags.strong
+        ? { tag: tags.strong, fontWeight: '600' }
+        : spec,
+  ),
+);
+
 export interface EditorHandle {
+  pluginSnapshot: () => PluginEditorSnapshot | null;
+  applyPluginEdit: (snapshot: PluginEditorSnapshot, text: string) => boolean;
   focus: () => void;
   insert: (text: string) => void;
   jump: (line: number) => void;
+  followLink: (createIfMissing?: boolean) => void;
+  getLocation: () => EditorLocation | null;
+  restoreLocation: (location: EditorLocation) => void;
 }
 interface Props {
+  noteId: string;
   value: string;
+  hidden?: boolean;
   vimEnabled: boolean;
   livePreview: boolean;
   workspace: Workspace;
   openNote: (id: string) => void;
+  openLink: (target: string, createIfMissing?: boolean) => void;
+  vimBindings: VimBinding[];
+  onCommand: (id: string) => void;
   commandLineHost: RefObject<HTMLDivElement | null>;
   slash: boolean;
   onChange: (value: string) => void;
@@ -36,13 +78,32 @@ interface Props {
 export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref) {
   const parent = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
-  const latest = useRef(props);
-  latest.current = props;
+  const openTag = useContext(TagNavigation);
+  const latest = useRef({ ...props, openTag });
+  latest.current = { ...props, openTag };
   const vimConfig = useRef(new Compartment());
   const previewConfig = useRef(new Compartment());
+  const highlightConfig = useRef(new Compartment());
+  const cursorConfig = useRef(new Compartment());
+  const lineNumberConfig = useRef(new Compartment());
   const external = useRef(false);
+  const location = useRef<ReturnType<typeof trackEditorLocation> | null>(null);
   useImperativeHandle(ref, () => ({
+    pluginSnapshot: () => pluginEditorSnapshot(view.current, latest.current.noteId),
+    applyPluginEdit: (snapshot, text) =>
+      applyPluginEditorEdit(view.current, latest.current.noteId, snapshot, text),
     focus: () => view.current?.focus(),
+    getLocation: () => (view.current ? captureEditorLocation(view.current) : null),
+    restoreLocation: (saved) => {
+      if (!view.current) return;
+      location.current?.restoreScroll();
+      restoreEditorLocation(view.current, saved);
+    },
+    followLink: (createIfMissing = true) => {
+      const editor = view.current;
+      if (editor && !editor.composing)
+        followWikiLink(editor.state, (target) => latest.current.openLink(target, createIfMissing));
+    },
     insert: (text) => {
       const editor = view.current;
       if (!editor) return;
@@ -57,25 +118,43 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       editor.focus();
     },
   }));
-  useEffect(() => {
+  useLayoutEffect(() => {
+    const locationKey = `foltra:editor-location:${latest.current.workspace.vault.id}:${latest.current.noteId}`;
+    const savedLocation = readEditorLocation(locationKey, latest.current.value.length);
     const editor = new EditorView({
       state: EditorState.create({
         doc: latest.current.value,
+        selection: savedLocation ? { anchor: savedLocation.anchor, head: savedLocation.head } : undefined,
         extensions: [
           vimConfig.current.of(latest.current.vimEnabled ? vim() : []),
           panels({ bottomContainer: latest.current.commandLineHost.current ?? undefined }),
           history(),
           drawSelection(),
+          cursorConfig.current.of(editorCursorExtension(latest.current.workspace.settings)),
+          lineNumberConfig.current.of(editorLineNumbers(latest.current.workspace.settings.lineNumbers)),
           highlightActiveLine(),
-          markdown({ extensions: [GFM] }),
+          markdown({ extensions: [GFM], addKeymap: false, codeLanguages: languages }),
+          markdownEditing,
+          imagePasteExtension(() => ({
+            vault: latest.current.workspace.path,
+            onError: latest.current.onError,
+          })),
+          noteCompletionExtension(
+            () => latest.current.workspace,
+            (error) => latest.current.onError(error),
+          ),
+          wikiLinkNavigation((target) => latest.current.openLink(target)),
           previewConfig.current.of(
             latest.current.livePreview ? livePreviewExtension(() => latest.current) : [],
           ),
-          syntaxHighlighting(defaultHighlightStyle),
+          highlightConfig.current.of(
+            syntaxHighlighting(latest.current.livePreview ? previewHighlightStyle : editorHighlightStyle),
+          ),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
           EditorView.contentAttributes.of({ 'aria-label': '노트 본문', spellcheck: 'false' }),
           EditorView.updateListener.of((update) => {
+            if (update.selectionSet || update.docChanged) location.current?.changed();
             if (update.docChanged && !external.current) latest.current.onChange(update.state.doc.toString());
             const cm = getCM(update.view);
             const vimState = cm?.state.vim;
@@ -112,6 +191,20 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
             '.cm-focused': { outline: 'none' },
             '.cm-cursor': { borderLeftColor: 'var(--accent)' },
             '.cm-activeLine': { background: 'transparent' },
+            '.cm-gutters': {
+              position: 'absolute',
+              top: '0',
+              insetInlineStart: 'auto',
+              insetInlineEnd: 'calc(100% + var(--line-number-gap, 24px))',
+              background: 'transparent',
+              border: 'none',
+              color: 'var(--muted)',
+              fontFamily: 'var(--mono-font)',
+              fontSize: '12px',
+              lineHeight: '31.2px',
+            },
+            '.cm-lineNumbers .cm-gutterElement': { padding: '0', minWidth: '2ch' },
+            '.cm-activeLineGutter': { background: 'transparent', color: 'var(--accent)', fontWeight: '600' },
             '&.cm-focused': { outline: 'none' },
             // Vim's highest-priority theme supplies a red cursor and an unfocused outline.
             // Scope to its layer so our theme wins without changing selection rendering.
@@ -127,32 +220,67 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       parent: parent.current!,
     });
     view.current = editor;
+    location.current = trackEditorLocation(editor, locationKey);
     const unbindInput = bindVimInput(editor);
     latest.current.onMode(latest.current.vimEnabled ? 'NORMAL' : 'EDIT');
-    // Report readiness after mount effects settle; StrictMode may recreate this view first.
-    const readyFrame = window.requestAnimationFrame(() => latest.current.onReady?.());
     return () => {
-      window.cancelAnimationFrame(readyFrame);
       unbindInput();
+      location.current?.destroy();
+      location.current = null;
       editor.destroy();
       view.current = null;
     };
   }, []);
   useEffect(() => {
+    if (props.hidden) return;
+    // Reading mode retains the editor and its undo history; measure after it becomes visible.
+    const frame = requestAnimationFrame(() => {
+      location.current?.restoreScroll();
+      view.current?.requestMeasure();
+      latest.current.onReady?.();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [props.hidden]);
+  useLayoutEffect(() => {
     const editor = view.current;
-    if (editor && editor.state.doc.toString() !== props.value) {
+    const change = editor && externalDocumentChange(editor.state, props.value);
+    if (editor && change) {
       external.current = true;
-      editor.dispatch({ changes: { from: 0, to: editor.state.doc.length, insert: props.value } });
-      external.current = false;
+      try {
+        editor.dispatch(change);
+      } finally {
+        external.current = false;
+      }
     }
   }, [props.value]);
   useEffect(() => {
     view.current?.dispatch({
-      effects: previewConfig.current.reconfigure(
-        props.livePreview ? livePreviewExtension(() => latest.current) : [],
-      ),
+      effects: [
+        previewConfig.current.reconfigure(
+          props.livePreview ? livePreviewExtension(() => latest.current, view.current.hasFocus) : [],
+        ),
+        highlightConfig.current.reconfigure(
+          syntaxHighlighting(props.livePreview ? previewHighlightStyle : editorHighlightStyle),
+        ),
+      ],
     });
   }, [props.livePreview]);
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: lineNumberConfig.current.reconfigure(editorLineNumbers(props.workspace.settings.lineNumbers)),
+    });
+  }, [props.workspace.settings.lineNumbers]);
+  useEffect(() => {
+    view.current?.dispatch({
+      effects: cursorConfig.current.reconfigure(editorCursorExtension(props.workspace.settings)),
+    });
+  }, [
+    props.workspace.settings.cursorShape,
+    props.workspace.settings.cursorFollowVim,
+    props.workspace.settings.cursorBlink,
+    props.workspace.settings.cursorBlinkRate,
+    props.workspace.settings.cursorAnimation,
+  ]);
   useEffect(() => {
     if (props.livePreview) view.current?.dispatch({ effects: refreshLivePreview.of(null) });
   }, [props.workspace]);
@@ -168,12 +296,21 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           error: (error) => latest.current.onError(error),
         })
       : undefined;
-    const modeChanged = (event: { mode: string }) => latest.current.onMode(event.mode.toUpperCase());
+    const modeChanged = (event: { mode: string }) => {
+      latest.current.onMode(event.mode.toUpperCase());
+      refreshEditorCursor(editor);
+    };
     cm?.on('vim-mode-change', modeChanged);
     return () => {
       unbind?.();
       cm?.off('vim-mode-change', modeChanged);
     };
   }, [props.vimEnabled]);
+  const vimBindingKey = JSON.stringify(props.vimBindings);
+  useEffect(() => {
+    const cm = view.current && getCM(view.current);
+    if (!cm || !props.vimEnabled) return;
+    return bindVimKeybindings(cm, latest.current.vimBindings, (id) => latest.current.onCommand(id));
+  }, [props.vimEnabled, vimBindingKey]);
   return <div className="editor" ref={parent} />;
 });

@@ -13,4 +13,6 @@ it('moves between panes and sidebar or main vertical regions without wrapping', 
   expect(nextFocusRegion('main-toolbar', 'down')).toBe('main');
   expect(nextFocusRegion('sidebar-navigation', 'up')).toBeNull();
   expect(nextFocusRegion('backlinks', 'right')).toBeNull();
+  expect(nextFocusRegion('settings-navigation', 'right')).toBe('main');
+  expect(nextFocusRegion('settings-navigation', 'left')).toBeNull();
 });

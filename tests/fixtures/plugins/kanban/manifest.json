@@ -1,0 +1,51 @@
+{
+  "kind": "plugin",
+  "id": "kanban",
+  "name": "칸반 보드",
+  "version": "1.0.0",
+  "description": "독립 데이터베이스의 상태별 보드입니다. 카드를 추가하고 상태를 바꾸거나 본문 노트를 연결하세요.",
+  "commands": [
+    {
+      "id": "open",
+      "title": "칸반 보드 열기",
+      "action": {
+        "type": "script"
+      }
+    },
+    {
+      "id": "summary",
+      "title": "칸반 데이터 요약",
+      "headless": true,
+      "action": {
+        "type": "script"
+      }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": [
+      "databases.read",
+      "databases.write",
+      "notes.read",
+      "notes.write",
+      "ui"
+    ],
+    "views": [
+      {
+        "id": "board",
+        "title": "칸반 보드"
+      }
+    ],
+    "events": [
+      "workspace.changed"
+    ],
+    "settings": [
+      {
+        "id": "board-name",
+        "label": "새 보드 데이터베이스 이름",
+        "type": "text",
+        "default": "할 일 보드"
+      }
+    ]
+  }
+}

@@ -43,16 +43,17 @@ npm run dev
 
 ## 써볼 수 있는 것
 
-- Markdown Live Preview·원문·읽기와 자동 저장. Vim은 기본 OFF, 설정에서 켤 수 있고 슬래시 메뉴도 독립적으로 on/off.
+- Markdown Live Preview·원문·읽기와 자동 저장. 코드 울타리(```` ```go ````) 뒤 Enter로 닫는 울타리 자동 생성과 언어별 문법 강조. Vim은 기본 OFF, 설정에서 켤 수 있고 슬래시 메뉴도 독립적으로 on/off.
 - 사이드바 최하단 Vault 메뉴, 최근 vault 선택 팝업, 새 vault 생성, 좌우 사이드바 너비 드래그와 복원.
 - 내용 검색의 ↑/↓ 결과 선택과 Enter 열기.
 - 모든 노트 목록의 제목 검색·폴더 필터·수정일/생성일/제목 정렬, 목록에서 노트 열기와 우클릭 관리.
 - 명령 팔레트와 leader/일반 단축키 설정, Leader 키·조합 기록. 기본 leader는 Space, 일반 단축키의 Mod는 Cmd 또는 Ctrl.
 - `[[노트 제목]]` 원문 저장과 `[[노트 제목|표시 이름]]` alias, 이름 변경 시 참조 갱신([링크 규칙](docs/LINKS.md)), 문맥 백링크, 힘 기반 노트 그래프(겹침 방지·연결 강조·확대·이동)와 생성/수정 타임라인.
-- [주제 모음](docs/TOPICS.md): 같은 `[[주제]]`를 적은 bullet과 하위 목록을 여러 노트에서 카드로 모아 보기. 주제 검색·페이지·정렬·원본 위치 이동, CLI 조회.
+- [주제 모음](docs/TOPICS.md): 같은 `[[주제]]`를 적은 문단·제목·인용문과 bullet/하위 목록을 여러 노트에서 카드로 모아 보기. 주제 검색·페이지·날짜/드래그 사용자 지정 정렬·원본 위치 이동, CLI 조회.
 - 노트 파일 없이 만드는 DB와 행. 표·보드·날짜 타임라인, 컬럼 타입 변경·너비 조절·필터·정렬, 이름 셀에서 본문 노트 열기/생성/연결.
 - 노트 안의 `foltra-query` 코드 블록으로 실제 DB 조회.
-- 로컬 JSON 확장 설치/제거, 확장 명령의 단축키 지정, 색상 테마 설치.
+- 설정의 확장 탭에서 Anki 설치·사용자 확장 파일 관리·단축키 지정. 테마 탭에서 Paper & Pine/Midnight 선택, Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula 설치와 사용자 테마 파일 추가·삭제.
+- 기본 확장 카탈로그는 Anki 연결을 제공합니다. 코드 플러그인 SDK v1의 독립 뷰·설정·변경 이벤트, 노트/DB API와 편집기 선택 변환으로 별도 확장을 만들어 파일로 설치할 수 있습니다. 코드 패키지는 권한 확인 후 기기별로 활성화하며 일반 네트워크·외부 파일·앱 DOM 직접 접근은 제공하지 않습니다.
 - 앱을 열지 않아도 같은 vault를 다루는 JSON CLI, 휴지통, 백업 내보내기/복원.
 
 | 동작 | 기본 키 |
@@ -90,11 +91,11 @@ cargo build -p foltra-cli
 ./target/debug/foltra --vault /absolute/path/to/vault query run --args '{"databaseId":"DATABASE_UUID","limit":100}'
 ./target/debug/foltra --vault /absolute/path/to/vault note read --id NOTE_UUID
 ./target/debug/foltra --vault /absolute/path/to/vault note update --id NOTE_UUID --expected-revision REVISION_FROM_READ --body-file ./draft.md
-./target/debug/foltra --vault /absolute/path/to/vault extension install --manifest-file examples/daily-trail.json
-./target/debug/foltra --vault /absolute/path/to/vault plugin.daily-trail.new-reflection
+./target/debug/foltra --vault /absolute/path/to/vault extension install --manifest-file examples/plugins/anki.json
+./target/debug/foltra --vault /absolute/path/to/vault extension status
 ```
 
-`DATABASE_UUID`, `NOTE_UUID`, `REVISION_FROM_READ`를 이전 명령의 실제 반환값으로 대체합니다. 수정과 삭제는 읽을 때 받은 revision을 사용합니다. 충돌이 나면 최신 내용을 읽고 병합한 뒤 다시 요청해야 합니다.
+`DATABASE_UUID`, `NOTE_UUID`, `REVISION_FROM_READ`를 이전 명령의 실제 반환값으로 대체합니다. 코드 확장은 설치 후 앱에서 권한을 확인하고 활성화합니다. 수정과 삭제는 읽을 때 받은 revision을 사용합니다. 충돌이 나면 최신 내용을 읽고 병합한 뒤 다시 요청해야 합니다.
 
 출력은 JSON입니다. 결과는 stdout, 오류는 stderr에 기록합니다. 성공은 exit 0, revision 충돌은 exit 3, 나머지 실패는 exit 1입니다. `FOLTRA_VAULT` 환경변수로 기본 vault를 지정할 수도 있습니다. `--args`는 전체 인자 객체, `--body-file`은 본문 파일, `query run --file`은 쿼리 JSON 파일을 받습니다.
 
@@ -116,7 +117,7 @@ npm run format
 - [구조와 실행 흐름](docs/ARCHITECTURE.md): 모듈 책임, 저장 계약, 기능 추가 위치.
 - [개발 현황과 남은 작업](docs/STATUS.md): 원래 요구사항별 구현·검증 구분.
 - [전체 제품 설계](docs/DESIGN.md): 장기 요구사항과 설계 가설. 현재 구현의 사실은 위 두 문서를 기준으로 합니다.
-- [확장 작성 예제](examples/daily-trail.json), [테마 예제](examples/terracotta.json).
+- [코드 플러그인 SDK](packages/plugin-sdk/README.md), [SDK 계약·제한](docs/PLUGIN_SDK.md), [Anki 확장 소스](examples/code/anki/), [테마 팔레트·출처](docs/THEMES.md).
 
 아직 공개 플러그인 실행 환경, Git 동기화, 모바일, 관계·수식 DB, 대규모 vault 품질 기준을 완료하지 않았습니다. 저장 포맷은 버전을 포함하지만 범용 포맷 마이그레이션은 구현 전입니다.
 
@@ -142,3 +143,5 @@ foltra --vault ./my-vault note update --id NOTE_UUID --expected-revision REVISIO
 일반 단축키는 대소문자를 구분합니다. `Ctrl+h`와 `Ctrl+H`는 다르며 `Ctrl+H`는 `Ctrl+Shift+h`와 같습니다. Leader 뒤의 `r`과 `R`도 구분합니다. 예전 설정은 기존 동작을 유지하도록 읽고 다음 설정 저장 시 `shortcutVersion: 2`로 기록합니다. 이 필드가 없는 구버전 앱으로 되돌리는 것은 지원하지 않습니다.
 
 한글 입력 소스에서 명령 키가 한글이나 `Process`/`Unidentified`로 전달되면 물리 키 위치와 Shift를 사용합니다. 영역 이동과 Vim Normal/Visual 명령에 적용하며, Insert 모드의 본문 입력과 `f`/`r` 뒤의 문자 인수는 기존 입력 경로를 유지합니다. 실제 macOS 입력기를 통한 검증 범위는 [개발 현황](docs/STATUS.md)을 참고하세요.
+
+AnkiConnect 연동과 태그 블록/DB 카드 동기화 사용법은 [Anki 연결](docs/ANKI.md)을 참고하세요.

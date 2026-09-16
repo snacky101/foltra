@@ -7,6 +7,7 @@ import type { useNote } from '../lib/useNote';
 import type { Dialog } from './AppDialogs';
 import type { NoteCommand } from '../lib/noteCommands';
 import { noteLinks } from '../lib/noteLinks';
+import { vimNormalBindings, type Command } from '../lib/commands';
 const Editor = lazy(() => import('./Editor').then((module) => ({ default: module.Editor })));
 const NotePreview = lazy(() => import('./NotePreview').then((module) => ({ default: module.NotePreview })));
 interface Props {
@@ -17,7 +18,9 @@ interface Props {
   backlinks: boolean;
   editor: RefObject<EditorHandle | null>;
   dispatch: (id: string) => void;
+  commands: Command[];
   openNote: (id: string, line?: number) => Promise<void>;
+  openLink: (target: string, createIfMissing?: boolean) => void;
   setNoteId: Dispatch<SetStateAction<string | null>>;
   setMode: (mode: string) => void;
   setDialog: Dispatch<SetStateAction<Dialog | null>>;
@@ -34,7 +37,9 @@ export function NotePane({
   backlinks,
   editor,
   dispatch,
+  commands,
   openNote,
+  openLink,
   setNoteId,
   setMode,
   setDialog,
@@ -45,7 +50,7 @@ export function NotePane({
 }: Props) {
   return (
     <>
-      <div className="note-scroll">
+      <div className="note-scroll" tabIndex={-1}>
         {noteId ? (
           <article className="note-document">
             <div className="note-meta">
@@ -65,6 +70,7 @@ export function NotePane({
               className="note-title"
               aria-label="노트 제목"
               value={note.draft.title}
+              disabled={note.status === 'loading'}
               onChange={(e) => note.edit({ title: e.target.value })}
               placeholder="Untitled"
             />
@@ -110,23 +116,32 @@ export function NotePane({
             ) : (
               note.note?.id === noteId && (
                 <Suspense fallback={<div className="loading-note">편집 도구를 준비하는 중…</div>}>
-                  {preview ? (
-                    <NotePreview
-                      body={note.draft.body}
-                      workspace={workspace}
-                      openNote={(id) => void openNote(id)}
-                    />
-                  ) : (
+                  {preview && (
+                    <Suspense fallback={<div className="loading-note">읽기 화면을 준비하는 중…</div>}>
+                      <NotePreview
+                        body={note.draft.body}
+                        workspace={workspace}
+                        openNote={(id) => void openNote(id)}
+                        openLink={openLink}
+                      />
+                    </Suspense>
+                  )}
+                  <div hidden={preview}>
                     <Editor
-                      key={noteId}
+                      key={`${workspace.vault.id}:${noteId}`}
+                      noteId={noteId}
                       ref={editor}
                       onReady={onEditorReady}
                       value={note.draft.body}
+                      hidden={preview}
                       vimEnabled={workspace.settings.vim}
                       livePreview={workspace.settings.editorMode === 'live'}
                       workspace={workspace}
                       openNote={(id) => void openNote(id)}
+                      openLink={openLink}
                       commandLineHost={commandLineHost}
+                      vimBindings={vimNormalBindings(commands, workspace.settings)}
+                      onCommand={dispatch}
                       slash={workspace.settings.slash}
                       onChange={(body) => note.edit({ body })}
                       onMode={setMode}
@@ -134,7 +149,7 @@ export function NotePane({
                       onNoteCommand={onNoteCommand}
                       onError={onError}
                     />
-                  )}
+                  </div>
                 </Suspense>
               )
             )}
@@ -158,7 +173,12 @@ export function NotePane({
         )}
       </div>
       {backlinks && noteId && (
-        <Backlinks workspace={workspace} noteId={noteId} openNote={(id, line) => void openNote(id, line)} />
+        <Backlinks
+          workspace={workspace}
+          noteId={noteId}
+          openNote={(id, line) => void openNote(id, line)}
+          openLink={openLink}
+        />
       )}
     </>
   );

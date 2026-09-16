@@ -23,7 +23,9 @@
           "type": "string"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     }
   },
@@ -63,7 +65,9 @@
           "type": "string"
         }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
@@ -74,8 +78,32 @@
     "headless": true,
     "argsSchema": {
       "type": "object",
-      "properties": { "id": { "type": "string" } },
-      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.open-link",
+    "title": "Open a note link, creating a missing title on demand",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
       "additionalProperties": false
     }
   },
@@ -98,7 +126,9 @@
           "description": "Folder UUID; empty string means vault root"
         }
       },
-      "required": ["title"],
+      "required": [
+        "title"
+      ],
       "additionalProperties": false
     }
   },
@@ -127,7 +157,10 @@
           "description": "Folder UUID; empty string means vault root"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -146,7 +179,10 @@
           "type": "string"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -174,7 +210,9 @@
           "type": "string"
         }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
@@ -205,7 +243,9 @@
           "type": "array"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     }
   },
@@ -224,7 +264,10 @@
           "type": "object"
         }
       },
-      "required": ["databaseId", "property"],
+      "required": [
+        "databaseId",
+        "property"
+      ],
       "additionalProperties": false
     }
   },
@@ -243,7 +286,10 @@
           "type": "object"
         }
       },
-      "required": ["databaseId", "property"],
+      "required": [
+        "databaseId",
+        "property"
+      ],
       "additionalProperties": false
     }
   },
@@ -266,7 +312,11 @@
           "description": "Schema and records revision returned by database.property.preview"
         }
       },
-      "required": ["databaseId", "property", "expectedRevision"],
+      "required": [
+        "databaseId",
+        "property",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -285,7 +335,9 @@
           "type": "object"
         }
       },
-      "required": ["databaseId"],
+      "required": [
+        "databaseId"
+      ],
       "additionalProperties": false
     }
   },
@@ -307,7 +359,10 @@
           "type": "object"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -326,7 +381,10 @@
           "type": "string"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -351,7 +409,10 @@
           "type": "string"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -382,7 +443,9 @@
           "type": "integer"
         }
       },
-      "required": ["databaseId"],
+      "required": [
+        "databaseId"
+      ],
       "additionalProperties": false
     }
   },
@@ -400,7 +463,7 @@
   },
   {
     "id": "topics.list",
-    "title": "List topics from linked bullet blocks",
+    "title": "List topics from linked paragraphs and list blocks",
     "readOnly": true,
     "headless": true,
     "argsSchema": {
@@ -412,21 +475,90 @@
   },
   {
     "id": "topics.blocks",
-    "title": "Collect bullet subtrees for a topic",
+    "title": "Collect paragraphs and list subtrees for a topic",
     "readOnly": true,
     "headless": true,
     "argsSchema": {
       "type": "object",
       "properties": {
-        "topic": { "type": "string", "description": "Opaque topic ID from topics.list" },
-        "limit": { "type": "integer", "description": "1–100 blocks, default 50" },
-        "offset": { "type": "integer" },
+        "topic": {
+          "type": "string",
+          "description": "Opaque topic ID from topics.list"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "1–100 blocks, default 50"
+        },
+        "offset": {
+          "type": "integer"
+        },
         "descending": {
           "type": "boolean",
           "description": "Newest source-note creation date first, default true"
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "newest",
+            "oldest",
+            "custom"
+          ],
+          "description": "Defaults to saved custom order, otherwise newest. Overrides descending."
         }
       },
-      "required": ["topic"],
+      "required": [
+        "topic"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "topics.reorder",
+    "title": "Move a topic card and save custom order",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "topic": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string",
+          "description": "Card ID from topics.blocks"
+        },
+        "target": {
+          "type": "string",
+          "description": "Destination card ID from topics.blocks"
+        },
+        "placement": {
+          "type": "string",
+          "enum": [
+            "before",
+            "after"
+          ]
+        },
+        "sort": {
+          "type": "string",
+          "enum": [
+            "newest",
+            "oldest",
+            "custom"
+          ]
+        },
+        "expectedRevision": {
+          "type": "string",
+          "description": "orderRevision from topics.blocks"
+        }
+      },
+      "required": [
+        "topic",
+        "source",
+        "target",
+        "placement",
+        "sort",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -442,7 +574,9 @@
           "type": "string"
         }
       },
-      "required": ["target"],
+      "required": [
+        "target"
+      ],
       "additionalProperties": false
     }
   },
@@ -458,7 +592,9 @@
           "type": "string"
         }
       },
-      "required": ["query"],
+      "required": [
+        "query"
+      ],
       "additionalProperties": false
     }
   },
@@ -488,7 +624,28 @@
         "editorMode": {
           "type": "string"
         },
+        "lineNumbers": {
+          "type": "string"
+        },
+        "cursorShape": {
+          "type": "string"
+        },
+        "cursorFollowVim": {
+          "type": "boolean"
+        },
+        "cursorBlink": {
+          "type": "string"
+        },
+        "cursorBlinkRate": {
+          "type": "integer"
+        },
+        "cursorAnimation": {
+          "type": "string"
+        },
         "slash": {
+          "type": "boolean"
+        },
+        "showUnresolvedLinks": {
           "type": "boolean"
         },
         "leader": {
@@ -507,7 +664,7 @@
   },
   {
     "id": "extension.install",
-    "title": "Install declarative extension",
+    "title": "Install extension package",
     "readOnly": false,
     "headless": true,
     "argsSchema": {
@@ -517,7 +674,9 @@
           "type": "object"
         }
       },
-      "required": ["manifest"],
+      "required": [
+        "manifest"
+      ],
       "additionalProperties": false
     }
   },
@@ -533,7 +692,9 @@
           "type": "string"
         }
       },
-      "required": ["id"],
+      "required": [
+        "id"
+      ],
       "additionalProperties": false
     }
   },
@@ -580,7 +741,9 @@
     "headless": true,
     "argsSchema": {
       "type": "object",
-      "required": ["snapshot"],
+      "required": [
+        "snapshot"
+      ],
       "properties": {
         "snapshot": {
           "type": "object"
@@ -616,7 +779,9 @@
           "type": "string"
         }
       },
-      "required": ["name"],
+      "required": [
+        "name"
+      ],
       "additionalProperties": false
     }
   },
@@ -638,7 +803,11 @@
           "type": "string"
         }
       },
-      "required": ["id", "name", "expectedRevision"],
+      "required": [
+        "id",
+        "name",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -657,7 +826,209 @@
           "type": "string"
         }
       },
-      "required": ["id", "expectedRevision"],
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.status",
+    "title": "status code plugin",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.enable",
+    "title": "enable code plugin",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "digest"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.disable",
+    "title": "disable code plugin",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.invoke",
+    "title": "invoke code plugin",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "digest": {
+          "type": "string"
+        },
+        "event": {
+          "type": "object"
+        },
+        "state": {
+          "type": "object"
+        },
+        "editor": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "id",
+        "event"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.settings.get",
+    "title": "settings.get code plugin",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.settings.update",
+    "title": "settings.update code plugin",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "values",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "tags.list",
+    "title": "List note tags",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "tags.blocks",
+    "title": "Read tagged blocks",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "tag": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "offset": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "tag"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "attachment.import",
+    "title": "Import a vault image attachment",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "data": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "data"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "attachment.read",
+    "title": "Read a vault image attachment",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path"
+      ],
       "additionalProperties": false
     }
   }

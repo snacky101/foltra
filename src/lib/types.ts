@@ -34,23 +34,31 @@ export interface Row {
 export interface Link {
   source: string;
   target: string | null;
+  name: string;
   label: string;
   block: string | null;
   line: number;
   context: string;
 }
 export interface Binding {
-  leader?: string;
-  shortcut?: string;
+  keys: string;
+  leader: boolean;
 }
 export interface Settings {
-  readonly shortcutVersion?: 2;
+  readonly shortcutVersion?: 4;
   vim: boolean;
   editorMode: 'live' | 'source' | 'read';
+  lineNumbers: 'none' | 'absolute' | 'relative';
+  cursorShape: 'bar' | 'block' | 'underline';
+  cursorFollowVim: boolean;
+  cursorBlink: 'steady' | 'blink' | 'breath';
+  cursorBlinkRate: number;
+  cursorAnimation: 'none' | 'smooth' | 'smear';
   slash: boolean;
+  showUnresolvedLinks: boolean;
   leader: string;
   theme: string;
-  keybindings: Record<string, Binding>;
+  keybindings: Record<string, Binding[]>;
 }
 export interface Query {
   databaseId: string;
@@ -68,6 +76,7 @@ export interface QueryResult {
   limit: number;
 }
 export type PluginAction =
+  | { type: 'script' }
   | { type: 'view'; view: string }
   | { type: 'template'; title: string; body: string }
   | { type: 'query'; query: Query };
@@ -77,7 +86,8 @@ export interface Extension {
   name: string;
   version: string;
   description?: string;
-  commands?: { id: string; title: string; action: PluginAction }[];
+  commands?: { id: string; title: string; action: PluginAction; headless?: boolean }[];
+  runtime?: import('./pluginTypes').PluginRuntime;
   tokens?: Record<string, string>;
 }
 export interface Folder {
@@ -103,6 +113,8 @@ export interface Workspace {
   links: Link[];
   settings: Settings;
   extensions: Extension[];
+  pluginStates?: import('./pluginTypes').PluginStatus[];
+  topicOrderRevision?: string;
 }
 export interface Topic {
   id: string;
@@ -112,6 +124,7 @@ export interface Topic {
   noteCount: number;
 }
 export interface TopicBlock {
+  id: string;
   noteId: string;
   noteTitle: string;
   revision: string;
@@ -127,8 +140,12 @@ export interface TopicBlocks {
   total: number;
   offset: number;
   limit: number;
+  sort: TopicSort;
+  orderRevision: string;
 }
-export type View = 'notes' | 'all-notes' | 'database' | 'graph' | 'timeline' | 'topics' | 'settings' | 'extensions' | 'trash';
+export type TopicSort = 'newest' | 'oldest' | 'custom';
+export type View =
+  'notes' | 'all-notes' | 'database' | 'graph' | 'timeline' | 'topics' | 'settings' | 'trash' | 'plugin';
 export interface CoreCommand {
   id: string;
   title: string;

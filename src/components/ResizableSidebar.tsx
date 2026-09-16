@@ -1,6 +1,14 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 
-export function ResizableSidebar({ side, children }: { side: 'left' | 'right'; children: ReactNode }) {
+export function ResizableSidebar({
+  side,
+  children,
+  collapsed = false,
+}: {
+  side: 'left' | 'right';
+  children: ReactNode;
+  collapsed?: boolean;
+}) {
   const initialWidth = side === 'left' ? 242 : 254;
   const minimum = side === 'left' ? 200 : 220;
   const storageKey = `foltra:sidebar-width:${side}`;
@@ -32,6 +40,7 @@ export function ResizableSidebar({ side, children }: { side: 'left' | 'right'; c
   return (
     <div
       ref={container}
+      hidden={collapsed}
       className={`resizable-sidebar resizable-sidebar-${side}${dragging ? ' is-resizing' : ''}`}
       style={{ '--sidebar-width': `${width}px` } as CSSProperties}
     >

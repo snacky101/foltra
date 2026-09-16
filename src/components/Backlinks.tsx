@@ -18,10 +18,12 @@ export function Backlinks({
   workspace,
   noteId,
   openNote,
+  openLink,
 }: {
   workspace: Workspace;
   noteId: string;
   openNote: (id: string, line?: number) => void;
+  openLink: (target: string) => void;
 }) {
   const links = noteLinks(workspace);
   const incoming = linkItems(
@@ -29,7 +31,7 @@ export function Backlinks({
     'incoming',
   );
   const outgoing = linkItems(
-    links.filter((l) => l.source === noteId),
+    links.filter((l) => l.source === noteId && (l.target || workspace.settings.showUnresolvedLinks)),
     'outgoing',
   );
   const panel = useRef<HTMLElement>(null);
@@ -129,8 +131,8 @@ export function Backlinks({
             data-backlink-item={key}
             key={key}
             className={`outgoing-link ${!link.target ? 'unresolved' : ''}`}
-            disabled={!workspace.notes.some((n) => n.id === link.target)}
-            onClick={() => link.target && openNote(link.target)}
+            title={!link.target ? `미생성 링크: ${link.name}` : undefined}
+            onClick={() => openLink(link.name)}
           >
             <Link2 size={13} />
             <span>{link.label}</span>

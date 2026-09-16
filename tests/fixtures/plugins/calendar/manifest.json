@@ -1,0 +1,6 @@
+{
+  "kind":"plugin","id":"calendar","name":"노트 캘린더","version":"1.0.0",
+  "description":"노트를 달력에서 탐색하고 날짜별 기록을 만드세요. 월 이동과 날짜 기준을 설정할 수 있습니다.",
+  "commands":[{"id":"open","title":"노트 캘린더 열기","action":{"type":"script"}}],
+  "runtime":{"apiVersion":1,"permissions":["notes.read","notes.write","ui"],"views":[{"id":"calendar","title":"노트 캘린더"}],"events":["workspace.changed"],"settings":[{"id":"date-field","label":"노트 날짜 기준","type":"select","default":"작성일","options":["작성일","수정일"]},{"id":"week-start","label":"한 주의 시작","type":"select","default":"일요일","options":["일요일","월요일"]}]}
+}

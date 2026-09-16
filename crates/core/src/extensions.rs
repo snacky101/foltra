@@ -8,6 +8,8 @@ use serde_json::{json, Value};
 #[serde(deny_unknown_fields)]
 struct Manifest {
     kind: String,
+    #[serde(default)]
+    runtime: Option<Value>,
     id: String,
     name: String,
     version: String,
@@ -24,15 +26,18 @@ struct Contribution {
     id: String,
     title: String,
     action: Action,
+    #[serde(default)]
+    headless: bool,
 }
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
 enum Action {
+    Script,
     View { view: String },
     Template { title: String, body: String },
     Query { query: Query },
 }
-fn valid_slug(value: &str) -> bool {
+pub(crate) fn valid_slug(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 80
         && value
@@ -68,6 +73,20 @@ fn validate(value: &Value) -> Result<Manifest> {
             if manifest.commands.len() > 50 || !manifest.tokens.is_empty() {
                 return Err(Error::new("invalid_extension", "Invalid plugin fields"));
             }
+            if let Some(runtime) = &manifest.runtime {
+                let config = crate::plugin_manifest::validate(runtime)?;
+                if config.background_command.as_ref().is_some_and(|id| {
+                    !manifest
+                        .commands
+                        .iter()
+                        .any(|c| c.id == *id && matches!(c.action, Action::Script))
+                }) {
+                    return Err(Error::new(
+                        "invalid_extension",
+                        "Background command must be a declared script command",
+                    ));
+                }
+            }
             let mut seen = std::collections::HashSet::new();
             for contribution in &manifest.commands {
                 if !valid_slug(&contribution.id)
@@ -81,6 +100,7 @@ fn validate(value: &Value) -> Result<Manifest> {
                     ));
                 }
                 match &contribution.action {
+                    Action::Script if manifest.runtime.is_some() => {}
                     Action::View { view }
                         if ["graph", "timeline", "topics", "notes", "databases"]
                             .contains(&view.as_str()) => {}
@@ -99,7 +119,7 @@ fn validate(value: &Value) -> Result<Manifest> {
             }
         }
         "theme" => {
-            if !manifest.commands.is_empty() {
+            if !manifest.commands.is_empty() || manifest.runtime.is_some() {
                 return Err(Error::new(
                     "invalid_extension",
                     "Themes cannot register commands",
@@ -115,6 +135,14 @@ fn validate(value: &Value) -> Result<Manifest> {
                     "accent",
                     "sidebar",
                     "sidebar-ink",
+                    "selection",
+                    "danger",
+                    "warning",
+                    "success",
+                    "syntax-keyword",
+                    "syntax-atom",
+                    "syntax-literal",
+                    "syntax-string",
                 ]
                 .contains(&key.as_str())
                     || color.len() != 7
@@ -157,10 +185,20 @@ pub fn remove(store: &Store, extension_id: &str) -> Result<Value> {
         return Err(Error::new("invalid_extension", "Invalid extension ID"));
     }
     let path = format!("extensions/{extension_id}.json");
-    if store.optional(&path)?.is_none() {
-        return Err(Error::new("not_found", "Extension is not installed"));
+    let raw = store
+        .optional(&path)?
+        .ok_or_else(|| Error::new("not_found", "Extension is not installed"))?;
+    let manifest: Value = serde_json::from_str(&raw)?;
+    let mut writes = vec![(path, None)];
+    if manifest["kind"] == "theme" {
+        let mut settings = crate::vault::settings(store)?;
+        if settings["theme"] == extension_id {
+            settings["theme"] = json!("paper");
+            writes.push((".foltra/settings.json".into(), Some(pretty(&settings)?)));
+        }
     }
-    store.commit(vec![(path, None)])?;
+    crate::plugin_runtime::disable(store, extension_id)?;
+    store.commit(writes)?;
     Ok(json!({"removed":extension_id}))
 }
 pub fn list(store: &Store) -> Result<Value> {
@@ -182,8 +220,8 @@ pub fn command_specs(store: &Store) -> Result<Vec<Value>> {
                 let kind = command["action"]["type"].as_str().unwrap_or("");
                 specs.push(json!({
                     "id":format!("plugin.{}.{}",manifest["id"].as_str().unwrap(),command["id"].as_str().unwrap()),
-                    "title":command["title"], "headless":kind != "view", "readOnly":kind != "template",
-                    "argsSchema":{"type":"object","properties":{},"required":[],"additionalProperties":false}
+                    "title":command["title"], "headless": if kind == "script" { command["headless"].as_bool().unwrap_or(false) } else {kind != "view"}, "readOnly":kind != "template" && kind != "script",
+                    "argsSchema":{"type":"object","properties":{},"required":[],"additionalProperties":kind == "script"}
                 }));
             }
         }
@@ -192,7 +230,7 @@ pub fn command_specs(store: &Store) -> Result<Vec<Value>> {
 }
 
 pub fn execute_command(store: &Store, command_id: &str, args: &Value) -> Result<Value> {
-    if !args.as_object().is_some_and(|o| o.is_empty()) {
+    if !args.is_object() {
         return Err(Error::new(
             "invalid_arguments",
             "Declarative commands take no arguments",
@@ -204,7 +242,26 @@ pub fn execute_command(store: &Store, command_id: &str, args: &Value) -> Result<
             if format!("plugin.{}.{}", manifest.id, command.id) != command_id {
                 continue;
             }
+            if !matches!(command.action, Action::Script) && !args.as_object().unwrap().is_empty() {
+                return Err(Error::new(
+                    "invalid_arguments",
+                    "Declarative commands take no arguments",
+                ));
+            }
             return match command.action {
+                Action::Script => {
+                    if !command.headless {
+                        return Err(Error::new(
+                            "requires_ui",
+                            "This plugin command needs the desktop app",
+                        ));
+                    }
+                    crate::plugin_runtime::invoke(
+                        store,
+                        &json!({"id":manifest.id,"event":{"type":"command","id":command.id,"args":args}}),
+                        true,
+                    )
+                }
                 Action::Template { title, body } => {
                     crate::notes::create_note(store, &json!({"title":title,"body":body}))
                 }

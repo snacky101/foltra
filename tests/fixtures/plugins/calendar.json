@@ -1,0 +1,56 @@
+{
+  "kind": "plugin",
+  "id": "calendar",
+  "name": "노트 캘린더",
+  "version": "1.0.0",
+  "description": "노트를 달력에서 탐색하고 날짜별 기록을 만드세요. 월 이동과 날짜 기준을 설정할 수 있습니다.",
+  "commands": [
+    {
+      "id": "open",
+      "title": "노트 캘린더 열기",
+      "action": {
+        "type": "script"
+      }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": [
+      "notes.read",
+      "notes.write",
+      "ui"
+    ],
+    "views": [
+      {
+        "id": "calendar",
+        "title": "노트 캘린더"
+      }
+    ],
+    "events": [
+      "workspace.changed"
+    ],
+    "settings": [
+      {
+        "id": "date-field",
+        "label": "노트 날짜 기준",
+        "type": "select",
+        "default": "작성일",
+        "options": [
+          "작성일",
+          "수정일"
+        ]
+      },
+      {
+        "id": "week-start",
+        "label": "한 주의 시작",
+        "type": "select",
+        "default": "일요일",
+        "options": [
+          "일요일",
+          "월요일"
+        ]
+      }
+    ],
+    "source": "// tests/fixtures/plugins/calendar/main.ts\nfunction monthNow() {\n  const now = /* @__PURE__ */ new Date();\n  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, \"0\")}`;\n}\nfunction localDate(value) {\n  const d = new Date(value);\n  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, \"0\")}-${String(d.getDate()).padStart(2, \"0\")}`;\n}\nvar button = (text, action, payload) => ({\n  type: \"button\",\n  text,\n  action,\n  payload\n});\nvar main_default = {\n  onLoad(api) {\n    api.state.month = monthNow();\n  },\n  onEvent(api) {\n    api.state.updated = Date.now();\n  },\n  commands: {\n    open(api) {\n      api.openView(\"calendar\");\n    }\n  },\n  views: {\n    calendar: {\n      render(api) {\n        const month = String(api.state.month || monthNow());\n        const [year, index] = month.split(\"-\").map(Number);\n        const notes = api.call(\"note.list\");\n        const monday = api.settings[\"week-start\"] === \"\\uC6D4\\uC694\\uC77C\";\n        const start = (new Date(year, index - 1, 1).getDay() + (monday ? 6 : 0)) % 7;\n        const length = new Date(year, index, 0).getDate();\n        const cells = (monday ? [\"\\uC6D4\", \"\\uD654\", \"\\uC218\", \"\\uBAA9\", \"\\uAE08\", \"\\uD1A0\", \"\\uC77C\"] : [\"\\uC77C\", \"\\uC6D4\", \"\\uD654\", \"\\uC218\", \"\\uBAA9\", \"\\uAE08\", \"\\uD1A0\"]).map((text) => ({ type: \"text\", text, tone: \"muted\" }));\n        for (let offset = 0; offset < Math.ceil((start + length) / 7) * 7; offset++) {\n          const day = offset - start + 1;\n          if (day < 1 || day > length) {\n            cells.push({ type: \"card\", children: [] });\n            continue;\n          }\n          const date = `${month}-${String(day).padStart(2, \"0\")}`;\n          const matches = notes.filter(\n            (n) => localDate(api.settings[\"date-field\"] === \"\\uC218\\uC815\\uC77C\" ? n.updatedAt : n.createdAt) === date\n          );\n          cells.push({\n            type: \"card\",\n            children: [\n              button(String(day), \"date\", date),\n              ...matches.slice(0, 8).map((n) => button(n.title, \"note\", n.id)),\n              ...matches.length > 8 ? [{ type: \"text\", text: `+${matches.length - 8}\\uAC1C`, tone: \"muted\" }] : []\n            ]\n          });\n        }\n        return {\n          type: \"stack\",\n          children: [\n            {\n              type: \"row\",\n              children: [\n                button(\"\\uC774\\uC804 \\uB2EC\", \"month\", -1),\n                { type: \"heading\", text: `${year}\\uB144 ${index}\\uC6D4` },\n                button(\"\\uB2E4\\uC74C \\uB2EC\", \"month\", 1),\n                button(\"\\uC774\\uBC88 \\uB2EC\", \"today\")\n              ]\n            },\n            { type: \"text\", tone: \"muted\", text: \"\\uB0A0\\uC9DC\\uB97C \\uB204\\uB974\\uBA74 \\uADF8 \\uB0A0\\uC9DC\\uC758 \\uB178\\uD2B8\\uB97C \\uC5F4\\uAC70\\uB098 \\uC0C8\\uB85C \\uB9CC\\uB4ED\\uB2C8\\uB2E4.\" },\n            { type: \"grid\", columns: 7, children: cells }\n          ]\n        };\n      },\n      onAction(api, action) {\n        if (action.id === \"today\") api.state.month = monthNow();\n        if (action.id === \"month\") {\n          const [y, m] = String(api.state.month || monthNow()).split(\"-\").map(Number);\n          const date = new Date(y, m - 1 + Number(action.payload), 1);\n          api.state.month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, \"0\")}`;\n        }\n        if (action.id === \"note\") api.openNote(String(action.payload));\n        if (action.id === \"date\") {\n          const title = String(action.payload);\n          const found = api.call(\"note.list\").find((n) => n.title === title);\n          const note = found || api.call(\"note.create\", { title, body: `# ${title}\n\n` });\n          api.openNote(note.id);\n        }\n      }\n    }\n  }\n};\nexport {\n  main_default as default\n};\n"
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "kind": "theme",
+  "id": "rose-pine",
+  "name": "Rosé Pine",
+  "version": "1.0.0",
+  "description": "짙은 보라색 바탕에 장밋빛과 솔빛을 더한 Rosé Pine.",
+  "tokens": {
+    "paper": "#191724",
+    "panel": "#1f1d2e",
+    "ink": "#e0def4",
+    "muted": "#908caa",
+    "line": "#403d52",
+    "accent": "#ebbcba",
+    "sidebar": "#191724",
+    "sidebar-ink": "#e0def4",
+    "selection": "#403d52",
+    "danger": "#eb6f92",
+    "warning": "#f6c177",
+    "success": "#9ccfd8",
+    "syntax-keyword": "#c4a7e7",
+    "syntax-atom": "#f6c177",
+    "syntax-literal": "#9ccfd8",
+    "syntax-string": "#ebbcba"
+  }
+}

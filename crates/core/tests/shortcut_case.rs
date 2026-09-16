@@ -15,26 +15,23 @@ fn legacy_shortcut_labels_keep_their_behavior_and_new_settings_preserve_case() {
     .to_string();
     std::fs::write(&file, &old).unwrap();
     let loaded = execute(path, "settings.get", json!({})).unwrap();
-    assert_eq!(loaded["shortcutVersion"], 2);
-    assert_eq!(loaded["keybindings"]["focus.left"]["shortcut"], "Ctrl+h");
-    assert_eq!(
-        loaded["keybindings"]["focus.up"]["shortcut"],
-        "Ctrl+Shift+k"
-    );
-    assert_eq!(loaded["keybindings"]["note.rename"]["shortcut"], "F2");
+    assert_eq!(loaded["shortcutVersion"], 4);
+    assert_eq!(loaded["keybindings"]["focus.left"][0]["keys"], "Ctrl+h");
+    assert_eq!(loaded["keybindings"]["focus.up"][0]["keys"], "Ctrl+Shift+k");
+    assert_eq!(loaded["keybindings"]["note.rename"][0]["keys"], "F2");
     assert_eq!(std::fs::read_to_string(&file).unwrap(), old);
     execute(path, "settings.update", json!({"theme":"night"})).unwrap();
     let stored: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&file).unwrap()).unwrap();
-    assert_eq!(stored["shortcutVersion"], 2);
+    assert_eq!(stored["shortcutVersion"], 4);
     assert_eq!(stored["keybindings"], loaded["keybindings"]);
-    let bindings = json!({"focus.left":{"shortcut":"Ctrl+h"},"focus.right":{"shortcut":"Ctrl+H","leader":"R n"}});
+    let bindings = json!({"focus.left":[{"keys":"Ctrl+h","leader":false}],"focus.right":[{"keys":"Ctrl+H","leader":false},{"keys":"R n","leader":true}]});
     execute(path, "settings.update", json!({"keybindings":bindings})).unwrap();
     assert_eq!(
         execute(path, "settings.get", json!({})).unwrap()["keybindings"],
         bindings
     );
-    for version in [0, 3] {
+    for version in [0, 5] {
         std::fs::write(&file, json!({"shortcutVersion":version}).to_string()).unwrap();
         assert_eq!(
             execute(path, "settings.get", json!({})).unwrap_err().code,

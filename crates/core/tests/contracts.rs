@@ -501,8 +501,10 @@ fn backup_rejects_path_escape_before_writing_any_originals() {
 #[test]
 fn plugin_commands_are_discoverable_and_headless_actions_use_the_core() {
     let v = vault();
-    let manifest: Value =
-        serde_json::from_str(include_str!("../../../examples/daily-trail.json")).unwrap();
+    let manifest: Value = serde_json::from_str(include_str!(
+        "../../../tests/fixtures/plugins/daily-trail.json"
+    ))
+    .unwrap();
     call(&v, "extension.install", json!({"manifest":manifest}));
     let specs = call(&v, "commands.list", json!({}));
     assert!(specs

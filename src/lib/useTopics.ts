@@ -1,8 +1,13 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { call } from './api';
-import type { Topic, TopicBlocks, Workspace } from './types';
+import type { Topic, TopicBlocks, TopicSort, Workspace } from './types';
 
-export const defaultTopicOptions = { topicId: null as string | null, offset: 0, descending: true };
+export const defaultTopicOptions = {
+  topicId: null as string | null,
+  offset: 0,
+  sort: null as TopicSort | null,
+  showSources: false,
+};
 export type TopicOptions = typeof defaultTopicOptions;
 
 export function useTopics(workspace: Workspace, options: TopicOptions) {
@@ -10,6 +15,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const sourceKey = JSON.stringify([
     workspace.path,
     workspace.notes.map((note) => [note.id, note.revision]),
+    workspace.topicOrderRevision,
     retry,
   ]);
   const [catalog, setCatalog] = useState<{ key: string; topics?: Topic[]; error?: string } | null>(null);
@@ -30,7 +36,13 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const topics = catalog?.key === sourceKey ? catalog.topics : undefined;
   const topic = topics?.find((topic) => topic.id === options.topicId) ?? topics?.[0];
   const offset = topic?.id === options.topicId ? options.offset : 0;
-  const requestKey = JSON.stringify([sourceKey, topic?.id, offset, options.descending]);
+  const requestKey = JSON.stringify([sourceKey, topic?.id, offset, options.sort]);
+  const context = JSON.stringify([workspace.path, topic?.id]);
+  const currentContext = useRef(context);
+  currentContext.current = context;
+  const pending = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<{ context: string; message: string } | null>(null);
   const [page, setPage] = useState<{ key: string; data?: TopicBlocks; error?: string } | null>(null);
   useEffect(() => {
     if (!topic) return;
@@ -39,7 +51,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       topic: topic.id,
       offset,
       limit: 50,
-      descending: options.descending,
+      ...(options.sort ? { sort: options.sort } : {}),
     }).then(
       (data) => {
         if (active) setPage({ key: requestKey, data });
@@ -51,12 +63,59 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
     return () => {
       active = false;
     };
-  }, [requestKey, workspace.path, topic?.id, offset, options.descending]);
+  }, [requestKey, workspace.path, topic?.id, offset, options.sort]);
+  useEffect(
+    () => () => {
+      currentContext.current = '';
+    },
+    [],
+  );
+  const reload = () => {
+    setSaveError(null);
+    setRetry((value) => value + 1);
+  };
+  const move = async (
+    source: string,
+    target: string,
+    placement: 'before' | 'after',
+    expectedRevision: string,
+    sort: TopicSort,
+  ) => {
+    if (pending.current || !topic) return false;
+    pending.current = true;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await call(workspace.path, 'topics.reorder', {
+        topic: topic.id,
+        source,
+        target,
+        placement,
+        expectedRevision,
+        sort,
+      });
+      if (currentContext.current !== context) return false;
+      reload();
+      return true;
+    } catch (error) {
+      if (currentContext.current === context) setSaveError({ context, message: (error as Error).message });
+      return false;
+    } finally {
+      pending.current = false;
+      setSaving(false);
+    }
+  };
   return {
     topics,
     topic,
     data: page?.key === requestKey ? page.data : undefined,
-    error: (catalog?.key === sourceKey && catalog.error) || (page?.key === requestKey && page.error) || '',
-    reload: () => setRetry((value) => value + 1),
+    error:
+      (saveError?.context === context && saveError.message) ||
+      (catalog?.key === sourceKey && catalog.error) ||
+      (page?.key === requestKey && page.error) ||
+      '',
+    reload,
+    saving,
+    move,
   };
 }

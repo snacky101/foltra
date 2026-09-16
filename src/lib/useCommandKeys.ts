@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { bindingsFor, canStartLeader, shortcutMatches, type Command } from './commands';
+import {
+  bindingsFor,
+  canStartLeader,
+  leaderCandidates,
+  sequenceKeys,
+  shortcutMatches,
+  type Command,
+} from './commands';
 import type { Settings } from './types';
 import { leaderMatches } from './leaderKey';
 import { moveSidebarFocus } from './workspaceFocus';
@@ -27,7 +34,13 @@ export function useCommandKeys(
     };
     const keydown = (event: KeyboardEvent) => {
       const { commands, settings, mode, modalOpen } = state.current;
-      if ((event.target as HTMLElement | null)?.closest('[data-key-recorder], [data-inline-rename]')) {
+      // A composition may still target the old editor after focus has moved.
+      // Route commands by the focused control, and never reinterpret text fields.
+      const target =
+        document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+          ? document.activeElement
+          : (event.target as HTMLElement | null);
+      if (target?.closest('[data-key-recorder], [data-inline-rename]')) {
         reset();
         return;
       }
@@ -36,20 +49,23 @@ export function useCommandKeys(
         reset();
         return;
       }
-      if (modalOpen || (event.target as HTMLElement | null)?.closest('[role="menu"], [role="dialog"]'))
-        return;
-      const target = event.target as HTMLElement | null;
+      if (modalOpen || target?.closest('[role="menu"], [role="dialog"]')) return;
       const editable = !!target?.closest(
         'input, textarea, select, [role="combobox"], [data-keyboard-input], [contenteditable="true"]',
       );
-      const inEditor = !!target?.closest('.cm-editor');
+      const inEditor =
+        !!target?.closest('.cm-editor') && !target?.closest('input, textarea, select, [data-keyboard-input]');
       const composing = event.isComposing || event.keyCode === 229;
       const commandMode =
         settings.vim && (!editable || (inEditor && (mode === 'NORMAL' || mode === 'VISUAL')));
-      const shortcut = commands.find((command) => {
-        const key = bindingsFor(command, settings).shortcut;
-        return key && shortcutMatches(event, key);
-      });
+      const shortcut =
+        sequence === null
+          ? commands.find((command) =>
+              bindingsFor(command, settings).some(
+                (binding) => !binding.leader && shortcutMatches(event, binding.keys),
+              ),
+            )
+          : undefined;
       // Only explicit pane navigation may interrupt text composition. Normal-mode
       // Vim keys are commands, so they can still reach the editor or sidebar.
       if (composing) {
@@ -117,17 +133,27 @@ export function useCommandKeys(
         event.stopImmediatePropagation();
         return;
       }
-      if (sequence === null || key.length !== 1) return;
+      if (sequence === null) return;
+      const candidates = leaderCandidates(commands, settings, sequence);
+      const modified =
+        sequence === '' && candidates.find(({ binding }) => shortcutMatches(event, binding.keys));
+      if (modified) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        invoke(modified.command);
+        return;
+      }
+      if (['Control', 'Meta', 'Alt', 'Shift'].includes(event.key)) return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (key.length !== 1 || event.ctrlKey || event.metaKey || event.altKey) {
+        reset();
+        return;
+      }
       sequence += key;
-      const next = commands.filter((command) =>
-        bindingsFor(command, settings).leader?.replaceAll(' ', '').startsWith(sequence!),
-      );
-      const exact = next.find(
-        (command) => bindingsFor(command, settings).leader?.replaceAll(' ', '') === sequence,
-      );
-      if (exact) invoke(exact);
+      const next = leaderCandidates(commands, settings, sequence);
+      const exact = next.find(({ binding }) => sequenceKeys(binding) === sequence);
+      if (exact) invoke(exact.command);
       else if (next.length) {
         setPending(sequence);
       } else reset();

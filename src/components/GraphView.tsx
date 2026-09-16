@@ -2,8 +2,17 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Maximize2, Minus, Plus } from 'lucide-react';
 import type { Workspace } from '../lib/types';
 import type { GraphInput, GraphLayout } from '../lib/graphLayout';
+import { graphDocuments } from '../lib/graphDocuments';
 
-export function GraphView({ workspace, openNote }: { workspace: Workspace; openNote: (id: string) => void }) {
+export function GraphView({
+  workspace,
+  openNote,
+  openLink,
+}: {
+  workspace: Workspace;
+  openNote: (id: string) => void;
+  openLink: (target: string) => void;
+}) {
   const [selected, setSelected] = useState<string | null>(null);
   const [hovered, setHovered] = useState<string | null>(null);
   const [zoom, setZoom] = useState(1);
@@ -12,20 +21,26 @@ export function GraphView({ workspace, openNote }: { workspace: Workspace; openN
   const [result, setResult] = useState<{ key: string; layout: GraphLayout } | null>(null);
   const [error, setError] = useState(false);
   const drag = useRef<{ x: number; y: number; pan: { x: number; y: number } } | null>(null);
-  const current = workspace.notes.find((note) => note.id === selected);
+  const documents = graphDocuments(workspace);
+  const current = documents.notes.find((note) => note.id === selected);
+  const open = (id: string) => {
+    const note = documents.notes.find((note) => note.id === id);
+    if (note?.unresolved) openLink(note.title);
+    else if (note) openNote(id);
+  };
   const adjacent = new Set(
-    workspace.links
+    documents.links
       .filter((link) => link.source === current?.id || link.target === current?.id)
       .flatMap((link) => [link.source, link.target]),
   );
-  const candidates = workspace.notes
+  const candidates = documents.notes
     .filter((note) => !local || !current || note.id === current.id || adjacent.has(note.id))
     .sort((a, b) => a.id.localeCompare(b.id))
     .slice(0, 120);
   const ids = new Set(candidates.map((note) => note.id));
   const input: GraphInput = {
     notes: candidates.map(({ id, title }) => ({ id, title })),
-    links: workspace.links
+    links: documents.links
       .filter((link) => ids.has(link.source) && ids.has(link.target ?? ''))
       .map(({ source, target }) => ({ source, target }))
       .sort((a, b) => a.source.localeCompare(b.source) || (a.target ?? '').localeCompare(b.target ?? '')),
@@ -168,18 +183,18 @@ export function GraphView({ workspace, openNote }: { workspace: Workspace; openN
               <g
                 key={node.id}
                 data-node-id={node.id}
-                className={`graph-node${selected === node.id ? ' selected' : ''}${activeId && !related.has(node.id) ? ' dimmed' : ''}`}
+                className={`graph-node${documents.notes.find((note) => note.id === node.id)?.unresolved ? ' unresolved' : ''}${selected === node.id ? ' selected' : ''}${activeId && !related.has(node.id) ? ' dimmed' : ''}`}
                 tabIndex={0}
                 role="button"
                 aria-label={`노트 ${node.title}`}
                 onClick={() => setSelected(node.id)}
-                onDoubleClick={() => openNote(node.id)}
+                onDoubleClick={() => open(node.id)}
                 onPointerEnter={() => setHovered(node.id)}
                 onPointerLeave={() => setHovered(null)}
                 onFocus={() => setHovered(node.id)}
                 onBlur={() => setHovered(null)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter') openNote(node.id);
+                  if (e.key === 'Enter') open(node.id);
                   if (e.key === ' ') {
                     e.preventDefault();
                     setSelected(node.id);
@@ -233,14 +248,18 @@ export function GraphView({ workspace, openNote }: { workspace: Workspace; openN
           <i />
           노트{' '}
           <span>
-            {graph?.nodes.length ?? 0} / {workspace.notes.length} 표시
+            {graph?.nodes.length ?? 0} / {documents.notes.length} 표시
           </span>
         </span>
       </div>
       {current ? (
-        <button className="graph-selection" onClick={() => openNote(current.id)}>
+        <button className="graph-selection" onClick={() => open(current.id)}>
           <strong>{current.title}</strong>
-          <span>{nodeMap.get(current.id)?.degree ?? 0} connections</span>
+          <span>
+            {current.unresolved
+              ? '미생성 노트 · 클릭하여 만들기'
+              : `${nodeMap.get(current.id)?.degree ?? 0} connections`}
+          </span>
           <ArrowUpRight size={17} />
         </button>
       ) : (

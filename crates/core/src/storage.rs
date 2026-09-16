@@ -1,10 +1,11 @@
 use crate::{Error, Result};
+use base64::{engine::general_purpose::STANDARD, Engine};
 use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
     fs::{self, File, OpenOptions},
-    io::Write,
+    io::{Read, Write},
     path::{Component, Path, PathBuf},
 };
 use uuid::Uuid;
@@ -48,7 +49,7 @@ fn sync_dir(path: &Path) -> Result<()> {
     Ok(())
 }
 
-fn atomic_write(path: &Path, text: &str) -> Result<()> {
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     let parent = path
         .parent()
         .ok_or_else(|| Error::new("invalid_path", "Missing parent directory"))?;
@@ -63,7 +64,7 @@ fn atomic_write(path: &Path, text: &str) -> Result<()> {
             options.mode(0o600);
         }
         let mut file = options.open(&temp)?;
-        file.write_all(text.as_bytes())?;
+        file.write_all(bytes)?;
         file.sync_all()?;
         fs::rename(&temp, path)?;
         sync_dir(parent)?;
@@ -80,6 +81,8 @@ struct Entry {
     path: String,
     before: Option<String>,
     after: Option<String>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    binary: bool,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -88,9 +91,10 @@ struct Journal {
     entries: Vec<Entry>,
 }
 
+#[derive(Clone)]
 pub struct Store {
     pub root: PathBuf,
-    _lock: File,
+    _lock: std::sync::Arc<File>,
 }
 
 impl Store {
@@ -127,7 +131,10 @@ impl Store {
         }
         let lock = options.open(lock_path)?;
         lock.lock_exclusive()?;
-        let store = Self { root, _lock: lock };
+        let store = Self {
+            root,
+            _lock: std::sync::Arc::new(lock),
+        };
         store.recover()?;
         Ok(store)
     }
@@ -141,6 +148,16 @@ impl Store {
             ));
         }
         Ok(fs::read_to_string(path)?)
+    }
+
+    pub fn read_bytes(&self, relative: &str, limit: usize) -> Result<Vec<u8>> {
+        let file = File::open(safe_path(&self.root, relative)?)?;
+        let mut bytes = Vec::new();
+        file.take(limit as u64 + 1).read_to_end(&mut bytes)?;
+        if bytes.len() > limit {
+            return Err(Error::new("file_too_large", "File exceeds the size limit"));
+        }
+        Ok(bytes)
     }
 
     pub fn optional(&self, relative: &str) -> Result<Option<String>> {
@@ -171,6 +188,14 @@ impl Store {
     }
 
     pub fn commit(&self, writes: Vec<(String, Option<String>)>) -> Result<()> {
+        self.commit_with_binary(writes, vec![])
+    }
+
+    pub fn commit_with_binary(
+        &self,
+        writes: Vec<(String, Option<String>)>,
+        binaries: Vec<(String, Vec<u8>)>,
+    ) -> Result<()> {
         let mut entries = vec![];
         for (path, after) in writes {
             safe_path(&self.root, &path)?;
@@ -178,10 +203,28 @@ impl Store {
                 before: self.optional(&path)?,
                 path,
                 after,
+                binary: false,
+            });
+        }
+        for (path, bytes) in binaries {
+            let before = match self.read_bytes(&path, crate::attachments::MAX_BYTES) {
+                Ok(bytes) => Some(STANDARD.encode(bytes)),
+                Err(e) if e.code == "not_found" => None,
+                Err(e) => return Err(e),
+            };
+            entries.push(Entry {
+                path,
+                before,
+                after: Some(STANDARD.encode(bytes)),
+                binary: true,
             });
         }
         let journal = Journal {
-            version: 1,
+            version: if entries.iter().any(|e| e.binary) {
+                2
+            } else {
+                1
+            },
             entries,
         };
         let pending = safe_path(&self.root, ".foltra/local/pending.json")?;
@@ -191,7 +234,11 @@ impl Store {
                 "An earlier save needs recovery",
             ));
         }
-        atomic_write(&pending, &serde_json::to_string(&journal)?)?;
+        let encoded = serde_json::to_vec(&journal)?;
+        if encoded.len() > 256 * 1024 * 1024 {
+            return Err(Error::new("file_too_large", "Save journal exceeds 256 MiB"));
+        }
+        atomic_write(&pending, &encoded)?;
         self.apply(&journal)?;
         fs::remove_file(pending)?;
         sync_dir(&self.root.join(".foltra/local"))?;
@@ -199,7 +246,7 @@ impl Store {
     }
 
     fn apply(&self, journal: &Journal) -> Result<()> {
-        if journal.version != 1 {
+        if ![1, 2].contains(&journal.version) {
             return Err(Error::new(
                 "unsupported_format",
                 "Unknown recovery journal version",
@@ -207,7 +254,21 @@ impl Store {
         }
         // Check every precondition before replaying any remaining writes.
         for entry in &journal.entries {
-            let current = self.optional(&entry.path)?;
+            let current = if entry.binary {
+                match self.read_bytes(&entry.path, crate::attachments::MAX_BYTES) {
+                    Ok(bytes) => Some(STANDARD.encode(bytes)),
+                    Err(e) if e.code == "not_found" => None,
+                    Err(e) => return Err(e),
+                }
+            } else {
+                self.optional(&entry.path)?
+            };
+            if entry.binary {
+                // Validate every binary before replaying any journal entry.
+                if let Some(encoded) = &entry.after {
+                    crate::attachments::decode_entry(&entry.path, encoded)?;
+                }
+            }
             if current != entry.before && current != entry.after {
                 return Err(Error::new(
                     "recovery_conflict",
@@ -221,7 +282,12 @@ impl Store {
         for entry in &journal.entries {
             let path = safe_path(&self.root, &entry.path)?;
             if let Some(text) = &entry.after {
-                atomic_write(&path, text)?;
+                let bytes = if entry.binary {
+                    crate::attachments::decode_entry(&entry.path, text)?
+                } else {
+                    text.as_bytes().to_vec()
+                };
+                atomic_write(&path, &bytes)?;
             } else if path.exists() {
                 fs::remove_file(&path)?;
                 sync_dir(path.parent().unwrap())?;
@@ -231,8 +297,10 @@ impl Store {
     }
 
     fn recover(&self) -> Result<()> {
-        if let Some(text) = self.optional(".foltra/local/pending.json")? {
-            let journal: Journal = serde_json::from_str(&text)?;
+        let pending = ".foltra/local/pending.json";
+        if safe_path(&self.root, pending)?.exists() {
+            let journal: Journal =
+                serde_json::from_slice(&self.read_bytes(pending, 256 * 1024 * 1024)?)?;
             self.apply(&journal)?;
             fs::remove_file(safe_path(&self.root, ".foltra/local/pending.json")?)?;
             sync_dir(&self.root.join(".foltra/local"))?;

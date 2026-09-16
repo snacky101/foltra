@@ -1,3 +1,7 @@
+import { TagNavigation } from './lib/tagNavigation';
+import { usePlugins } from './lib/usePlugins';
+import { PluginView } from './components/PluginView';
+import { useSettingsNavigation, settingsGroups, type SettingsGroup } from './lib/settingsNavigation';
 import { leaderLabel } from './lib/leaderKey';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -6,6 +10,7 @@ import {
   ChevronRight,
   Loader2,
   PanelRight,
+  PanelLeft,
   Save,
   Table2,
   X,
@@ -18,7 +23,7 @@ import { useNoteActions, type NoteAction } from './lib/useNoteActions';
 import { moveWorkspaceFocus, rememberWorkspaceFocus } from './lib/workspaceFocus';
 import { useCommandKeys } from './lib/useCommandKeys';
 import { useCloseGuard } from './lib/useCloseGuard';
-import { bindingsFor } from './lib/commands';
+import { leaderCandidates, sequenceKeys } from './lib/commands';
 import { createBuiltinCommands } from './lib/builtinCommands';
 import { applyTheme } from './lib/theme';
 import { defaultNoteListOptions } from './lib/noteList';
@@ -32,6 +37,8 @@ import { NoteContextMenu, type NoteMenuTarget } from './components/NoteContextMe
 import { FolderDialog } from './components/FolderDialog';
 import { useTreeEditing, type FolderAction } from './lib/useTreeEditing';
 import type { EditorHandle } from './components/Editor';
+import type { EditorLocation } from './lib/editorLocation';
+import { moveNoteHistory, recordNoteVisit, type NoteHistory } from './lib/noteHistory';
 
 import { NotePane } from './components/NotePane';
 import { AllNotesView } from './components/AllNotesView';
@@ -41,21 +48,42 @@ import { DatabaseView } from './components/DatabaseView';
 import { TimelineView } from './components/KnowledgeViews';
 import { TopicsView } from './components/TopicsView';
 import { GraphView } from './components/GraphView';
+import { useOpenWikiLink } from './lib/useOpenWikiLink';
 import { SettingsView } from './components/SettingsView';
-import { ExtensionsView } from './components/ExtensionsView';
 import { TrashView } from './components/TrashView';
 
 export default function App() {
   const vault = useWorkspace();
   const workspace = vault.workspace;
-  const [view, setView] = useState<View>('notes');
+  const [workView, setWorkView] = useState<View>('notes');
+  const settingsNavigation = useSettingsNavigation(vault.path);
+  const view = settingsNavigation.opened ? 'settings' : workView;
+  const setView = (target: View) => {
+    if (target === 'notes') pendingEditorFocus.current = true;
+    settingsNavigation.close(false);
+    setWorkView(target);
+  };
   const [noteListOptions, setNoteListOptions] = useState(defaultNoteListOptions);
-  const [topicOptions, setTopicOptions] = useState(defaultTopicOptions);
+  const [topicOptions, setTopicOptions] = useState(() => ({
+    ...defaultTopicOptions,
+    showSources: localStorage.getItem('foltra:topics:sources') === 'true',
+  }));
+  useEffect(() => {
+    localStorage.setItem('foltra:topics:sources', String(topicOptions.showSources));
+  }, [topicOptions.showSources]);
   const [noteId, setNoteId] = useState<string | null>(null);
   const [databaseId, setDatabaseId] = useState<string | null>(null);
   const editorMode = workspace?.settings.editorMode ?? 'live';
   const preview = editorMode === 'read';
   const [backlinks, setBacklinks] = useState(true);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('foltra:sidebar-collapsed:left') === 'true',
+  );
+  const [compactNavigation, setCompactNavigation] = useState(
+    () => localStorage.getItem('foltra:sidebar-navigation:compact') === 'true',
+  );
+  const sidebarHidden = sidebarCollapsed && !settingsNavigation.opened;
+  const sidebarToggle = useRef<HTMLButtonElement>(null);
   const [mode, setMode] = useState('EDIT');
   const [palette, setPalette] = useState(false);
   const [vaultPicker, setVaultPicker] = useState(false);
@@ -67,12 +95,15 @@ export default function App() {
   const [noteMenu, setNoteMenu] = useState<NoteMenuTarget | null>(null);
   const [toast, setToast] = useState('');
   const [query, setQuery] = useState<Query | undefined>();
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<NoteHistory>({ back: [], forward: [] });
+  const returning = useRef(false);
   const editor = useRef<EditorHandle>(null);
   const commandLineHost = useRef<HTMLDivElement>(null);
   const selectedVault = useRef('');
   const pendingInsert = useRef<string | null>(null);
   const pendingLine = useRef<number | null>(null);
+  const pendingLocation = useRef<EditorLocation | null>(null);
+  const pendingEditorFocus = useRef(true);
   const note = useNote(
     vault.path,
     noteId,
@@ -89,6 +120,13 @@ export default function App() {
   const closeVaultPicker = useCallback(() => setVaultPicker(false), []);
   const closeFolderDialog = useCallback(() => setFolderDialog(null), []);
   const closeNoteMenu = useCallback(() => setNoteMenu(null), []);
+
+  useEffect(() => {
+    localStorage.setItem('foltra:sidebar-collapsed:left', String(sidebarCollapsed));
+  }, [sidebarCollapsed]);
+  useEffect(() => {
+    localStorage.setItem('foltra:sidebar-navigation:compact', String(compactNavigation));
+  }, [compactNavigation]);
 
   useEffect(() => {
     if (workspace) applyTheme(workspace);
@@ -110,6 +148,10 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [toast]);
   const editorReady = () => {
+    if (pendingEditorFocus.current && editor.current) {
+      editor.current.focus();
+      pendingEditorFocus.current = false;
+    }
     if (pendingInsert.current !== null && editor.current) {
       editor.current.insert(pendingInsert.current);
       pendingInsert.current = null;
@@ -118,20 +160,73 @@ export default function App() {
       editor.current.jump(pendingLine.current);
       pendingLine.current = null;
     }
+    if (pendingLocation.current && editor.current) {
+      editor.current.restoreLocation(pendingLocation.current);
+      pendingLocation.current = null;
+    }
   };
+  useEffect(() => {
+    if (!preview || settingsNavigation.opened || note.status === 'loading' || !pendingEditorFocus.current)
+      return;
+    if (note.note?.id !== noteId || view !== 'notes') return;
+    const frame = requestAnimationFrame(() => {
+      if (pendingLocation.current && editor.current) {
+        editor.current.restoreLocation(pendingLocation.current);
+        pendingLocation.current = null;
+      }
+      document.querySelector<HTMLElement>('.note-scroll')?.focus({ preventScroll: true });
+      pendingEditorFocus.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [preview, settingsNavigation.opened, note.status, note.note?.id, noteId, view]);
   const openNote = async (id: string, line?: number) => {
+    if (returning.current) return;
     if (!(await note.save())) return;
-    if (noteId && id !== noteId) setHistory((old) => [...old.slice(-49), noteId]);
+    pendingEditorFocus.current = !preview || !!line;
+    if (noteId && (id !== noteId || line)) {
+      const location = editor.current?.getLocation() ?? null;
+      setHistory((old) => recordNoteVisit(old, { id: noteId, location }));
+    }
+    pendingLocation.current = null;
     setNoteId(id);
     setView('notes');
     setPalette(false);
     if (line) {
       pendingLine.current = line;
-      if (id === noteId && view === 'notes' && !preview) editorReady();
       void updateSettings({ editorMode: 'live' });
     } else pendingLine.current = null;
+    if (id === noteId && workView === 'notes' && !preview) {
+      requestAnimationFrame(editorReady);
+    }
+  };
+  const navigateHistory = async (direction: 'back' | 'forward') => {
+    if (returning.current || note.status === 'loading' || !workspace) return;
+    returning.current = true;
+    try {
+      if (!(await note.save()) || selectedVault.current !== workspace.path) return;
+      const result = moveNoteHistory(
+        history,
+        direction,
+        noteId ? { id: noteId, location: editor.current?.getLocation() ?? null } : null,
+        (id) => workspace.notes.some((item) => item.id === id),
+      );
+      setHistory(result.history);
+      if (!result.target) return;
+      pendingLine.current = null;
+      pendingLocation.current = result.target.location;
+      setNoteId(result.target.id);
+      setView('notes');
+      setPalette(false);
+      if (result.target.id === noteId && workView === 'notes') requestAnimationFrame(editorReady);
+    } finally {
+      returning.current = false;
+    }
+  };
+  const openSettings = async (group?: SettingsGroup) => {
+    if (await note.save()) settingsNavigation.open(group);
   };
   const navigate = async (target: View, dbId?: string) => {
+    if (target === 'settings') return openSettings();
     if (!(await note.save())) return;
     setView(target);
     if (dbId) {
@@ -139,6 +234,7 @@ export default function App() {
       setQuery(undefined);
     }
   };
+  const openLink = useOpenWikiLink(vault.path, workspace, note.save, vault.refresh, openNote, onError);
   const openBody = (row: Row) => {
     if (row.bodyNoteId && workspace?.notes.some((n) => n.id === row.bodyNoteId))
       void openNote(row.bodyNoteId);
@@ -174,7 +270,14 @@ export default function App() {
     await vault.refresh();
     setView('database');
   };
-  const treeEditing = useTreeEditing(vault.path, workspace, note.save, vault.refresh, openNote);
+  const treeEditing = useTreeEditing(vault.path, workspace, note.save, vault.refresh, async (id) => {
+    await openNote(id);
+    // Sidebar creation immediately starts inline naming; it owns focus until committed.
+    pendingEditorFocus.current = false;
+  });
+  useEffect(() => {
+    if (treeEditing.editing) setSidebarCollapsed(false);
+  }, [treeEditing.editing?.id]);
   const noteActions = useNoteActions(
     vault.path,
     note,
@@ -204,12 +307,28 @@ export default function App() {
         setView('notes');
         pendingInsert.current = null;
         pendingLine.current = null;
+        pendingLocation.current = null;
       },
       notify: setToast,
     });
   const changeEditorMode = async (mode: Settings['editorMode']) => {
-    await updateSettings({ editorMode: mode });
+    pendingEditorFocus.current = mode !== 'read';
+    if (await updateSettings({ editorMode: mode })) {
+      if (mode !== 'read') requestAnimationFrame(editorReady);
+    } else pendingEditorFocus.current = false;
   };
+  const plugins = usePlugins({
+    visible: workView === 'plugin' && !settingsNavigation.opened,
+    workspace,
+    editor,
+    noteId,
+    save: note.save,
+    refresh: vault.refresh,
+    openNote,
+    openView: () => setView('plugin'),
+    onError,
+    notify: setToast,
+  });
   const commands = createBuiltinCommands({
     'command.palette': () => setPalette(true),
     'vault.switch': () => setVaultPicker(true),
@@ -217,13 +336,19 @@ export default function App() {
     'note.find': () => setPalette(true),
     search: () => setDialog({ kind: 'search' }),
     'note.save': () => noteCommand('write'),
-    'note.close': () => noteCommand('quit'),
+    'note.close': () => {
+      if (view === 'notes' && noteId) return noteCommand('writequit');
+    },
     'note.save-close': () => noteCommand('writequit'),
     'note.preview': () => changeEditorMode(preview ? 'live' : 'read'),
     'note.mode.live': () => changeEditorMode('live'),
     'note.mode.source': () => changeEditorMode('source'),
     'note.mode.read': () => changeEditorMode('read'),
     'note.link': () => setDialog({ kind: 'link' }),
+    'note.follow-link': () => editor.current?.followLink(),
+    'note.follow-existing-link': () => editor.current?.followLink(false),
+    'note.back': () => navigateHistory('back'),
+    'note.forward': () => navigateHistory('forward'),
     'note.query': () => setDialog({ kind: 'query' }),
     'note.delete': () => currentNoteAction('delete'),
     'note.move': () => currentNoteAction('move'),
@@ -254,6 +379,15 @@ export default function App() {
     'note.duplicate': () => currentNoteAction('duplicate'),
     'note.copy-link': () => currentNoteAction('copy-link'),
     'backlinks.open': () => setBacklinks((p) => !p),
+    'sidebar.toggle': () => {
+      if (settingsNavigation.opened) return;
+      const restoreFocus =
+        document.activeElement?.closest('#primary-sidebar') ||
+        document.activeElement === sidebarToggle.current;
+      setSidebarCollapsed((p) => !p);
+      if (restoreFocus) requestAnimationFrame(() => sidebarToggle.current?.focus());
+    },
+    'sidebar.navigation.compact': () => setCompactNavigation((p) => !p),
     'database.create': () => setDialog({ kind: 'new-database' }),
     'database.property.edit': () => {
       const database = workspace?.databases.find((db) => db.id === databaseId);
@@ -272,10 +406,12 @@ export default function App() {
     'view.graph.open': () => navigate('graph'),
     'view.timeline.open': () => navigate('timeline'),
     'view.topics.open': () => navigate('topics'),
+    'topics.sources.toggle': () =>
+      setTopicOptions((current) => ({ ...current, showSources: !current.showSources })),
     'view.database': () =>
       databaseId ? navigate('database', databaseId) : setDialog({ kind: 'new-database' }),
     'settings.open': () => navigate('settings'),
-    'extensions.open': () => navigate('extensions'),
+    'extensions.open': () => openSettings('extensions'),
     'vim.toggle': async () => {
       await updateSettings({ vim: !workspace?.settings.vim });
     },
@@ -284,8 +420,10 @@ export default function App() {
     },
     'trash.open': () => navigate('trash'),
   });
+  commands.push(...plugins.commands);
   for (const extension of workspace?.extensions ?? [])
     for (const contribution of extension.commands ?? []) {
+      if (contribution.action.type === 'script') continue;
       commands.push({
         id: `plugin.${extension.id}.${contribution.id}`,
         title: contribution.title,
@@ -332,9 +470,10 @@ export default function App() {
     await action();
     setNoteId(null);
     setDatabaseId(null);
-    setHistory([]);
+    setHistory({ back: [], forward: [] });
+    pendingLocation.current = null;
     setNoteListOptions(defaultNoteListOptions);
-    setTopicOptions(defaultTopicOptions);
+    setTopicOptions((current) => ({ ...defaultTopicOptions, showSources: current.showSources }));
     setQuery(undefined);
     setView('notes');
     selectedVault.current = '';
@@ -350,6 +489,7 @@ export default function App() {
     );
 
   const titles: Record<View, string> = {
+    plugin: plugins.active?.title ?? '플러그인',
     notes: '노트',
     'all-notes': '모든 노트',
     database: activeDatabase?.name ?? '데이터베이스',
@@ -357,19 +497,27 @@ export default function App() {
     timeline: '타임라인',
     topics: '주제 모음',
     settings: '설정',
-    extensions: '확장',
     trash: '휴지통',
   };
   return (
-    <>
+    <TagNavigation value={(tag) => setDialog({ kind: 'search', query: `tag:${tag}` })}>
       <div
-        className="app-shell"
+        className={`app-shell${sidebarHidden ? ' sidebar-collapsed' : ''}`}
         inert={noteActions.busy}
         onFocusCapture={(e) => rememberWorkspaceFocus(e.target)}
       >
         <Sidebar
           workspace={workspace}
-          view={view}
+          settingsOpen={settingsNavigation.opened}
+          settingsGroup={settingsNavigation.group}
+          selectSettingsGroup={settingsNavigation.setGroup}
+          closeSettings={() => settingsNavigation.close()}
+          collapsed={sidebarHidden}
+          collapse={() => dispatch('sidebar.toggle')}
+          collapseButtonRef={sidebarHidden ? undefined : sidebarToggle}
+          compactNavigation={compactNavigation}
+          toggleCompactNavigation={() => dispatch('sidebar.navigation.compact')}
+          view={settingsNavigation.opened ? 'settings' : view}
           noteId={noteId}
           databaseId={databaseId}
           openNote={(id) => void openNote(id)}
@@ -386,20 +534,29 @@ export default function App() {
         />
         <div className="main-shell">
           <header className="topbar" data-tauri-drag-region data-focus-region="main-toolbar" tabIndex={-1}>
+            {sidebarHidden && (
+              <button
+                ref={sidebarToggle}
+                className="icon-button sidebar-toggle"
+                aria-label="왼쪽 사이드바 펼치기"
+                title="왼쪽 사이드바 펼치기"
+                aria-expanded="false"
+                aria-controls="primary-sidebar"
+                onClick={() => dispatch('sidebar.toggle')}
+              >
+                <PanelLeft size={17} />
+              </button>
+            )}
             <button
               className="icon-button"
-              aria-label="이전 노트"
-              disabled={!history.length}
+              aria-label={settingsNavigation.opened ? '작업으로 돌아가기' : '이전 노트'}
+              disabled={!settingsNavigation.opened && !history.back.length}
               onClick={() => {
-                const id = history.at(-1);
-                if (id)
-                  void note.save().then((ok) => {
-                    if (ok) {
-                      setHistory((h) => h.slice(0, -1));
-                      setNoteId(id);
-                      setView('notes');
-                    }
-                  });
+                if (settingsNavigation.opened) {
+                  settingsNavigation.close();
+                  return;
+                }
+                dispatch('note.back');
               }}
             >
               <ArrowLeft size={17} />
@@ -408,8 +565,12 @@ export default function App() {
               {workspace.vault.name}
             </span>
             <ChevronRight size={13} />
-            <span data-tauri-drag-region>{titles[view]}</span>
-            {view === 'notes' && note.note && (
+            <span data-tauri-drag-region>
+              {settingsNavigation.opened
+                ? `설정 · ${settingsGroups.find((g) => g.id === settingsNavigation.group)!.title}`
+                : titles[view]}
+            </span>
+            {!settingsNavigation.opened && view === 'notes' && note.note && (
               <>
                 <ChevronRight size={13} />
                 <span className="breadcrumb-note" data-tauri-drag-region>
@@ -418,7 +579,7 @@ export default function App() {
               </>
             )}
             <div className="topbar-actions">
-              {view === 'notes' && noteId && (
+              {!settingsNavigation.opened && view === 'notes' && noteId && (
                 <>
                   <div className="editor-mode-switch" role="group" aria-label="노트 보기 모드">
                     {(
@@ -468,106 +629,143 @@ export default function App() {
               <button onClick={() => void vault.refresh()}>다시 확인</button>
             </div>
           )}
-          <div className="workspace-content" data-focus-region="main" tabIndex={-1}>
-            {view === 'all-notes' && (
-              <AllNotesView
-                workspace={workspace}
-                options={noteListOptions}
-                onChange={setNoteListOptions}
-                openNote={(id) => void openNote(id)}
-                createNote={(folderId) => setDialog({ kind: 'new-note', folderId })}
-                noteMenu={setNoteMenu}
-              />
-            )}
-            {view === 'notes' && (
-              <NotePane
-                workspace={workspace}
-                noteId={noteId}
-                note={note}
-                preview={preview}
-                backlinks={backlinks}
-                editor={editor}
-                dispatch={dispatch}
-                openNote={openNote}
-                setNoteId={setNoteId}
-                setMode={setMode}
-                setDialog={setDialog}
-                onError={onError}
-                onEditorReady={editorReady}
-                commandLineHost={commandLineHost}
-                onNoteCommand={noteCommand}
-              />
-            )}
-            {view === 'database' &&
-              (activeDatabase ? (
-                <DatabaseView
-                  key={`${workspace.vault.id}:${activeDatabase.id}`}
-                  vault={vault.path}
+          <div className={`workspace-switch${settingsNavigation.opened ? ' settings-open' : ''}`}>
+            <div
+              className="workspace-content workspace-work-content"
+              data-focus-region={settingsNavigation.opened ? undefined : 'main'}
+              tabIndex={-1}
+              inert={settingsNavigation.opened}
+              aria-hidden={settingsNavigation.opened}
+            >
+              {workView === 'all-notes' && (
+                <AllNotesView
                   workspace={workspace}
-                  database={activeDatabase}
-                  refresh={vault.refresh}
-                  openBody={openBody}
-                  addProperty={() => setDialog({ kind: 'property', database: activeDatabase })}
-                  editProperty={(property) =>
-                    setDialog({ kind: 'property-edit', database: activeDatabase, property })
-                  }
-                  onError={onError}
-                  initialQuery={query}
+                  options={noteListOptions}
+                  onChange={setNoteListOptions}
+                  openNote={(id) => void openNote(id)}
+                  createNote={(folderId) => setDialog({ kind: 'new-note', folderId })}
+                  noteMenu={setNoteMenu}
                 />
-              ) : (
-                <div className="empty-notes">
-                  <Table2 size={36} />
-                  <h1>데이터부터 시작하세요.</h1>
-                  <button className="primary-button" onClick={() => dispatch('database.create')}>
-                    데이터베이스 만들기
-                  </button>
-                </div>
-              ))}
-            {view === 'graph' && (
-              <GraphView
-                key={workspace.vault.id}
+              )}
+              {workView === 'notes' && (
+                <NotePane
+                  commands={commands}
+                  workspace={workspace}
+                  noteId={noteId}
+                  note={note}
+                  preview={preview}
+                  backlinks={backlinks}
+                  editor={editor}
+                  dispatch={dispatch}
+                  openNote={openNote}
+                  openLink={openLink}
+                  setNoteId={setNoteId}
+                  setMode={setMode}
+                  setDialog={setDialog}
+                  onError={onError}
+                  onEditorReady={editorReady}
+                  commandLineHost={commandLineHost}
+                  onNoteCommand={noteCommand}
+                />
+              )}
+              {workView === 'database' &&
+                (activeDatabase ? (
+                  <DatabaseView
+                    key={`${workspace.vault.id}:${activeDatabase.id}`}
+                    vault={vault.path}
+                    workspace={workspace}
+                    database={activeDatabase}
+                    refresh={vault.refresh}
+                    openBody={openBody}
+                    addProperty={() => setDialog({ kind: 'property', database: activeDatabase })}
+                    editProperty={(property) =>
+                      setDialog({ kind: 'property-edit', database: activeDatabase, property })
+                    }
+                    onError={onError}
+                    initialQuery={query}
+                  />
+                ) : (
+                  <div className="empty-notes">
+                    <Table2 size={36} />
+                    <h1>데이터부터 시작하세요.</h1>
+                    <button className="primary-button" onClick={() => dispatch('database.create')}>
+                      데이터베이스 만들기
+                    </button>
+                  </div>
+                ))}
+              {workView === 'graph' && (
+                <GraphView
+                  key={workspace.vault.id}
+                  workspace={workspace}
+                  openNote={(id) => void openNote(id)}
+                  openLink={openLink}
+                />
+              )}
+              {workView === 'timeline' && (
+                <TimelineView workspace={workspace} openNote={(id) => void openNote(id)} />
+              )}
+              {workView === 'topics' && (
+                <TopicsView
+                  key={workspace.vault.id}
+                  workspace={workspace}
+                  options={topicOptions}
+                  toggleSources={() => dispatch('topics.sources.toggle')}
+                  onChange={setTopicOptions}
+                  openNote={(id, line) => void openNote(id, line)}
+                  openLink={openLink}
+                />
+              )}
+              {workView === 'plugin' && (
+                <PluginView
+                  title={plugins.active?.title ?? '플러그인'}
+                  tree={plugins.tree}
+                  busy={plugins.busy}
+                  error={plugins.active ? plugins.errors[plugins.active.pluginId] : undefined}
+                  action={plugins.action}
+                  refresh={() => void plugins.renderView()}
+                />
+              )}
+              {workView === 'trash' && (
+                <TrashView
+                  items={workspace.trash}
+                  vault={vault.path}
+                  refresh={vault.refresh}
+                  onError={onError}
+                />
+              )}
+            </div>
+            <div
+              className="workspace-content workspace-settings-content"
+              data-focus-region={settingsNavigation.opened ? 'main' : undefined}
+              tabIndex={-1}
+              inert={!settingsNavigation.opened}
+              aria-hidden={!settingsNavigation.opened}
+            >
+              <SettingsView
+                pluginErrors={plugins.errors}
+                beforeDisablePlugin={plugins.stop}
+                invokePluginSettings={plugins.invokeSettings}
+                active={settingsNavigation.opened}
+                group={settingsNavigation.group}
                 workspace={workspace}
-                openNote={(id) => void openNote(id)}
-              />
-            )}
-            {view === 'timeline' && (
-              <TimelineView workspace={workspace} openNote={(id) => void openNote(id)} />
-            )}
-            {view === 'topics' && (
-              <TopicsView
-                key={workspace.vault.id}
-                workspace={workspace}
-                options={topicOptions}
-                onChange={setTopicOptions}
-                openNote={(id, line) => void openNote(id, line)}
-              />
-            )}
-            {view === 'settings' && (
-              <SettingsView workspace={workspace} commands={commands} update={updateSettings} />
-            )}
-            {view === 'extensions' && (
-              <ExtensionsView workspace={workspace} refresh={vault.refresh} onError={onError} />
-            )}
-            {view === 'trash' && (
-              <TrashView
-                items={workspace.trash}
-                vault={vault.path}
+                commands={commands}
+                update={updateSettings}
                 refresh={vault.refresh}
                 onError={onError}
               />
-            )}
+            </div>
           </div>
-          <div className="vim-command-dock" ref={commandLineHost} />
+          <div className="vim-command-dock" ref={commandLineHost} hidden={settingsNavigation.opened} />
           <footer className="statusbar">
             <span className={`mode-badge ${mode.toLowerCase()}`}>
-              {view === 'notes' && noteId && !preview ? mode : 'NAVIGATE'}
+              {!settingsNavigation.opened && view === 'notes' && noteId && !preview ? mode : 'NAVIGATE'}
             </span>
             <span className="vim-status">{workspace.settings.vim ? 'VIM ON' : 'VIM OFF'}</span>
             <span className="status-hint">
               <kbd>{leaderLabel(workspace.settings.leader)}</kbd>명령 시작
             </span>
             <span className="status-right">
-              {view === 'notes' && noteId && (
+              {!settingsNavigation.opened && view === 'notes' && noteId && (
                 <span>{note.draft.body.trim().split(/\s+/).filter(Boolean).length} words</span>
               )}
               {note.status === 'saving' ? (
@@ -595,6 +793,10 @@ export default function App() {
             close={closeVaultPicker}
             open={(path) => selectVault(() => vault.open(path))}
             create={(path, name, demo) => selectVault(() => vault.create(path, name, demo))}
+            forget={async (path) => {
+              if (path === vault.path) await selectVault(async () => vault.forget(path));
+              else vault.forget(path);
+            }}
           />
         )}
         {palette && (
@@ -661,21 +863,17 @@ export default function App() {
             <div>
               <CommandIcon size={15} />
               <strong>
-                {leaderLabel(workspace.settings.leader)} {pending.split('').join(' ')}
+                {leaderLabel(workspace.settings.leader)} {pending}
               </strong>
               <small>다음 키를 입력하세요 · Esc 취소</small>
             </div>
             <section>
-              {commands
-                .filter((c) =>
-                  bindingsFor(c, workspace.settings).leader?.replaceAll(' ', '').startsWith(pending),
-                )
-                .map((command) => (
-                  <span key={command.id}>
-                    <kbd>{bindingsFor(command, workspace.settings).leader}</kbd>
-                    {command.title}
-                  </span>
-                ))}
+              {leaderCandidates(commands, workspace.settings, pending).map(({ command, binding }) => (
+                <span key={`${command.id}:${binding.keys}`}>
+                  <kbd>{sequenceKeys(binding) ?? binding.keys}</kbd>
+                  {command.title}
+                </span>
+              ))}
             </section>
           </div>
         )}
@@ -694,6 +892,6 @@ export default function App() {
           노트를 처리하고 있습니다…
         </div>
       )}
-    </>
+    </TagNavigation>
   );
 }

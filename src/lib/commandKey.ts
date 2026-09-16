@@ -1,11 +1,13 @@
 // Resolve command keys while a non-Latin input source is active. Text inputs must
 // keep the original event; Latin keyboard layouts continue to use event.key.
 export function commandKey(
-  event: Pick<KeyboardEvent, 'key' | 'shiftKey'> & Partial<Pick<KeyboardEvent, 'code'>>,
+  event: Pick<KeyboardEvent, 'key' | 'shiftKey'> &
+    Partial<Pick<KeyboardEvent, 'code' | 'isComposing' | 'keyCode'>>,
 ): string {
   const { key, code = '', shiftKey } = event;
   if (!(
-    (Array.from(key).length === 1 && /[^\x00-\x7f]/.test(key)) ||
+    /[^\x00-\x7f]/.test(key) ||
+    ((event.isComposing || event.keyCode === 229) && (key === '' || key === 'Dead')) ||
     key === 'Process' ||
     key === 'Unidentified'
   ))

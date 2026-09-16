@@ -11,15 +11,23 @@
     "tauri": "tauri",
     "core:build": "cargo build -p foltra-cli",
     "test": "cargo test -p foltra-core -p foltra-cli && vitest run",
-    "check": "npm run build && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
-    "format": "prettier --write src vite.config.ts && cargo fmt --all"
+    "check": "npm run plugins:check && npm run build && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
+    "format": "prettier --write src vite.config.ts && cargo fmt --all",
+    "plugin:pack": "node scripts/pack-plugin.mjs",
+    "plugins:build": "node scripts/build-example-plugins.mjs",
+    "plugins:check": "tsc -p packages/plugin-sdk/tsconfig.examples.json",
+    "prebuild": "npm run plugins:build",
+    "pretest": "npm run plugins:build && node scripts/build-test-plugins.mjs"
   },
   "dependencies": {
+    "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/commands": "^6.10.0",
     "@codemirror/lang-markdown": "^6.5.0",
     "@codemirror/language": "^6.11.0",
+    "@codemirror/language-data": "^6.5.2",
     "@codemirror/state": "^6.5.0",
     "@codemirror/view": "^6.38.0",
+    "@lezer/highlight": "^1.2.3",
     "@lezer/markdown": "^1.7.2",
     "@replit/codemirror-vim": "^6.4.0",
     "@tauri-apps/api": "^2.11.1",
@@ -29,6 +37,7 @@
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "react-markdown": "^10.1.0",
+    "remark-breaks": "^4.0.0",
     "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
@@ -39,6 +48,8 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@vitejs/plugin-react": "^6.0.0",
+    "esbuild": "^0.28.2",
+    "jsdom": "^30.0.1",
     "prettier": "^3.9.6",
     "typescript": "^6.0.0",
     "vite": "^8.3.0",

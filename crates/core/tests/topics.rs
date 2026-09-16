@@ -50,17 +50,130 @@ fn collects_exact_subtrees_from_multiple_notes_without_requiring_topic_notes() {
 }
 
 #[test]
-fn parses_markdown_boundaries_and_excludes_code_comments_escaped_and_non_bullet_links() {
+fn parses_markdown_boundaries_and_excludes_code_comments_escaped_and_continuation_links() {
     let v = vault();
     note(&v, "Examples", "[[Paragraph]]\n\n```md\n- [[Fenced]]\n```\n\n    - [[IndentedCode]]\n\n<!--\n- [[Comment]]\n-->\n\n- `[[InlineCode]]`\n- \\[[Escaped]]\n- continuation\n  [[Continuation]]\n- [label](https://example.com/[[Destination]])\n- Real [[Foo]]\n  ```md\n  - [[InnerCode]]\n  ```\n  - Child\n- Next");
     let topics = call(&v, "topics.list", json!({}));
-    assert_eq!(topics.as_array().unwrap().len(), 1, "{topics}");
+    assert_eq!(topics.as_array().unwrap().len(), 2, "{topics}");
     assert_eq!(topics[0]["title"], "Foo");
+    assert_eq!(topics[1]["title"], "Paragraph");
     let result = blocks(&v, "name:Foo");
     assert_eq!(
         result["blocks"][0]["body"],
         "- Real [[Foo]]\n  ```md\n  - [[InnerCode]]\n  ```\n  - Child"
     );
+}
+
+#[test]
+fn collects_paragraphs_with_links_on_any_line_without_adjacent_blocks() {
+    let v = vault();
+    note(&v, "문단", "앞 문단\n\n첫 줄\n주제 [[Foo|표시]]를 기록합니다.\n같은 문단 [[Foo]] [[Bar]]\n\n다음 문단\n\n또 다른 [[Foo]] 문단");
+    note(&v, "목록", "- 기존 [[Foo]]\n  - 하위 항목");
+    let foo = blocks(&v, "name:Foo");
+    assert_eq!(foo["total"], 3);
+    assert_eq!(foo["topic"]["noteCount"], 2);
+    let paragraphs: Vec<_> = foo["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|b| b["noteTitle"] == "문단")
+        .collect();
+    assert_eq!(paragraphs[0]["line"], 3);
+    assert_eq!(paragraphs[0]["endLine"], 5);
+    assert_eq!(
+        paragraphs[0]["body"],
+        "첫 줄\n주제 [[Foo|표시]]를 기록합니다.\n같은 문단 [[Foo]] [[Bar]]"
+    );
+    assert_eq!(paragraphs[1]["line"], 9);
+    assert_eq!(paragraphs[1]["body"], "또 다른 [[Foo]] 문단");
+    assert_eq!(blocks(&v, "name:Bar")["total"], 1);
+}
+
+#[test]
+fn collects_headings_and_quoted_paragraphs_preserving_markdown_and_crlf_positions() {
+    let v = vault();
+    note(&v, "블록", "# 제목 [[Foo]]\r\n\r\n본문\r\n\r\n> 인용 [[Foo]]\r\n> 이어지는 문장\r\n>\r\n> 다른 인용\r\n\r\n밑줄 제목 [[Foo]]\r\n---\r\n\r\n- 부모 [[Foo]]\r\n  - 자식 [[Foo]]\r\n");
+    let result = blocks(&v, "name:Foo");
+    let cards = result["blocks"].as_array().unwrap();
+    assert_eq!(cards.len(), 5);
+    assert_eq!(cards[0]["body"], "# 제목 [[Foo]]");
+    assert_eq!(cards[0]["line"], 1);
+    assert_eq!(cards[1]["body"], "> 인용 [[Foo]]\n> 이어지는 문장");
+    assert_eq!(cards[1]["line"], 5);
+    assert_eq!(cards[1]["endLine"], 6);
+    assert_eq!(cards[2]["body"], "밑줄 제목 [[Foo]]\n---");
+    assert_eq!(cards[2]["endLine"], 11);
+    assert_eq!(cards[3]["body"], "- 부모 [[Foo]]\n  - 자식 [[Foo]]");
+    assert_eq!(cards[4]["body"], "- 자식 [[Foo]]");
+}
+
+#[test]
+fn paragraph_topics_share_note_identity_aliases_and_do_not_modify_sources() {
+    let v = vault();
+    let foo = note(&v, "Foo", "");
+    let id = foo["id"].as_str().unwrap();
+    let key = format!("note:{id}");
+    note(&v, "문단", &format!("[[Foo|별칭]] [[{id}]] [[Foo#제목]]\n\n`[[Code]]` \\[[Escaped]]\n\n```md\n[[Fence]]\n```\n\n    [[Indented]]\n\n<!-- [[Comment]] -->\n\n[외부](https://example.com/[[Url]])"));
+    let before = call(&v, "vault.export", json!({}));
+    assert_eq!(
+        call(&v, "topics.list", json!({})).as_array().unwrap().len(),
+        1
+    );
+    assert_eq!(blocks(&v, &key)["total"], 1);
+    assert_eq!(
+        call(&v, "vault.export", json!({}))["files"],
+        before["files"]
+    );
+    call(
+        &v,
+        "note.update",
+        json!({"id":id,"expectedRevision":foo["revision"],"title":"새 주제"}),
+    );
+    assert_eq!(blocks(&v, &key)["topic"]["title"], "새 주제");
+    assert_eq!(blocks(&v, &key)["total"], 1);
+}
+
+#[test]
+fn unindented_text_after_a_list_matches_the_editors_paragraph_boundary() {
+    let v = vault();
+    note(
+        &v,
+        "목록 종료",
+        "- 항목 [[Foo]]\n  - 하위 항목\n일반 문단\n[[Foo]] [[Bar]]\n- 다음 항목 [[Foo]]",
+    );
+    let cards = blocks(&v, "name:Foo")["blocks"].as_array().unwrap().clone();
+    assert_eq!(cards.len(), 3);
+    assert_eq!(cards[0]["body"], "- 항목 [[Foo]]\n  - 하위 항목");
+    assert_eq!(cards[0]["endLine"], 2);
+    assert_eq!(cards[1]["body"], "일반 문단\n[[Foo]] [[Bar]]");
+    assert_eq!(cards[1]["line"], 3);
+    assert_eq!(cards[1]["endLine"], 4);
+    assert_eq!(cards[2]["body"], "- 다음 항목 [[Foo]]");
+    assert_eq!(blocks(&v, "name:Bar")["total"], 1);
+}
+
+#[test]
+fn paragraph_boundaries_preserve_quotes_tabs_hard_breaks_and_inline_markup() {
+    for (body, expected) in [
+        ("> - 항목\n> 일반 [[Foo]]", "> 일반 [[Foo]]"),
+        ("1. 항목  \n일반 [[Foo]]", "일반 [[Foo]]"),
+        ("- 항목\n\t이어지는 문장\n일반 [[Foo]]", "일반 [[Foo]]"),
+        ("- **강조\n계속**\n일반 [[Foo]]", "일반 [[Foo]]"),
+        ("- `코드\n계속`\n일반 [[Foo]]", "일반 [[Foo]]"),
+    ] {
+        let v = vault();
+        note(&v, "경계", body);
+        let result = blocks(&v, "name:Foo");
+        assert_eq!(result["total"], 1, "{body}");
+        assert_eq!(result["blocks"][0]["body"], expected, "{body}");
+    }
+    let v = vault();
+    note(
+        &v,
+        "연속 내용",
+        "- **강조\n[[Inline]]**\n\n- 항목\n  [[Indented]]\n\n- 항목\n\t[[Tabbed]]",
+    );
+    assert_eq!(call(&v, "topics.list", json!({})), json!([]));
 }
 
 #[test]

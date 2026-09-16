@@ -1,0 +1,52 @@
+{
+  "kind": "plugin",
+  "id": "kanban",
+  "name": "칸반 보드",
+  "version": "1.0.0",
+  "description": "독립 데이터베이스의 상태별 보드입니다. 카드를 추가하고 상태를 바꾸거나 본문 노트를 연결하세요.",
+  "commands": [
+    {
+      "id": "open",
+      "title": "칸반 보드 열기",
+      "action": {
+        "type": "script"
+      }
+    },
+    {
+      "id": "summary",
+      "title": "칸반 데이터 요약",
+      "headless": true,
+      "action": {
+        "type": "script"
+      }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": [
+      "databases.read",
+      "databases.write",
+      "notes.read",
+      "notes.write",
+      "ui"
+    ],
+    "views": [
+      {
+        "id": "board",
+        "title": "칸반 보드"
+      }
+    ],
+    "events": [
+      "workspace.changed"
+    ],
+    "settings": [
+      {
+        "id": "board-name",
+        "label": "새 보드 데이터베이스 이름",
+        "type": "text",
+        "default": "할 일 보드"
+      }
+    ],
+    "source": "// tests/fixtures/plugins/kanban/main.ts\nvar button = (text, action, payload) => ({\n  type: \"button\",\n  text,\n  action,\n  payload\n});\nvar databases = (api) => api.call(\"database.list\").filter((d) => d.properties.some((p) => p.type === \"status\" || p.type === \"select\"));\nfunction current(api) {\n  const all = databases(api);\n  return all.find((d) => d.id === api.state.databaseId) || all[0];\n}\nfunction status(db) {\n  return db.properties.find((p) => p.type === \"status\" || p.type === \"select\");\n}\nvar main_default = {\n  onEvent(api) {\n    api.state.updated = Date.now();\n  },\n  commands: {\n    open(api) {\n      api.openView(\"board\");\n    },\n    summary(api) {\n      return databases(api).map((d) => ({\n        id: d.id,\n        name: d.name,\n        total: api.call(\"query.run\", { databaseId: d.id, limit: 1 }).total\n      }));\n    }\n  },\n  views: {\n    board: {\n      render(api) {\n        const all = databases(api), db = current(api);\n        if (!db)\n          return {\n            type: \"stack\",\n            children: [\n              { type: \"text\", text: \"\\uC0C1\\uD0DC \\uCEEC\\uB7FC\\uC774 \\uC788\\uB294 \\uB370\\uC774\\uD130\\uBCA0\\uC774\\uC2A4\\uB97C \\uB9CC\\uB4E4\\uBA74 \\uCE78\\uBC18\\uC73C\\uB85C \\uAD00\\uB9AC\\uD560 \\uC218 \\uC788\\uC2B5\\uB2C8\\uB2E4.\" },\n              button(\"\\uC0C8 \\uBCF4\\uB4DC \\uB9CC\\uB4E4\\uAE30\", \"create\")\n            ]\n          };\n        const property = status(db), title = db.properties.find((p) => p.type === \"text\");\n        const result = api.call(\"query.run\", { databaseId: db.id, limit: 200 });\n        const states = [\n          .../* @__PURE__ */ new Set([\n            ...property.options || [],\n            ...result.rows.map((r) => String(r.values[property.id] ?? \"\\uBBF8\\uC9C0\\uC815\"))\n          ])\n        ];\n        if (!states.length) states.push(\"\\uBBF8\\uC9C0\\uC815\");\n        return {\n          type: \"stack\",\n          children: [\n            {\n              type: \"row\",\n              children: [\n                ...all.map((d) => button(d.name, \"database\", d.id)),\n                button(\"\\uC0C8 \\uBCF4\\uB4DC \\uB9CC\\uB4E4\\uAE30\", \"create\")\n              ]\n            },\n            {\n              type: \"row\",\n              children: [\n                {\n                  type: \"input\",\n                  label: \"\\uC0C8 \\uCE74\\uB4DC \\uC81C\\uBAA9\",\n                  action: \"draft\",\n                  value: String(api.state.draft ?? \"\"),\n                  placeholder: \"\\uD560 \\uC77C\\uC744 \\uC785\\uB825\\uD558\\uACE0 Enter\"\n                },\n                button(\"\\uCE74\\uB4DC \\uCD94\\uAC00\", \"add\", db.id)\n              ]\n            },\n            {\n              type: \"text\",\n              tone: \"muted\",\n              text: `${result.total}\\uAC1C \\uCE74\\uB4DC${result.total > 200 ? \" \\xB7 \\uCC98\\uC74C 200\\uAC1C \\uD45C\\uC2DC\" : \"\"}`\n            },\n            {\n              type: \"grid\",\n              columns: Math.min(states.length, 7),\n              children: states.map((state) => ({\n                type: \"stack\",\n                children: [\n                  {\n                    type: \"heading\",\n                    text: `${state} \\xB7 ${result.rows.filter((r) => String(r.values[property.id] ?? \"\\uBBF8\\uC9C0\\uC815\") === state).length}`\n                  },\n                  ...result.rows.filter((r) => String(r.values[property.id] ?? \"\\uBBF8\\uC9C0\\uC815\") === state).map(\n                    (row) => ({\n                      type: \"card\",\n                      children: [\n                        {\n                          type: \"text\",\n                          text: String(title ? row.values[title.id] || \"\\uC81C\\uBAA9 \\uC5C6\\uC74C\" : row.id)\n                        },\n                        {\n                          type: \"select\",\n                          label: \"\\uCE74\\uB4DC \\uC0C1\\uD0DC\",\n                          action: \"status\",\n                          value: state,\n                          options: states,\n                          payload: { id: row.id, revision: row.revision, property: property.id }\n                        },\n                        button(row.bodyNoteId ? \"\\uBCF8\\uBB38 \\uC5F4\\uAE30\" : \"\\uBCF8\\uBB38 \\uB9CC\\uB4E4\\uAE30\", \"body\", {\n                          id: row.id,\n                          revision: row.revision\n                        })\n                      ]\n                    })\n                  )\n                ]\n              }))\n            }\n          ]\n        };\n      },\n      onAction(api, action) {\n        if (action.id === \"create\") {\n          const db = api.call(\"database.create\", {\n            name: String(api.settings[\"board-name\"]),\n            properties: [\n              { id: \"title\", name: \"\\uC774\\uB984\", type: \"text\" },\n              { id: \"status\", name: \"\\uC0C1\\uD0DC\", type: \"status\", options: [\"\\uD560 \\uC77C\", \"\\uC9C4\\uD589 \\uC911\", \"\\uC644\\uB8CC\"] }\n            ]\n          });\n          api.state.databaseId = db.id;\n        }\n        if (action.id === \"database\") api.state.databaseId = String(action.payload);\n        if (action.id === \"draft\") api.state.draft = String(action.value);\n        if (action.id === \"add\") {\n          const db = current(api);\n          if (!db) return;\n          const title = db.properties.find((p) => p.type === \"text\");\n          if (!title) {\n            api.notify(\"\\uD14D\\uC2A4\\uD2B8 \\uCEEC\\uB7FC\\uC744 \\uBA3C\\uC800 \\uCD94\\uAC00\\uD558\\uC138\\uC694.\");\n            return;\n          }\n          const text = String(api.state.draft ?? \"\").trim();\n          if (!text) return;\n          const property = status(db);\n          api.call(\"record.create\", {\n            databaseId: db.id,\n            values: {\n              [title.id]: text,\n              ...property.options?.length ? { [property.id]: property.options[0] } : {}\n            }\n          });\n          api.state.draft = \"\";\n        }\n        if (action.id === \"status\") {\n          const p = action.payload;\n          api.call(\"record.update\", {\n            id: p.id,\n            expectedRevision: p.revision,\n            values: { [p.property]: String(action.value) }\n          });\n        }\n        if (action.id === \"body\") {\n          const p = action.payload;\n          const result = api.call(\"record.body\", { id: p.id, expectedRevision: p.revision, body: \"\" });\n          api.openNote(result.id);\n        }\n      }\n    }\n  }\n};\nexport {\n  main_default as default\n};\n"
+  }
+}

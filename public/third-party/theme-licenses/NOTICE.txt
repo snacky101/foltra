@@ -1,0 +1,8 @@
+Foltra theme adaptations
+
+Catppuccin Mocha: Copyright (c) 2021 Catppuccin. MIT. https://github.com/catppuccin/palette
+Rosé Pine: Copyright (c) mvllow. MIT. https://github.com/rose-pine/palette
+Tokyo Night: Copyright (c) 2018-present Enkia. MIT. https://github.com/enkia/tokyo-night-vscode-theme
+Darcula: Copyright JetBrains s.r.o. Apache-2.0. https://github.com/JetBrains/intellij-community/tree/master/platform/platform-resources/src
+
+Colors have been mapped to Foltra UI roles and may be adjusted for text contrast. These ports are maintained by Foltra, not endorsed by the original theme projects.

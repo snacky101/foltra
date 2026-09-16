@@ -100,6 +100,7 @@ pub struct Record {
 pub struct Link {
     pub source: String,
     pub target: Option<String>,
+    pub name: String,
     pub label: String,
     pub block: Option<String>,
     pub line: usize,

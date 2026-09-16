@@ -15,41 +15,51 @@ export function useNote(
   const base = useRef<Note | null>(null);
   const current = useRef(draft);
   const dirty = useRef(false);
+  const pendingSince = useRef<number | null>(null);
   const inFlight = useRef<Promise<boolean> | null>(null);
   const epoch = useRef(0);
   const onSavedRef = useRef(onSaved);
   onSavedRef.current = onSaved;
 
-  const load = useCallback(async () => {
-    const turn = ++epoch.current;
-    if (!id || !vault) {
-      base.current = null;
-      dirty.current = false;
-      current.current = { title: '', body: '' };
-      setDraft(current.current);
-      setError('');
-      setNote(null);
-      setStatus('saved');
-      return;
-    }
-    setStatus('loading');
-    setError('');
-    try {
-      const value = await call<Note>(vault, 'note.read', { id });
-      if (turn !== epoch.current) return;
-      base.current = value;
-      current.current = { title: value.title, body: value.body };
-      dirty.current = false;
-      setNote(value);
-      setDraft(current.current);
-      setStatus('saved');
-    } catch (e) {
-      if (turn === epoch.current) {
-        setError((e as Error).message);
-        setStatus('error');
+  const load = useCallback(
+    async (background = false) => {
+      const turn = ++epoch.current;
+      const startedDraft = current.current;
+      const startedNote = base.current;
+      if (!id || !vault) {
+        base.current = null;
+        dirty.current = false;
+        pendingSince.current = null;
+        current.current = { title: '', body: '' };
+        setDraft(current.current);
+        setError('');
+        setNote(null);
+        setStatus('saved');
+        return;
       }
-    }
-  }, [vault, id]);
+      if (!background) setStatus('loading');
+      setError('');
+      try {
+        const value = await call<Note>(vault, 'note.read', { id });
+        if (turn !== epoch.current) return;
+        // A background read must never replace input or a write that happened after it started.
+        if (background && (current.current !== startedDraft || base.current !== startedNote)) return;
+        base.current = value;
+        current.current = { title: value.title, body: value.body };
+        dirty.current = false;
+        pendingSince.current = null;
+        setNote(value);
+        setDraft(current.current);
+        setStatus('saved');
+      } catch (e) {
+        if (turn === epoch.current && (!background || current.current === startedDraft)) {
+          setError((e as Error).message);
+          setStatus('error');
+        }
+      }
+    },
+    [vault, id],
+  );
 
   useEffect(() => {
     void load();
@@ -65,46 +75,47 @@ export function useNote(
       !dirty.current &&
       !inFlight.current
     )
-      void load();
+      void load(true);
   }, [externalRevision, id, load]);
 
   const edit = useCallback((patch: Partial<{ title: string; body: string }>) => {
     current.current = { ...current.current, ...patch };
     dirty.current = true;
+    pendingSince.current ??= Date.now();
     setDraft(current.current);
     setStatus('dirty');
     setError('');
   }, []);
 
   const save = useCallback(async (): Promise<boolean> => {
-    if (inFlight.current) {
-      const ok = await inFlight.current;
-      return ok && (dirty.current ? save() : true);
-    }
-    const original = base.current;
-    if (!original || !dirty.current) return true;
-    const sent = { ...current.current };
+    if (inFlight.current) return inFlight.current;
+    if (!base.current || !dirty.current) return true;
     const turn = epoch.current;
     setStatus('saving');
     const promise = (async () => {
       try {
-        const result = await call<Note>(vault, 'note.update', {
-          id: original.id,
-          expectedRevision: original.revision,
-          ...sent,
-        });
-        if (turn !== epoch.current) return true;
-        base.current = result;
-        setNote(result);
-        if (current.current.title === sent.title && current.current.body === sent.body) {
-          current.current = { title: result.title, body: result.body };
-          dirty.current = false;
-          setDraft(current.current);
-          setStatus('saved');
-        } else {
-          setStatus('dirty');
+        // All callers (autosave, navigation and close) wait until the newest draft is durable.
+        while (dirty.current && base.current) {
+          const original = base.current;
+          const sent = { ...current.current };
+          pendingSince.current = null;
+          const result = await call<Note>(vault, 'note.update', {
+            id: original.id,
+            expectedRevision: original.revision,
+            ...sent,
+          });
+          if (turn !== epoch.current) return false;
+          base.current = result;
+          setNote(result);
+          if (current.current.title === sent.title && current.current.body === sent.body) {
+            current.current = { title: result.title, body: result.body };
+            dirty.current = false;
+            pendingSince.current = null;
+            setDraft(current.current);
+            setStatus('saved');
+          }
+          await onSavedRef.current();
         }
-        await onSavedRef.current();
         return true;
       } catch (e) {
         if (turn === epoch.current) {
@@ -126,9 +137,24 @@ export function useNote(
 
   useEffect(() => {
     if (status !== 'dirty') return;
-    const timeout = window.setTimeout(() => void save(), 650);
+    const remaining = 2000 - (Date.now() - (pendingSince.current ?? Date.now()));
+    const timeout = window.setTimeout(() => void save(), Math.max(0, Math.min(650, remaining)));
     return () => window.clearTimeout(timeout);
   }, [draft, status, save]);
+  useEffect(() => {
+    const flush = () => {
+      if (dirty.current) void save();
+    };
+    const visibility = () => {
+      if (document.hidden) flush();
+    };
+    window.addEventListener('blur', flush);
+    document.addEventListener('visibilitychange', visibility);
+    return () => {
+      window.removeEventListener('blur', flush);
+      document.removeEventListener('visibilitychange', visibility);
+    };
+  }, [save]);
   useEffect(() => {
     const beforeUnload = (event: BeforeUnloadEvent) => {
       if (dirty.current) {
@@ -146,6 +172,7 @@ export function useNote(
       body: current.current.body,
     });
     dirty.current = false;
+    pendingSince.current = null;
     setError('');
     setStatus('saved');
     await onSavedRef.current();
@@ -155,6 +182,7 @@ export function useNote(
     // Already-started writes must settle before closing; a force quit only discards unsaved input.
     if (inFlight.current) await inFlight.current;
     dirty.current = false;
+    pendingSince.current = null;
     setStatus('saved');
     setError('');
   }, []);

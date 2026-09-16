@@ -1,9 +1,16 @@
 export type FocusDirection = 'left' | 'down' | 'up' | 'right';
 export type FocusRegion =
-  'sidebar-navigation' | 'sidebar-tree' | 'sidebar-footer' | 'main-toolbar' | 'main' | 'backlinks';
+  | 'sidebar-navigation'
+  | 'sidebar-tree'
+  | 'sidebar-footer'
+  | 'settings-navigation'
+  | 'main-toolbar'
+  | 'main'
+  | 'backlinks';
 const lastFocus = new WeakMap<HTMLElement, HTMLElement>();
 
 export function nextFocusRegion(current: FocusRegion, direction: FocusDirection): FocusRegion | null {
+  if (current === 'settings-navigation') return direction === 'right' ? 'main' : null;
   const sidebar: FocusRegion[] = ['sidebar-navigation', 'sidebar-tree', 'sidebar-footer'];
   const index = sidebar.indexOf(current);
   if (index >= 0) {
@@ -25,7 +32,7 @@ export function rememberWorkspaceFocus(target: EventTarget) {
 }
 function focusRegion(name: FocusRegion) {
   const region = document.querySelector<HTMLElement>(`[data-focus-region="${name}"]`);
-  if (!region || !region.getClientRects().length) return;
+  if (!region || region.closest('[inert], [hidden]') || !region.getClientRects().length) return;
   const previous = lastFocus.get(region);
   const links =
     name === 'backlinks'
@@ -34,18 +41,23 @@ function focusRegion(name: FocusRegion) {
         )
       : null;
   if (links && !links.length) return;
+  const firstVisible = (selector: string) =>
+    [...region.querySelectorAll<HTMLElement>(selector)].find(
+      (item) => !item.closest('[hidden], [inert]') && item.getClientRects().length,
+    );
   const target =
     previous?.isConnected &&
     !previous.matches(':disabled') &&
+    !previous.closest('[hidden], [inert]') &&
     previous.getClientRects().length &&
     (!links || links.includes(previous))
       ? previous
       : (links?.[0] ??
-        region.querySelector<HTMLElement>(
-          '.cm-content[contenteditable="true"], [data-sidebar-item].active',
+        firstVisible(
+          '.cm-content[contenteditable="true"], [data-sidebar-item].active, [data-settings-group].active',
         ) ??
-        region.querySelector<HTMLElement>('[data-tree-item]:not([disabled])') ??
-        region.querySelector<HTMLElement>(
+        firstVisible('[data-tree-item]:not([disabled])') ??
+        firstVisible(
           '[data-sidebar-item]:not([disabled]), button:not([disabled]), input:not([disabled]), [tabindex="0"]',
         ) ??
         region);
@@ -56,18 +68,26 @@ export function moveWorkspaceFocus(direction: FocusDirection) {
   const current = document.activeElement?.closest<HTMLElement>('[data-focus-region]')?.dataset.focusRegion as
     FocusRegion | undefined;
   const next = nextFocusRegion(current ?? 'main', direction);
-  if (next) focusRegion(next);
+  const settings = document.querySelector<HTMLElement>('[data-focus-region="settings-navigation"]');
+  if (next === 'sidebar-tree' && settings && !settings.closest('[inert]')) focusRegion('settings-navigation');
+  else if (next) focusRegion(next);
 }
 export function moveSidebarFocus(target: HTMLElement, key: string): boolean {
   const origin = target.closest<HTMLElement>('[data-focus-region]');
   const name = origin?.dataset.focusRegion ?? '';
-  if (!origin || (!name.startsWith('sidebar-') && name !== 'backlinks')) return false;
+  if (!origin || (!name.startsWith('sidebar-') && name !== 'backlinks' && name !== 'settings-navigation'))
+    return false;
+  const settings = name === 'settings-navigation';
   const region =
-    name === 'backlinks'
+    name === 'backlinks' || settings
       ? origin
       : target.closest('.sidebar')?.querySelector<HTMLElement>('[data-focus-region="sidebar-tree"]');
   if (!region) return false;
-  const selector = name === 'backlinks' ? '[data-backlink-item]' : '[data-tree-item]';
+  const selector = settings
+    ? '[data-settings-group]'
+    : name === 'backlinks'
+      ? '[data-backlink-item]'
+      : '[data-tree-item]';
   const items = [...region.querySelectorAll<HTMLButtonElement>(selector)].filter(
     (item) => !item.disabled && item.getClientRects().length,
   );
@@ -83,6 +103,11 @@ export function moveSidebarFocus(target: HTMLElement, key: string): boolean {
     return true;
   }
   if (key === 'l') {
+    if (settings) {
+      active.click();
+      focusRegion('main');
+      return true;
+    }
     if (active.getAttribute('aria-expanded') === 'true') {
       const child = items[items.indexOf(active) + 1];
       if (child?.dataset.parentFolder === active.closest<HTMLElement>('[data-folder-id]')?.dataset.folderId)
@@ -102,5 +127,6 @@ export function moveSidebarFocus(target: HTMLElement, key: string): boolean {
   }
   const next = Math.max(0, Math.min(items.length - 1, items.indexOf(active) + (key === 'j' ? 1 : -1)));
   focus(items[next]);
+  if (settings) items[next]?.click();
   return true;
 }

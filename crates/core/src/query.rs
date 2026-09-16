@@ -23,6 +23,7 @@ pub fn links(notes: &[Note], records: &[Record]) -> Result<Vec<Link>> {
             out.push(Link {
                 source: note.meta.id.clone(),
                 target: resolved,
+                name: link.name.into(),
                 label: link.label(),
                 block: link.suffix.strip_prefix("#^").map(str::to_string),
                 line,
@@ -41,6 +42,7 @@ pub fn links(notes: &[Note], records: &[Record]) -> Result<Vec<Link>> {
         if let Some(note_id) = &record.body_note_id {
             out.push(Link {
                 source: record.id.clone(),
+                name: note_id.clone(),
                 target: notes
                     .iter()
                     .find(|n| n.meta.id == *note_id)
@@ -118,6 +120,9 @@ pub fn search(store: &Store, term: &str) -> Result<Value> {
             "invalid_arguments",
             "Search is limited to 500 bytes",
         ));
+    }
+    if let Some(tag) = term.trim().strip_prefix("tag:") {
+        return crate::tags::search(store, tag);
     }
     let connection = index(store)?;
     if term.trim().is_empty() {

@@ -16,12 +16,14 @@ export function Select({
   onValueChange,
   children,
   className = '',
+  disabled = false,
   'aria-label': label,
 }: {
   value: string;
   onValueChange: (value: string) => void;
   children: ReactNode;
   className?: string;
+  disabled?: boolean;
   'aria-label'?: string;
 }) {
   const options = Children.toArray(children)
@@ -38,6 +40,9 @@ export function Select({
   const list = useRef<HTMLDivElement>(null);
   const search = useRef({ text: '', time: 0 });
   const id = useId();
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
   const show = () => {
     setActive(
       Math.max(
@@ -92,6 +97,7 @@ export function Select({
       <button
         ref={trigger}
         type="button"
+        disabled={disabled}
         role="combobox"
         className={`select-control ${className}`}
         aria-label={label}

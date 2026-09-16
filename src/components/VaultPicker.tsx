@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import { ArrowLeft, Check, FolderOpen, Plus } from 'lucide-react';
+import { ArrowLeft, Check, FolderOpen, Plus, X } from 'lucide-react';
 import { isTauri } from '@tauri-apps/api/core';
 import { open as chooseDirectory } from '@tauri-apps/plugin-dialog';
 import { Modal } from './Modal';
@@ -13,8 +13,9 @@ interface Props {
   close: () => void;
   open: (path: string) => Promise<void>;
   create: (path: string, name: string, demo: boolean) => Promise<void>;
+  forget: (path: string) => Promise<void>;
 }
-export function VaultPicker({ current, recent, close, open, create }: Props) {
+export function VaultPicker({ current, recent, close, open, create, forget }: Props) {
   const [step, setStep] = useState<'list' | 'open' | 'create'>('list');
   const [openPath, setOpenPath] = useState('');
   const location = useVaultLocation(current || recent[0]?.path || '');
@@ -27,14 +28,14 @@ export function VaultPicker({ current, recent, close, open, create }: Props) {
   const dismiss = useCallback(() => {
     if (!busyRef.current) close();
   }, [close]);
-  const run = async (action: () => Promise<void>) => {
+  const run = async (action: () => Promise<void>, dismissAfter = true) => {
     if (busyRef.current) return;
     busyRef.current = true;
     setBusy(true);
     setError('');
     try {
       await action();
-      close();
+      if (dismissAfter) close();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -69,28 +70,39 @@ export function VaultPicker({ current, recent, close, open, create }: Props) {
           <p className="muted">이 기기에서 열었던 공간</p>
           <div className="vault-picker-list">
             {recent.map((vault) => (
-              <button
-                key={vault.path}
-                className="vault-picker-item"
-                disabled={busy}
-                aria-label={`Vault ${vault.name} 열기`}
-                onClick={() => (vault.path === current ? close() : void run(() => open(vault.path)))}
-              >
-                <FolderOpen size={20} />
-                <span>
-                  <strong>{vault.name}</strong>
-                  <small>{vault.path}</small>
-                </span>
-                {vault.path === current && (
-                  <span className="vault-current">
-                    <Check size={14} />
-                    현재
+              <div className="vault-picker-row" key={vault.path}>
+                <button
+                  className="vault-picker-item"
+                  disabled={busy}
+                  aria-label={`Vault ${vault.name} 열기`}
+                  onClick={() => (vault.path === current ? close() : void run(() => open(vault.path)))}
+                >
+                  <FolderOpen size={20} />
+                  <span>
+                    <strong>{vault.name}</strong>
+                    <small>{vault.path}</small>
                   </span>
-                )}
-              </button>
+                  {vault.path === current && (
+                    <span className="vault-current">
+                      <Check size={14} />
+                      현재
+                    </span>
+                  )}
+                </button>
+                <button
+                  className="icon-button vault-forget"
+                  aria-label={`Vault ${vault.name} 목록에서 제거`}
+                  title="목록에서 제거 · 실제 파일은 유지됩니다"
+                  disabled={busy}
+                  onClick={() => void run(() => forget(vault.path), vault.path === current)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
             ))}
             {!recent.length && <p className="muted">아직 등록된 vault가 없습니다.</p>}
           </div>
+          <p className="muted vault-forget-help">목록에서 제거해도 폴더와 노트는 삭제되지 않습니다.</p>
           <div className="vault-picker-actions">
             <button
               className="secondary-button"

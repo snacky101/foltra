@@ -63,5 +63,9 @@ export function useWorkspace() {
     setError('');
     localStorage.removeItem('foltra:last-vault');
   };
-  return { path, workspace, error, refresh, open, create, close, recentVaults };
+  const forget = (target: string) => {
+    if (target === path || target === workspace?.path) close();
+    setRecentVaults((recent) => recent.filter((vault) => vault.path !== target));
+  };
+  return { path, workspace, error, refresh, open, create, close, recentVaults, forget };
 }

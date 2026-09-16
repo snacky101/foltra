@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Search, ArrowUpRight } from 'lucide-react';
 import { leaderLabel } from '../lib/leaderKey';
 import { Modal } from './Modal';
-import { bindingsFor, type Command } from '../lib/commands';
+import { bindingsFor, sequenceKeys, type Command } from '../lib/commands';
 import type { Binding, NoteSummary, Settings } from '../lib/types';
 
 export function Palette({
@@ -36,7 +36,7 @@ export function Palette({
       id: note.id,
       title: note.title,
       section: '노트',
-      binding: {} as Binding,
+      binding: [] as Binding[],
       action: () => openNote(note.id),
     })),
   ].slice(0, 30);
@@ -84,8 +84,8 @@ export function Palette({
               <small>{result.section}</small>
             </span>
             <kbd>
-              {result.binding.shortcut ??
-                (result.binding.leader ? `${leaderLabel(settings.leader)} ${result.binding.leader}` : '')}
+              {result.binding[0] &&
+                `${result.binding[0].leader ? `${leaderLabel(settings.leader)} ` : ''}${sequenceKeys(result.binding[0]) ?? result.binding[0].keys}`}
             </kbd>
           </button>
         ))}

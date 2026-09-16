@@ -18,6 +18,129 @@ fn read(v: &TempDir, n: &Value) -> Value {
 }
 
 #[test]
+fn unresolved_links_keep_their_destination_and_create_only_when_opened() {
+    let v = vault();
+    let source = note(
+        &v,
+        "Journal",
+        "[[아직 없는 생각|별칭]] [[아직 없는 생각#^detail]]",
+    );
+    let links = call(&v, "links.list", json!({}));
+    assert_eq!(links[0]["name"], "아직 없는 생각");
+    assert_eq!(links[0]["label"], "별칭");
+    assert!(links[0]["target"].is_null());
+    assert_eq!(
+        call(&v, "note.list", json!({})).as_array().unwrap().len(),
+        1
+    );
+    let created = call(&v, "note.open-link", json!({"target":"아직 없는 생각"}));
+    assert_eq!(created["title"], "아직 없는 생각");
+    assert_eq!(created["body"], "");
+    assert_eq!(read(&v, &source)["body"], source["body"]);
+    assert_eq!(
+        call(&v, "note.open-link", json!({"target":"아직 없는 생각"}))["id"],
+        created["id"]
+    );
+    assert_eq!(
+        call(&v, "note.open-link", json!({"target":created["id"]}))["id"],
+        created["id"]
+    );
+    assert_eq!(
+        call(&v, "backlinks.list", json!({"target":created["id"]}))
+            .as_array()
+            .unwrap()
+            .len(),
+        2
+    );
+    assert_eq!(
+        call(&v, "note.list", json!({})).as_array().unwrap().len(),
+        2
+    );
+}
+
+#[test]
+fn opening_ambiguous_deleted_or_invalid_targets_never_creates_replacements() {
+    let v = vault();
+    note(&v, "Same", "");
+    note(&v, "Same", "");
+    let deleted = note(&v, "Deleted", "");
+    call(
+        &v,
+        "note.delete",
+        json!({"id":deleted["id"],"expectedRevision":deleted["revision"]}),
+    );
+    let before = call(&v, "vault.export", json!({}));
+    for target in [
+        "Same",
+        "",
+        " ",
+        " Padding ",
+        "record:missing",
+        "A|alias",
+        "A#block",
+        "[[A]]",
+        deleted["id"].as_str().unwrap(),
+    ] {
+        assert!(
+            execute(
+                v.path().to_str().unwrap(),
+                "note.open-link",
+                json!({"target":target})
+            )
+            .is_err(),
+            "{target}"
+        );
+    }
+    assert_eq!(
+        call(&v, "vault.export", json!({}))["files"],
+        before["files"]
+    );
+}
+
+#[test]
+fn unresolved_visibility_defaults_on_and_persists_per_vault() {
+    let v = vault();
+    assert_eq!(
+        call(&v, "settings.get", json!({}))["showUnresolvedLinks"],
+        true
+    );
+    call(&v, "settings.update", json!({"showUnresolvedLinks":false}));
+    assert_eq!(
+        call(&v, "workspace.get", json!({}))["settings"]["showUnresolvedLinks"],
+        false
+    );
+    assert!(execute(
+        v.path().to_str().unwrap(),
+        "settings.update",
+        json!({"showUnresolvedLinks":"false"})
+    )
+    .is_err());
+    std::fs::write(v.path().join(".foltra/settings.json"), r#"{"vim":true}"#).unwrap();
+    let settings = call(&v, "settings.get", json!({}));
+    assert_eq!(settings["showUnresolvedLinks"], true);
+    assert_eq!(settings["vim"], true);
+}
+
+#[test]
+fn concurrent_link_opens_create_one_note() {
+    let v = vault();
+    let tasks: Vec<_> = (0..4)
+        .map(|_| {
+            let path = v.path().to_str().unwrap().to_string();
+            std::thread::spawn(move || {
+                execute(&path, "note.open-link", json!({"target":"Concurrent"})).unwrap()
+            })
+        })
+        .collect();
+    let opened: Vec<_> = tasks.into_iter().map(|task| task.join().unwrap()).collect();
+    assert!(opened.iter().all(|note| note["id"] == opened[0]["id"]));
+    assert_eq!(
+        call(&v, "note.list", json!({})).as_array().unwrap().len(),
+        1
+    );
+}
+
+#[test]
 fn readable_targets_and_explicit_aliases_survive_save_rename_and_topic_grouping() {
     let v = vault();
     let target = note(&v, "노트이름", "");

@@ -10,7 +10,8 @@ import type { Database, Note, Property, Row, Workspace } from '../lib/types';
 
 export type Dialog =
   | { kind: 'new-note'; folderId?: string }
-  | { kind: 'new-database' | 'search' | 'query' | 'link' | 'slash' }
+  | { kind: 'new-database' | 'query' | 'link' | 'slash' }
+  | { kind: 'search'; query?: string }
   | { kind: 'body'; row: Row }
   | { kind: 'property'; database: Database }
   | { kind: 'property-edit'; database: Database; property: Property };
@@ -54,7 +55,7 @@ export function AppDialogs({
     }
   };
   if (dialog.kind === 'search')
-    return <SearchDialog vault={workspace.path} close={close} openNote={openNote} />;
+    return <SearchDialog vault={workspace.path} initialQuery={dialog.query} close={close} openNote={openNote} />;
   if (dialog.kind === 'property-edit')
     return (
       <PropertyEditor

@@ -9,11 +9,16 @@ serde_json.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1", features = ["v4"] }
 sha2 = "0.10"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 fs2 = "0.4"
 regex = "1"
 rusqlite = { version = "0.38", features = ["bundled"] }
 dirs = "6"
 pulldown-cmark = { version = "0.13", default-features = false }
+rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
+
+ureq = { version = "3", default-features = false, features = ["json"] }
 
 [dev-dependencies]
 tempfile = "3"

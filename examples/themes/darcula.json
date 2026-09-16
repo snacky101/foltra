@@ -1,0 +1,25 @@
+{
+  "kind": "theme",
+  "id": "darcula",
+  "name": "Darcula",
+  "version": "1.0.0",
+  "description": "JetBrains의 차콜 그레이와 차분한 코드 강조색.",
+  "tokens": {
+    "paper": "#2b2b2b",
+    "panel": "#3c3f41",
+    "ink": "#a9b7c6",
+    "muted": "#bbbbbb",
+    "line": "#515151",
+    "accent": "#589df6",
+    "sidebar": "#313335",
+    "sidebar-ink": "#bbbbbb",
+    "selection": "#214283",
+    "danger": "#ff8080",
+    "warning": "#bbb529",
+    "success": "#6a8759",
+    "syntax-keyword": "#cc7832",
+    "syntax-atom": "#6897bb",
+    "syntax-literal": "#9876aa",
+    "syntax-string": "#6a8759"
+  }
+}

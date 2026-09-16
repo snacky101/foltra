@@ -68,10 +68,19 @@ test('a normal shortcut cannot silently replace the recorded leader', () => {
     vim: false,
     editorMode: 'live' as const,
     slash: false,
+    lineNumbers: 'none' as const,
+    cursorShape: 'bar' as const,
+    cursorFollowVim: true,
+    cursorBlink: 'blink' as const,
+    cursorBlinkRate: 600,
+    cursorAnimation: 'none' as const,
+    showUnresolvedLinks: true,
     leader: 'Meta+k',
     theme: 'paper',
     keybindings: {},
   };
-  expect(bindingConflict([], settings, 'test', { shortcut: 'Mod+k' }, 'meta')).toContain('Leader');
-  expect(bindingConflict([], settings, 'test', { shortcut: 'Ctrl+k' }, 'meta')).toBeNull();
+  expect(bindingConflict([], settings, 'test', [{ keys: 'Mod+k', leader: false }], 'meta')).toContain(
+    'Leader',
+  );
+  expect(bindingConflict([], settings, 'test', [{ keys: 'Ctrl+k', leader: false }], 'meta')).toBeNull();
 });

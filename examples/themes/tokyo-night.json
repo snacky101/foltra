@@ -1,0 +1,25 @@
+{
+  "kind": "theme",
+  "id": "tokyo-night",
+  "name": "Tokyo Night",
+  "version": "1.0.0",
+  "description": "밤의 도시를 닮은 남색과 선명한 파란색.",
+  "tokens": {
+    "paper": "#1a1b26",
+    "panel": "#16161e",
+    "ink": "#a9b1d6",
+    "muted": "#9aa5ce",
+    "line": "#414868",
+    "accent": "#7aa2f7",
+    "sidebar": "#16161e",
+    "sidebar-ink": "#a9b1d6",
+    "selection": "#283457",
+    "danger": "#f7768e",
+    "warning": "#e0af68",
+    "success": "#9ece6a",
+    "syntax-keyword": "#bb9af7",
+    "syntax-atom": "#ff9e64",
+    "syntax-literal": "#7dcfff",
+    "syntax-string": "#9ece6a"
+  }
+}

@@ -5,14 +5,16 @@ import { call } from '../lib/api';
 
 export function SearchDialog({
   vault,
+  initialQuery = '',
   close,
   openNote,
 }: {
   vault: string;
+  initialQuery?: string;
   close: () => void;
   openNote: (id: string) => void;
 }) {
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<{ id: string; title: string; excerpt: string }[]>([]);
   const [selected, setSelected] = useState(0);
   const [loading, setLoading] = useState(true);

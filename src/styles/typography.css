@@ -1,0 +1,292 @@
+.markdown-preview,
+.cm-live-preview {
+  --md-body-size: 14px;
+  --md-separator-height: 15px;
+  --md-list-indent: 24px;
+  --md-list-item-gap: 6px;
+  --md-h1-size: 29px;
+  --md-h2-size: 17px;
+  --md-h3-size: 15px;
+  --md-h4-size: 14px;
+  --md-h5-size: 11.62px;
+  --md-h6-size: 9.38px;
+  --md-paragraph-before: 15px;
+  --md-paragraph-after: 15px;
+  --md-h1-before: 28px;
+  --md-h1-after: 18px;
+  --md-h2-before: 36px;
+  --md-h2-after: 15px;
+  --md-h3-before: 25px;
+  --md-h3-after: 12px;
+  --md-h4-before: calc(var(--md-body-size) * 1.33);
+  --md-h4-after: var(--md-h4-before);
+  --md-h5-before: calc(var(--md-body-size) * 0.83 * 1.67);
+  --md-h5-after: var(--md-h5-before);
+  --md-h6-before: calc(var(--md-body-size) * 0.67 * 2.33);
+  --md-h6-after: var(--md-h6-before);
+  --md-list-before: var(--md-body-size);
+  --md-list-after: var(--md-body-size);
+  --md-quote-before: 32px;
+  --md-quote-after: 32px;
+  --md-code-before: 20px;
+  --md-code-after: 20px;
+  font-size: var(--md-body-size);
+  line-height: 1.95;
+}
+.markdown-preview h1,
+.editor .cm-live-h1 {
+  font-family: var(--display-font);
+  font-size: var(--md-h1-size);
+  line-height: 1.5;
+  font-weight: 400;
+  letter-spacing: -0.6px;
+}
+.markdown-preview h2,
+.editor .cm-live-h2 {
+  font-size: var(--md-h2-size);
+  font-weight: 600;
+  letter-spacing: -0.4px;
+}
+.markdown-preview h3,
+.editor .cm-live-h3 {
+  font-size: var(--md-h3-size);
+  font-weight: 700;
+}
+.markdown-preview h4,
+.editor .cm-live-h4 {
+  font-size: var(--md-h4-size);
+  font-weight: 700;
+}
+.markdown-preview h5,
+.editor .cm-live-h5 {
+  font-size: var(--md-h5-size);
+  font-weight: 700;
+}
+.markdown-preview h6,
+.editor .cm-live-h6 {
+  font-size: var(--md-h6-size);
+  font-weight: 700;
+}
+.markdown-preview h1 {
+  margin: var(--md-h1-before) 0 var(--md-h1-after);
+}
+.markdown-preview h2 {
+  margin: var(--md-h2-before) 0 var(--md-h2-after);
+}
+.markdown-preview h3 {
+  margin: var(--md-h3-before) 0 var(--md-h3-after);
+}
+.markdown-preview h4 {
+  margin: var(--md-h4-before) 0 var(--md-h4-after);
+}
+.markdown-preview h5 {
+  margin: var(--md-h5-before) 0 var(--md-h5-after);
+}
+.markdown-preview h6 {
+  margin: var(--md-h6-before) 0 var(--md-h6-after);
+}
+.markdown-preview p {
+  margin: var(--md-paragraph-before) 0 var(--md-paragraph-after);
+}
+.markdown-preview ul,
+.markdown-preview ol {
+  margin: var(--md-list-before) 0 var(--md-list-after);
+  padding-left: var(--md-list-indent);
+}
+.markdown-preview li {
+  --md-list-blank-lines: 0;
+  padding: 0;
+  margin: 0;
+  min-height: 1.95em;
+}
+.markdown-preview li + li {
+  margin-top: calc(var(--md-list-item-gap) + var(--md-list-blank-lines) * 1.95em);
+}
+.markdown-preview li > ul,
+.markdown-preview li > ol {
+  margin-top: var(--md-list-item-gap);
+}
+.markdown-preview li > ul,
+.markdown-preview li > ol {
+  margin-bottom: 0;
+}
+.markdown-preview li > p {
+  margin: 0;
+}
+.markdown-preview li > p + p {
+  margin-top: var(--md-separator-height);
+}
+.markdown-preview li::marker {
+  color: var(--accent);
+}
+.markdown-preview ul > li {
+  list-style: none;
+  position: relative;
+}
+.markdown-preview ul > li::before {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--accent);
+  left: calc(-0.5 * var(--md-list-indent) - 2px);
+  top: calc(0.975em - 2px);
+}
+.editor .cm-line.cm-live-list-line {
+  padding-left: calc(var(--cm-list-depth) * var(--md-list-indent));
+}
+.editor .cm-live-list-start {
+  text-indent: calc(-1 * var(--md-list-indent));
+}
+.editor .cm-live-list-marker {
+  display: inline-block;
+  width: var(--md-list-indent);
+  text-indent: 0;
+  text-align: center;
+}
+.markdown-preview strong,
+.editor .cm-live-strong {
+  font-weight: 600;
+}
+.editor .cm-editor.cm-live-preview {
+  --md-separator-height: calc(var(--md-body-size) * 1.95);
+  font-size: var(--md-body-size);
+}
+.editor .cm-live-preview .cm-content {
+  padding-top: 0;
+}
+.editor .cm-live-preview .cm-live-separator {
+  height: var(--md-separator-height);
+  min-height: var(--md-separator-height);
+  line-height: var(--md-separator-height);
+  padding: 0;
+}
+.editor .cm-live-preview .cm-live-hidden-separator {
+  height: 0;
+  min-height: 0;
+  line-height: 0;
+  font-size: 0;
+  padding: 0;
+}
+.editor .cm-live-heading {
+  color: var(--ink);
+}
+.editor .cm-live-preview .cm-gutters {
+  line-height: 27.3px;
+}
+.editor .cm-live-gutter-hidden {
+  visibility: hidden;
+}
+.editor .cm-live-gutter-separator {
+  line-height: var(--md-separator-height);
+}
+.editor .cm-live-gutter-code {
+  line-height: 19.8px;
+}
+.editor .cm-live-gutter-h1 {
+  line-height: calc(var(--md-h1-size) * 1.5);
+}
+.editor .cm-live-gutter-h2 {
+  line-height: calc(var(--md-h2-size) * 1.95);
+}
+.editor .cm-live-gutter-h3 {
+  line-height: calc(var(--md-h3-size) * 1.95);
+}
+.editor .cm-live-gutter-h4 {
+  line-height: calc(var(--md-h4-size) * 1.95);
+}
+.editor .cm-live-gutter-h5 {
+  line-height: calc(var(--md-h5-size) * 1.95);
+}
+.editor .cm-live-gutter-h6 {
+  line-height: calc(var(--md-h6-size) * 1.95);
+}
+
+.attachment-image {
+  max-width: 100%;
+  height: auto;
+  vertical-align: middle;
+  border-radius: 4px;
+}
+.cm-live-image {
+  display: inline-block;
+  max-width: 100%;
+  text-indent: 0;
+  vertical-align: middle;
+}
+.attachment-placeholder {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Tags retain the same pill geometry while their text is edited. */
+.tag-chip {
+  --tag-fill: color-mix(in srgb, var(--accent) 7%, var(--paper));
+  --tag-edge: color-mix(in srgb, var(--accent) 20%, var(--paper));
+  display: inline-block;
+  max-inline-size: 100%;
+  margin-inline: 1px;
+  vertical-align: baseline;
+  color: color-mix(in srgb, var(--accent) 70%, var(--ink));
+  background: var(--tag-fill);
+  border: 1px solid var(--tag-edge);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font: inherit;
+  font-size: 0.86em;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+  text-indent: 0;
+  text-decoration: none;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    color 140ms ease;
+}
+button.tag-chip {
+  cursor: pointer;
+}
+button.tag-chip:hover,
+button.tag-chip:focus-visible,
+.cm-live-preview .tag-chip:hover,
+.tag-chip-editing {
+  --tag-fill: color-mix(in srgb, var(--accent) 13%, var(--paper));
+  --tag-edge: color-mix(in srgb, var(--accent) 38%, var(--paper));
+  color: var(--ink);
+}
+
+.code-muted {
+  color: var(--muted);
+}
+.code-accent {
+  color: var(--accent);
+}
+.code-syntax-keyword {
+  color: var(--syntax-keyword);
+}
+.code-syntax-atom {
+  color: var(--syntax-atom);
+}
+.code-syntax-literal {
+  color: var(--syntax-literal);
+}
+.code-syntax-string {
+  color: var(--syntax-string);
+}
+.code-warning {
+  color: var(--warning);
+}
+.code-danger {
+  color: var(--danger);
+}
+.code-heading,
+.code-strong {
+  font-weight: 600;
+}
+.code-emphasis {
+  font-style: italic;
+}
+.code-strikethrough {
+  text-decoration: line-through;
+}

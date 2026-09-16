@@ -52,6 +52,35 @@ pub fn create_note(store: &Store, args: &Value) -> Result<Value> {
     Ok(serde_json::to_value(read_note(store, &note.meta.id)?)?)
 }
 
+// Resolution and optional creation share the vault lock, including concurrent GUI/CLI opens.
+pub fn open_link(store: &Store, args: &Value) -> Result<Value> {
+    let target = text(args, "target")?;
+    let all = notes(store)?;
+    if let Some(note) = wiki::resolve_note(&all, target) {
+        return Ok(serde_json::to_value(note)?);
+    }
+    if all.iter().any(|note| note.meta.title == target) {
+        return Err(Error::new(
+            "ambiguous_link",
+            "같은 제목의 노트가 여러 개입니다. 자동완성에서 노트를 선택해 주세요.",
+        ));
+    }
+    if target.starts_with("record:") || id(target).is_ok() {
+        return Err(Error::new(
+            "not_found",
+            "연결 대상을 찾을 수 없습니다. 삭제된 노트는 휴지통에서 복원해 주세요.",
+        ));
+    }
+    let title = nonempty(target, "Title")?;
+    if title != target || title.contains(['[', ']', '|', '#', '\n', '\r', '\\']) {
+        return Err(Error::new(
+            "invalid_link",
+            "노트 링크의 대상 이름이 올바르지 않습니다.",
+        ));
+    }
+    create_note(store, &json!({"title":title}))
+}
+
 pub fn update_note(store: &Store, args: &Value) -> Result<Value> {
     let mut note = read_note(store, text(args, "id")?)?;
     check_revision(text(args, "expectedRevision")?, &note.revision)?;
@@ -134,6 +163,11 @@ pub(crate) fn plan_note_write(
     }
     if replacement.is_none() {
         writes.push((note_path(note_id)?, None));
+    }
+    if targets_changed {
+        if let Some(write) = crate::topic_order::rekey(store, &before, &after)? {
+            writes.push(write);
+        }
     }
     Ok(writes)
 }

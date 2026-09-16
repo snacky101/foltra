@@ -28,22 +28,34 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `notes.rs`, `databases.rs` | 각 객체의 생성/수정/삭제, revision과 값 검증 | UI별 저장 로직 |
 | `query.rs` | 링크 인덱스, 구조화된 쿼리, 재생성 가능한 검색 인덱스 | 임의 SQL/JS 실행 |
 | `wiki.rs` | 제목/UUID 대상 해석, alias 보존, Markdown 소스 범위 기반 참조 갱신 | UI별 링크 저장 규칙 |
-| `topics.rs` | Markdown 목록 경계·주제 식별·읽기 전용 카드 조회 | 원문 복제·UI 상태·임의 코드 실행 |
-| `extensions.rs` | 선언형 manifest 검증·설치·명령 실행 | 커뮤니티 JS를 host에서 실행 |
+| `topics.rs`, `topic_order.rs` | Markdown 문단·목록 경계·주제 식별·카드 조회·revision 기반 표시 순서와 내용 대응 | 원문 복제·UI 상태·임의 코드 실행 |
+| `extensions.rs`, `plugin_manifest.rs` | 선언형/코드 manifest·SDK 버전·뷰 스키마 검증, 설치·공통 명령 | 앱 DOM에 커뮤니티 코드 주입 |
+| `plugin_runtime.rs`, `plugin_sdk.js` | 제한된 QuickJS 실행, 권한·기기별 승인, 코어 API, 전용 데이터 revision | 임의 파일/네트워크/시스템 API·UI thread 실행 |
+| `usePlugins`, `pluginSession`, `PluginView`, `pluginEditor` | 플러그인 세션·이벤트·뷰 렌더링·늦은 편집 결과 검사 | 독자 노트/DB 저장 규칙 |
+| `PluginSettingsForm`, `PluginSettingsView`, `ExtensionsView` | 확장별 설정 페이지, 선언형 입력·revision 저장, 같은 세션의 동적 설정 뷰 | 별도 플러그인 실행 엔진·권한 우회·동기화 데이터 복제 |
+| `anki_bridge.rs`, `examples/code/anki` | 제한된 로컬 AnkiConnect 전송 / 별도 코드 패키지의 원본 매핑·충돌·동기화 화면 | 일반 네트워크 접근·카드 삭제·개인 덱 자동 선택 |
+| `attachments.rs`, `imagePaste.ts`, `AttachmentImage` | 이미지 형식·크기·경로 검증과 파일 저장 / 비동기 붙여넣기 위치 추적 / 로컬 이미지 표시 | 클립보드 상시 감시, 외부 이미지 자동 다운로드, 임의 파일 경로 읽기 |
+| `tags.rs`, `noteTags.ts`, `remarkTags.ts` | Markdown 태그 식별·블록 조회·칩 표시·정확한 태그 검색, 공유 fixture | 노트 원문 태그 변환·코드/URL 속 태그 인식 |
 | `vault.rs`, `backup.rs` | vault 구성, 설정, 휴지통, snapshot | 클라우드 인증/동기화 가정 |
 | `src/lib/useNote.ts` | 편집 초안, 직렬 자동 저장, 충돌 보존 | 전역 탐색과 DB 처리 |
 | `src/lib/useNoteActions.ts` | 노트 관리 전 저장, 선택 revision 유지, 이름 변경·복제·삭제 UI 흐름 | core 검증 복제, 충돌 자동 재시도 |
 | `src/lib/useTreeEditing.ts`, `InlineTreeName` | 생성 후 인라인 입력, 선택 revision으로 이름 저장, 초안/포커스 복원 | 파일 직접 접근, 충돌 자동 재시도 |
 | `GraphView`, `graphLayout.worker.ts`, `graphLayout.ts` | SVG 탐색, worker 생명주기, 복제한 객체의 힘 기반 배치 | vault 원본 수정, 무한 시뮬레이션 |
-| `src/lib/useWorkspace.ts` | snapshot 로딩, 외부 변경 갱신, vault 선택 | 본문 편집 초안 |
-| `src/lib/useTopics.ts`, `TopicsView` | 주제·페이지 요청 수명, 카드 표시, 원본 위치 탐색 | 파일 접근·Markdown 목록 경계 재구현 |
+| `src/lib/useWorkspace.ts` | snapshot 로딩, 외부 변경 갱신, vault 선택·등록 목록 제거 | 본문 편집 초안, 실제 vault 파일 삭제 |
+| `src/lib/useTopics.ts`, `TopicsView` | 주제·페이지 요청 수명, 카드 표시, 원본 위치 탐색 | 파일 접근·Markdown 블록 경계 재구현 |
 | `src/lib/builtinCommands.ts` | UI 명령 ID·제목·기본 단축키 | 이벤트 리스너 |
 | `src/lib/useCommandKeys.ts` | 시간 제한 없는 leader/일반 키 이벤트 라우팅, 조합 입력 보호 | 특정 기능의 데이터 변경 |
+| `src/lib/vimKeybindings.ts` | 설정의 Normal 조합을 Vim 엔진에 등록·해제하고 공통 명령으로 전달 | 별도 전역 키 리스너, Insert 입력 처리 |
 | `src/lib/commandKey.ts`, `vimInput.ts` | 명령 문맥의 물리 키 보정, CodeMirror Vim API 연결 | Insert 본문·literal 인수 변환, OS 입력 소스 변경 |
 | `src/lib/noteLinks.ts` | UI 백링크·연결 수에서 DB 본문 소속 관계 제외 | 원본 bodyNoteId 수정, 코어 관계 조회 계약 변경 |
 | `Backlinks`, `workspaceFocus.ts` | 열 수 있는 링크만 탐색, 갱신 중 포커스 유지 | 노트 원본 변경 |
 | `src/lib/leaderKey.ts`, `LeaderKeyRecorder` | Leader 값 파싱/기록, 키 충돌 안내, 기록 중 전역 명령 격리 | 개별 기능 실행, 파일 직접 저장 |
-| `src/lib/livePreview.tsx` | CM decoration과 편집 위치별 원문 표시 | Markdown 원본 수정·별도 저장 |
+| `src/lib/livePreview.tsx`, `livePreviewLayout.ts`, `styles/typography.css` | CM decoration, 활성 줄 원문, 읽기/편집 공통 서체·블록 간격 | Markdown 원본 수정·별도 저장 |
+| `src/lib/markdownTables.ts`, `livePreviewTable.tsx`, `tableContextMenu.tsx` | GFM 구문 트리의 셀 범위, 표의 키보드·마우스 탐색/편집, CM transaction으로 셀·행·열 수정, 공통 ContextMenu 재사용 | 별도 저장/undo 엔진, React 렌더링 중 조합 입력 DOM 교체 |
+| `src/lib/markdownEditing.ts` | Markdown Enter의 한 줄 목록 이어쓰기, 원래 번호/들여쓰기 처리 유지 | 저장 본문 일괄 변환, 독자 Markdown parser |
+| `src/lib/editorCursor.ts`, `cursorAppearance.ts`, `cursorMotion.ts` | 커서 좌표 측정·모드별 모양·점멸·이동 효과와 수명 관리 | 문서·선택 변경, 전역 키 처리, 프레임별 React 상태 갱신 |
+| `src/lib/wikiCompletion.ts`, `wikiLinkNavigation.ts` | 편집기 자동완성·괄호/alias 보존, 클릭·커서 위치의 링크 대상 해석 | 노트 직접 생성, 전역 키 처리 |
+| `src/lib/useOpenWikiLink.ts` | 초안 저장 후 링크 열기, core 생성 결과와 화면 연결 | 도메인 생성 규칙·충돌 우회 |
 | `src/lib/vimCommands.ts`, `noteCommands.ts` | 호출한 편집기로 Ex 라우팅, 저장·닫기 계약 | revision 우회 |
 | `SearchDialog`, `Select`, `DateField`, `ResizableSidebar` | 검색 키 탐색, 테마 공통 입력과 패널 너비 | core 데이터 규칙 |
 | `src/components/*` | 노트·DB·뷰·설정 등의 표시와 입력 | 파일시스템 접근 |
@@ -58,13 +70,16 @@ vault/
   .foltra/
     vault.json             # vault UUID, name, formatVersion
     settings.json          # Vim, slash, leader, theme, bindings
+    topic-order.json       # 주제별 사용자 지정 카드 순서와 내용 해시
     local/write.lock       # 동기화 대상 제외
     local/pending.json     # 다중 파일 변경 복구용; 정상 완료 시 제거
     cache/index.sqlite     # 검색용 파생 데이터; 삭제 후 재생성 가능
   notes/<uuid>.md          # JSON 형식 metadata header + Markdown body
+  attachments/<sha256>.*   # 클립보드 이미지 원본 (PNG/JPEG/GIF/WebP)
   databases/<uuid>.json    # DB schema
   records/<uuid>.json      # 독립된 DB row, optional bodyNoteId
-  extensions/<id>.json     # 검증된 선언형 plugin/theme
+  extensions/<id>.json     # 검증된 선언형/코드 plugin/theme
+  plugin-data/<id>.json    # 플러그인 전용 설정·데이터, revision 및 백업 대상
   trash/<uuid>.json        # 삭제된 note/row 원본과 원래 경로
 ```
 
@@ -75,6 +90,14 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 노트 수정·삭제와 행 수정·삭제·본문 연결은 `expectedRevision`이 필수입니다. revision은 원본 파일 전체의 SHA-256입니다. 서로 다른 Foltra 프로세스는 같은 vault 잠금으로 직렬화합니다. 쓰기는 복구 journal → 임시 파일 write/fsync → rename → 디렉터리 fsync → journal 제거 순서입니다. 복구 시 원본이 journal의 before/after 어느 쪽에도 일치하지 않으면 외부 내용을 덮어쓰지 않고 중단합니다.
 
 **한계:** OS 잠금을 무시하고 직접 파일을 쓰는 외부 편집기와의 모든 경쟁 상태를 방지하지는 않습니다. 현재 symlink 검사는 검사 직후 경로를 바꾸는 악성 로컬 프로세스에 대한 완전한 방어가 아닙니다. 강제 종료·전원 장애·다른 파일시스템의 내구성 검증은 별도로 필요합니다. journal 회복 테스트는 중간 상태 fixture로 수행했습니다.
+
+### 이미지 첨부
+
+`attachment.import {data}`는 base64 이미지 바이트의 실제 형식과 크기를 확인하고 `attachments/<sha256>.<확장자>`에 저장합니다. 같은 바이트는 파일을 재사용하고, 기존 해시 경로의 내용이 다르면 덮어쓰지 않습니다. PNG/JPEG/GIF/WebP, 파일당 10 MiB, 4천만 픽셀 이하이며 각 변은 16384px 이하입니다. `attachment.read {path}`는 관리되는 해시 경로와 내용이 일치하는 이미지만 반환합니다. 확장 SDK에는 새 파일 읽기 권한을 자동으로 부여하지 않습니다.
+
+편집기는 이미지 저장이 완료된 뒤 `![이미지](../attachments/…)`를 한 번의 실행 취소가 가능한 변경으로 삽입합니다. 노트 Markdown 파일을 기준으로 한 상대 경로이므로 vault 폴더를 옮겨도 연결됩니다. 비동기 작업 중 다른 편집은 삽입 위치에 반영하고, 노트 전환·영역 교체·실행 취소 시 취소합니다. 이미지 저장을 기다리는 동안 한글 조합을 시작했으면 조합 완료 후 삽입합니다. 읽기 모드와 Live Preview는 코어에서 읽은 이미지 데이터만 표시하며 원격 URL·SVG·임의 로컬 경로는 자동 로드하지 않습니다.
+
+이미지 저장은 바이너리 항목을 지원하는 복구 journal v2를 사용합니다. 텍스트만 저장할 때는 v1을 유지하고 두 버전을 복구할 수 있습니다. 이미지가 있는 `vault.export`는 base64 `attachments` 맵을 포함하는 snapshot v2를 반환하며, v1 백업도 계속 가져올 수 있습니다. 복원은 모든 경로·해시·이미지 데이터를 검증한 뒤 텍스트와 바이너리를 같은 journal로 처리합니다. 백업 파일의 기존 CLI 입력 제한(16 MiB, RPC 18 MiB)은 유지되므로 큰 vault는 폴더 전체를 복사하거나 Git으로 보관할 수 있습니다. 링크 삭제나 실행 취소로 파일을 자동 삭제하지 않습니다. 다른 노트·휴지통·편집 이력의 참조를 보존하기 위한 동작이며 첨부파일 정리 UI는 아직 없습니다.
 
 ## 실제 실행 흐름
 
@@ -88,13 +111,25 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 ### 확장 명령과 단축키
 
+플러그인 관리 UI는 설정의 `extensions` 그룹에, 테마 설치·제거·선택은 `theme` 그룹에 있습니다. `extensions.open` 명령은 현재 작업을 저장한 뒤 확장 그룹을 직접 열며, 기존 작업 뷰는 유지합니다. 플러그인은 `ExtensionsView`, 테마는 `ThemeSettings`에서 관리합니다. 테마 기본 선택지는 Paper & Pine과 Midnight이고, 카탈로그와 파일로 추가한 테마는 선택 카드에서 바로 삭제합니다. 사용 중인 테마 삭제와 Paper 복귀는 코어의 한 저장 트랜잭션입니다. 파일 종류가 다른 경우 올바른 설정 그룹을 안내합니다.
+
+`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki만 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
+
 1. JSON 설치 시 `extensions.rs`가 허용 필드, command/action, theme token을 검사합니다. 읽을 때도 다시 검사합니다.
 2. core `commands.list`가 `plugin.<extension-id>.<command-id>`를 반환합니다. UI도 같은 ID를 팔레트와 단축키 설정에 등록합니다.
-3. `useCommandKeys`는 조합 입력·편집 모드·modal 상태를 고려해 명령 하나를 실행합니다. 키 목록은 각 화면에 흩어 두지 않습니다.
+3. 명령마다 `{ keys, leader }` 배열을 저장합니다. 각 조합의 `leader`는 Leader 포함 여부이며 별도 Vim/일반 단축키 필드가 없습니다. `useCommandKeys`는 Leader/일반 조합을, `vimKeybindings`는 노트 본문 Normal 조합을 기존 Vim 엔진을 통해 공통 명령으로 전달합니다. 키 목록은 각 화면에 흩어 두지 않습니다.
 4. template 명령은 GUI/CLI 모두 core에서 노트를 생성합니다. query 명령은 CLI에서 결과를, UI에서는 DB 뷰를 제공합니다. view 명령은 UI에서 화면을 전환하며 CLI에서는 `requires_ui`를 반환합니다.
 5. 제거 시 확장 manifest만 제거합니다. 만들어진 사용자 노트·DB를 삭제하지 않습니다.
 
-프리뷰의 plugin action은 `template`, `query`, 내장 `view`입니다. 외부 코드로 새 renderer나 property type을 등록하는 SDK는 아직 없습니다. 테마는 지정된 색상 token만 바꿀 수 있습니다. 이것을 임의 코드를 안전하게 실행하는 sandbox로 설명해서는 안 됩니다.
+카탈로그와 파일로 설치한 패키지를 하나의 목록으로 보여 주고, ‘설치된 것만’ 스위치로 현재 vault에 설치된 항목을 거릅니다. 필터를 바꿔도 검색어는 유지합니다. 같은 ID의 카탈로그 항목보다 실제 설치된 manifest의 이름·버전·내용을 우선하며, 설치 상태와 제거 버튼은 필터와 관계없이 표시합니다.
+
+기존 `template`, `query`, 내장 `view` 외에 SDK v1 `script` 명령을 지원합니다. `runtime`에 담긴 번들 JS 모듈은 core의 QuickJS에서 호출마다 새 문맥으로 실행됩니다. TypeScript 패키징은 `scripts/pack-plugin.mjs`, 작성 타입은 `packages/plugin-sdk/`에 있습니다. 새 화면의 구조/동작을 플러그인 코드가 계산하고 `PluginView`가 검증된 tree를 React로 표시합니다. 배포 확장 소스는 `examples/code/anki/`에 있습니다. 캘린더·칸반·편집 도구는 SDK 회귀 테스트용 fixture로만 유지하며 `npm test`에서 빌드합니다.
+
+`usePlugins`는 활성 패키지별 직렬 세션, JSON 상태, load/unload, 변경 이벤트와 오류 중단을 담당합니다. `pluginSession`은 vault나 패키지가 바뀌면 대기 요청을 취소하고 늦은 응답을 버립니다. Core invocation은 최대 500ms/32MiB JS heap/512KiB stack/64 host calls/512KiB output으로 제한하며, DOM·Node·파일·네트워크는 노출하지 않습니다. 권한을 가진 명령/뷰 action만 데이터를 쓸 수 있습니다. 렌더링과 변경 이벤트는 읽기 전용이며 UI 결과는 고유한 패키지의 화면/허용된 노트/편집기 동작만 전달합니다. CodeMirror 선택 수정은 원래 노트·본문·선택·조합 상태를 다시 확인한 일반 transaction이므로 undo/자동저장을 유지합니다.
+
+활성화는 설치와 분리됩니다. `extension.enable`은 사용자가 확인한 digest가 현재 manifest와 같은지 확인하고, 기기의 앱 데이터 폴더 `app.foltra.desktop/plugin-grants/<vault-path-hash>/<id>.json`에 승인을 저장합니다. Vault 안에 승인 정보를 두지 않으며 코드/권한 변경과 복원한 다른 경로의 vault는 다시 활성화해야 합니다. `plugin-data`는 백업에 포함하지만 실행 승인은 포함하지 않습니다. Core의 `Store` 복제는 동일한 잠금 파일의 `Arc`를 공유해 JS callback의 소유 수명 동안에도 vault 잠금을 유지합니다. 플러그인 API도 공통 `dispatch`의 명령/인자/revision 검사를 거칩니다. 개별 데이터 명령은 원자적이지만 여러 호출을 하나의 transaction으로 묶지는 않습니다.
+
+이 API는 임의 DOM/CSS·CodeMirror 내부 확장이나 새 DB property type을 허용하지 않습니다. 네트워크·외부 파일 API, OS 프로세스 격리, 공개 marketplace/업데이트, 기존 Obsidian 플러그인 호환은 미구현입니다. 테마는 계속 지정된 색상 token을 사용합니다. 자세한 계약과 제한은 [PLUGIN_SDK.md](PLUGIN_SDK.md)에 있습니다.
 
 ## 새 기능을 추가할 때
 
@@ -120,13 +155,23 @@ Markdown의 raw HTML과 원격 이미지 자동 로딩을 사용하지 않습니
 
 ## 편집기와 화면 상태
 
-주제 모음은 [TOPICS.md](TOPICS.md)의 목록 범위/그룹 계약을 사용합니다. 코어의 `topics.list`/`topics.blocks`는 CLI에서도 사용할 수 있습니다. 카드의 원본 버튼은 노트 본문의 1-based 행을 기존 `openNote` 경로에 전달합니다. 편집기는 mount effect가 안정된 다음 프레임에 준비 완료를 알리고, cleanup은 이전 알림을 취소합니다. 개발 StrictMode의 편집기 재생성이 대기 중인 커서 이동을 먼저 소비하지 않도록 한 규칙입니다.
+`lineNumbers`(`none`/`absolute`/`relative`)는 Vault 설정이며 기본 `none`입니다. `src/lib/lineNumbers.ts`는 CodeMirror gutter를 구성하고 상대 번호를 현재 주 선택의 head 기준으로 계산합니다. 현재 줄은 실제 줄 번호를 표시합니다. gutter는 본문 flex 배치에서 제외해 기존 왼쪽 여백에 절대 배치하고, CodeMirror의 고정 gutter를 끕니다. 번호 유무와 자릿수가 본문 너비·줄바꿈에 영향을 주지 않으며 노트 스크롤을 함께 따릅니다. 선택 줄이 바뀌거나 문서가 바뀌면 표시를 갱신하며 화면 밖 줄 전체의 DOM을 만들지 않습니다. 독립 compartment로 적용해 문서·선택·undo history를 유지합니다. Live Preview/원문에는 원본 줄 번호를, 읽기 화면에는 번호를 표시하지 않습니다.
 
-새 vault는 `vim: false`, `editorMode: live`로 시작합니다. 기존의 명시적 Vim 설정은 유지합니다. live/source 전환은 CodeMirror compartment를 재설정하며 같은 문서와 undo history를 사용합니다. 읽기 모드는 별도 renderer입니다. Live Preview의 decoration은 원문을 변경하지 않고 활성 줄/블록 및 선택 범위를 원문으로 드러냅니다. 표·쿼리는 기존 NotePreview를 재사용합니다. 위키링크와 웹 링크는 편집 중 Ctrl/Cmd+클릭으로 열 수 있습니다.
+`cursorShape`(`bar`/`block`/`underline`), `cursorFollowVim`, `cursorBlink`(`steady`/`blink`/`breath`), `cursorBlinkRate`(200–2000ms 정수), `cursorAnimation`(`none`/`smooth`/`smear`)은 Vault 설정입니다. 기본값은 세로선·Vim 모드별 모양 사용·Blink·600ms·이동 효과 없음입니다. Vim 자체는 기본 OFF입니다. `cursorFollowVim`은 Normal/Visual을 블록, Replace를 밑줄로 바꾸고 Insert에서는 선택한 모양을 사용합니다. 기존 `auto` 값은 세로선+모드별 모양으로, 기존의 명시적 모양은 모드별 모양 OFF로 읽어 동작을 유지하며 읽기만으로 파일을 수정하지 않습니다. 구 CLI의 `auto` patch도 새 설정으로 정규화합니다.
 
-Vim의 전역 Ex 등록은 WeakMap으로 호출한 편집기 handler에 연결합니다. `:w`는 저장, `:q`는 현재 노트 닫기, `:wq`/`:x`는 저장 후 닫기입니다. 저장 실패/충돌은 강제 저장으로 우회하지 않습니다. `:q!`는 진행 중 저장이 끝나기를 기다린 뒤 미저장 초안만 버리며, 이미 자동 저장한 내용을 되돌리지는 않습니다. 현재 노트 외 파일 경로와 범위 저장은 거절합니다.
+`CursorSettings`는 모양·제자리 애니메이션·점멸 간격·이동 효과를 구분하고 실제 CSS를 공유하는 미리보기를 표시합니다. 점멸 간격은 밝음/어두움 한 단계의 시간이며 전체 주기는 두 배입니다. Steady에서는 간격 입력을 비활성화합니다. Blink는 단계적으로, Breath는 ease-in-out으로 밝기가 변합니다. 점멸은 CSS로 실행하고 입력·선택 이동 시 밝은 상태에서 다시 시작합니다.
 
-최근 vault 목록과 사이드바 너비는 앱의 기기별 localStorage에 보관합니다. vault 설정이나 Git 동기화 원본에는 넣지 않습니다. Vault 전환은 현재 초안을 저장하고 대상 workspace를 성공적으로 읽은 뒤 화면을 바꾸므로, 실패한 경로 선택이 현재 workspace를 비우지 않습니다. 최근 목록은 이 앱에서 열었던 경로이며 디스크 전체를 자동 탐색하지 않습니다.
+선택한 모양·효과는 별도 compartment로 갱신해 문서와 undo history를 유지합니다. `editorCursor`는 `requestMeasure`에서 좌표를 읽고 본문 위의 입력을 받지 않는 레이어만 그립니다. Vim 모드 이벤트와 스크롤도 재측정을 요청합니다. 순수 `cursorAppearance`는 모드별 모양을, `cursorMotion`은 경과 시간에 따른 위치와 잔상을 계산합니다. 이동이 끝나면 animation frame을 중단하고, blur/조합 입력/multiple selection에서는 기본 커서로 복귀하며 unmount 시 리스너와 레이어를 제거합니다. 시스템의 `prefers-reduced-motion`이 켜지면 점멸과 이동 효과를 모두 생략합니다. 이 레이어는 제목·Ex 입력창·읽기 모드에는 적용하지 않습니다.
+
+주제 모음은 [TOPICS.md](TOPICS.md)의 블록 범위/그룹 계약을 사용합니다. 코어의 `topics.list`/`topics.blocks`와 `topics.reorder`는 CLI에서도 사용할 수 있습니다. 순서는 별도 vault 메타데이터에 저장하고 노트 본문을 바꾸지 않습니다. 원본/순서 snapshot revision을 함께 검사하며, 순서 키의 이름→UUID 이전은 노트 변경 transaction에 포함합니다. 백업/복원은 이 메타데이터를 검증하고 보존합니다. 원본 정보 표시는 기기별 localStorage에 저장하고 공통 `topics.sources.toggle` 명령으로 전환하며, 조회 조건·원본 데이터와 분리합니다. 카드의 원본 버튼은 노트 본문의 1-based 행을 기존 `openNote` 경로에 전달합니다. 편집기는 mount effect가 안정된 다음 프레임에 준비 완료를 알리고, cleanup은 이전 알림을 취소합니다. 개발 StrictMode의 편집기 재생성이 대기 중인 커서 이동을 먼저 소비하지 않도록 한 규칙입니다.
+
+새 vault는 `vim: false`, `editorMode: live`로 시작합니다. 기존의 명시적 Vim 설정은 유지합니다. live/source 전환은 CodeMirror compartment를 재설정하며 같은 문서와 undo history를 사용합니다. 읽기 모드는 별도 renderer입니다. Live Preview의 decoration은 편집기 focus effect와 선택 범위를 따라 활성 줄/블록만 원문으로 드러내고, 본문을 떠나면 미리보기로 복귀합니다. 선택 끝이 다음 줄 시작과 일치하면 선택되지 않은 다음 줄은 제외합니다. 보기 모드 버튼/명령은 편집기 mount 완료 시 대기 중인 focus를 적용합니다. 표·쿼리는 기존 NotePreview를 재사용합니다. 위키링크와 웹 링크는 편집 중 Ctrl/Cmd+클릭으로 열 수 있습니다.
+
+`[[` 자동완성은 CodeMirror autocomplete의 로컬 keymap과 IME 처리를 사용합니다. 후보 선택은 본문만 변경하며, 실제 생성은 [LINKS.md](LINKS.md)의 `note.open-link` 경로에서만 실행합니다. core는 같은 vault 잠금 안에서 먼저 UUID/제목을 해석하고 생성 여부를 결정합니다. `Link.name`은 alias와 분리한 파생 대상 필드입니다. `showUnresolvedLinks`는 기존 설정에도 기본 true를 병합하고, `graphDocuments`는 표시용 가상 노드를 만들며 원본 노트를 쓰지 않습니다.
+
+Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출한 편집기 handler에 연결합니다. 현재 단일 활성 편집기의 매핑만 유지하며 설정 변경·편집기 해제 시 자신이 등록한 매핑을 제거해 기존 Vim 동작을 복원합니다. 키 조합은 `gd` 같은 연속 입력 또는 `Mod+Enter` 같은 수정 키 조합입니다. 연속 입력은 영문·숫자 최대 12개이며 공백은 구분자이고 대소문자를 구분합니다. Leader 없이 입력하는 연속 조합은 영문으로 시작하며 Vim Normal 본문에 등록됩니다. UI는 명령 간 중복·접두어 충돌과 Leader 첫 키 충돌을 검사하고, core는 저장 형식을 검증합니다. 명령의 배열을 비우면 모든 조합이 해제되며 키 자체를 제거하면 기본 바인딩으로 돌아갑니다. UI는 빈 입력을 저장 목록에서 제외합니다. 설정 UI는 키 조합과 일반 단축키 입력란을 분리합니다. 키 조합의 `<leader>f` 표기를 기존 `{ keys: "f", leader: true }`로 파싱하며, 체크박스는 사용하지 않습니다. 이 표기 변환은 저장 포맷과 기존 라우팅을 바꾸지 않습니다. 기본 `gd`는 `note.follow-existing-link`, Mod+Enter는 `note.follow-link` 명령으로 편집기 handle의 현재 커서 위치를 해석합니다. 둘 다 `useOpenWikiLink`의 저장·열기 흐름을 사용하며, `gd`는 기존 노트만 열고 없는 대상에서는 저장·생성·이동 기록을 변경하지 않습니다. Mod+Enter는 기존 atomic `note.open-link`로 열기/생성을 유지합니다. 별도 전역 키 리스너나 원본 쓰기 경로를 만들지 않습니다. `:w`는 저장, `:q`는 현재 노트 닫기, `:wq`/`:x`는 저장 후 닫기입니다. 저장 실패/충돌은 강제 저장으로 우회하지 않습니다. `:q!`는 진행 중 저장이 끝나기를 기다린 뒤 미저장 초안만 버리며, 이미 자동 저장한 내용을 되돌리지는 않습니다. 현재 노트 외 파일 경로와 범위 저장은 거절합니다.
+
+최근 vault 목록과 사이드바 너비·왼쪽 접기 상태·탐색 메뉴 컴팩트 모드는 앱의 기기별 localStorage에 보관합니다. vault 설정이나 Git 동기화 원본에는 넣지 않습니다. Vault 전환은 현재 초안을 저장하고 대상 workspace를 성공적으로 읽은 뒤 화면을 바꾸므로, 실패한 경로 선택이 현재 workspace를 비우지 않습니다. 최근 목록은 이 앱에서 열었던 경로이며 디스크 전체를 자동 탐색하지 않습니다.
 
 `useVaultLocation`은 Welcome과 VaultPicker의 생성 경로 초안을 공유합니다. 현재/최근 vault의 상위 폴더, 없으면 core `vault.default`의 상위 폴더를 기준으로 이름을 붙입니다. `vaultLocation`은 경로 구분자와 폴더명 제안을 계산하며 파일을 만들지 않습니다. 폴더 선택은 생성할 상위 위치를 바꾸고 이름 자동 반영을 유지합니다. 전체 경로를 직접 수정하면 그 경로를 우선하며 늦게 도착한 기본 위치 응답으로 덮어쓰지 않습니다. `VaultPathField`는 경로 입력과 우측 폴더 버튼의 공통 배치만 담당합니다. 기존 vault 열기의 폴더 선택은 선택한 경로를 그대로 사용하며, 생성 초안과 별도입니다. 실제 생성은 기존 `useWorkspace.create` → core `vault.init`을 유지합니다.
 
@@ -152,4 +197,14 @@ Vim의 전역 Ex 등록은 WeakMap으로 호출한 편집기 handler에 연결�
 
 `NoteTree`는 현재 트리에서 시작한 note ID를 ref에 보관합니다. drop payload는 노트 정보로 역직렬화하지 않습니다. 폴더 행 또는 NOTES 루트 영역에서만 이동할 수 있고, 같은 위치는 제외합니다. 드롭 시점의 workspace note snapshot을 `useNoteActions.moveTo`에 전달하면 공통 busy guard가 중복 실행을 막고 `moveNoteToFolder`가 편집 초안 저장 후 `expectedRevision`과 `folderId`만 core로 보냅니다. 성공 전 트리를 임의로 옮기지 않습니다. 대상 폴더 유효성 및 충돌 검사는 기존 core가 담당합니다. 컨텍스트 메뉴의 이동도 같은 함수로 처리합니다.
 
-키 바인딩 설정은 `shortcutVersion: 2`에서 대문자를 Shift 조합으로 해석합니다. Core는 버전 필드가 없거나 1인 설정의 단축키 마지막 알파벳만 소문자로 정규화해 기존 의미를 보존합니다. 읽기는 원본 파일을 변경하지 않으며 다음 `settings.update`에서만 새 버전으로 저장합니다. 새 버전 설정의 대소문자는 그대로 보존하고 알 수 없는 버전은 거절합니다. 버전 2를 모르는 구버전 앱으로의 downgrade는 지원하지 않습니다.
+키 바인딩 설정은 `shortcutVersion: 4`에서 `keybindings[commandId]: [{ keys: string, leader: boolean }]` 형식을 사용합니다. Core는 기존 `leader`/`shortcut`/`vimNormal` 객체를 배열로 변환합니다. 버전 1의 대문자 일반 단축키는 이전 의미대로 소문자로 정규화하고, 버전 2 이상의 대소문자는 유지합니다. 이전 `note.follow-link`의 Normal 필드 누락은 기본 `gd`를 유지하며 명시적 빈 값은 해제로 보존합니다. 버전 1–3의 `note.follow-link`에 저장된 Leader 없는 소문자 `gd`만 `note.follow-existing-link`로 옮깁니다. 다른 조합과 명시적 해제는 보존하고, 새 명령을 이미 설정했다면 덮어쓰지 않습니다. 버전 4에서 사용자가 다시 지정한 조합은 이 변환을 적용하지 않습니다. 읽기는 원본 파일을 변경하지 않으며 다음 명시적 설정 저장 때 버전 4로 기록합니다. CLI도 새 배열을 조회·저장하며 이전 객체 형식의 입력은 호환 변환합니다. 버전 4를 모르는 구버전 앱으로의 downgrade는 지원하지 않습니다.
+
+### 설정과 기기별 탐색 상태
+
+`settingsNavigation.ts`는 설정 진입/복귀 포커스와 선택 그룹을 관리합니다. App은 작업 뷰와 설정 표시 여부를 따로 보관하며, 설정 동안 작업 뷰를 inert 상태로 유지합니다. `SettingsNavigation`과 `SettingsView`는 같은 그룹 정의를 사용하고, 이동은 기존 `useCommandKeys`/`workspaceFocus`를 거칩니다. `settings.css`의 CSS 전환에는 별도의 애니메이션 라이브러리나 프레임별 React 상태 갱신이 없습니다.
+
+`editorLocation.ts`는 편집기의 선택·스크롤을 Vault/노트별 기기 저장소로 연결합니다. `Editor` 생성 시 선택을 읽고 준비 프레임에서 스크롤을 복원한 다음 App에 준비 완료를 알립니다. App은 명시적인 파일 열기 요청의 포커스를 이 경계에서 처리합니다. 창의 크기와 위치는 네이티브 window-state 플러그인이 앱 설정 디렉터리에 보관합니다. 두 상태 모두 Vault 동기화·노트 revision과 분리됩니다.
+
+Cmd+W(macOS)/Ctrl+W(그 외)는 공통 `note.close` 명령으로 현재 노트를 저장한 뒤 닫고 사이드바와 앱 창을 유지합니다. 열린 노트가 없거나 다른 뷰·설정·대화상자를 사용 중이면 노트를 닫지 않습니다. 저장 실패 시 노트를 열어 두며, 단축키는 기존 설정에서 변경·해제할 수 있습니다. Vim `:q`의 미저장 변경 거절 규칙은 유지합니다. macOS의 `src-tauri/src/menu.rs`는 기본 메뉴의 Cmd+W 창 닫기 예약을 제거하고 편집기 명령 라우터가 키를 받게 합니다. File → Close Window 메뉴와 빨간 닫기 버튼은 네이티브 창을 닫습니다. `useCloseGuard`의 초안 저장/실패 시 닫기 중단 흐름을 거친 후, Rust event loop는 마지막 창 닫기로 발생하는 `ExitRequested { code: None }`의 앱 종료만 막습니다. Dock/Finder의 `Reopen`은 기존 main 창을 복원·포커스하거나 동일한 설정으로 다시 만들고 window-state 플러그인으로 크기/위치를 복원합니다. 네이티브 Cmd+Q 및 명시적 종료 코드는 그대로 종료하며, 이 정책은 macOS에서만 적용합니다.
+
+노트 탐색 기록은 `noteHistory.ts`에서 출발 노트 ID와 선택·스크롤의 snapshot을 최대 50개 메모리에 보관합니다. `note.back`(기본 `Ctrl+o`), `note.forward`(기본 `Ctrl+i`), 상단 이전 버튼이 같은 기록을 사용합니다. 뒤로·앞으로 이동할 때 현재 위치를 반대 방향 기록에 보관하며, 뒤로 간 후 새 노트를 열면 기존 앞으로 기록을 비웁니다. 현재 초안 저장에 성공한 뒤 목적 위치를 편집기 준비 경계에서 복원하므로 저장 실패 시 양쪽 기록을 소비하지 않습니다. 같은 노트 재방문으로 기기 저장소의 최신 위치가 바뀌어도 각 출발 위치는 유지됩니다. 삭제된 노트는 양방향으로 건너뛰고 Vault 전환 시 양쪽 기록을 비웁니다. 노트 안의 모든 Vim 이동을 추적하는 jumplist는 아닙니다.

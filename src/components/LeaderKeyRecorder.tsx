@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { Keyboard } from 'lucide-react';
-import { bindingsFor, shortcutMatches, type Command } from '../lib/commands';
+import { bindingsFor, bindingUsesLeader, type Command } from '../lib/commands';
 import { leaderLabel, recordLeaderKey } from '../lib/leaderKey';
 import type { Settings } from '../lib/types';
 
@@ -50,8 +50,7 @@ export function LeaderKeyRecorder({
               const value = recordLeaderKey(event.nativeEvent);
               if (!value) return;
               const collision = commands.find((command) => {
-                const key = bindingsFor(command, settings).shortcut;
-                return key && shortcutMatches(event, key);
+                return bindingsFor(command, settings).some((binding) => bindingUsesLeader(binding, value));
               });
               if (collision) {
                 setError(`“${collision.title}” 단축키와 겹칩니다. 다른 키를 눌러주세요.`);

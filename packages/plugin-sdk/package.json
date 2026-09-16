@@ -1,0 +1,10 @@
+{
+  "name": "@foltra/plugin-sdk",
+  "version": "0.1.0",
+  "type": "module",
+  "types": "index.d.ts",
+  "files": [
+    "index.d.ts",
+    "README.md"
+  ]
+}
