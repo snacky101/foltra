@@ -94,6 +94,7 @@
 }
 .sidebar nav button,
 .database-navigation > button,
+.database-navigation-row > button,
 .note-navigation > button,
 .note-navigation-row > button:first-child,
 .sidebar-bottom > button {
@@ -220,13 +221,35 @@
   padding: 3px;
   display: flex;
 }
-.database-navigation {
-  margin-bottom: 28px;
+.database-tree {
+  flex-shrink: 0;
+  padding-bottom: 28px;
 }
 .sidebar-tree {
+  display: flex;
+  flex-direction: column;
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+}
+.note-tree {
+  display: flex;
+  flex-direction: column;
+  flex: 1 0 auto;
+}
+.note-tree > .sidebar-section-title {
+  flex-shrink: 0;
+}
+.note-navigation {
+  flex: 1;
+}
+.database-navigation-row {
+  display: flex;
+  min-width: 0;
+}
+.tree-inline-editor.database-inline-editor {
+  grid-template-columns: 16px minmax(0, 1fr);
+  font-size: 12px;
 }
 .note-navigation > button,
 .note-navigation-row > button:first-child {

@@ -24,7 +24,7 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `crates/core/src/lib.rs` | 명령 입력 계약과 분기, 공통 오류 | UI 상태, 직접 키 처리 |
 | `crates/core/src/storage.rs` | vault 경로 제한, 잠금, 파일 읽기/쓰기, journal 복구 | 노트·DB의 제품 규칙 |
 | `database_schema.rs` | 컬럼 변경 검사·변환 계획·snapshot revision·일괄 적용 | GUI 변환 로직, 데이터 삭제에 의한 타입 변경 |
-| `folders.rs` | 가상 폴더 계층, 이름·부모 검증, revision 기반 이름 변경과 빈 폴더 삭제 | 실제 디렉터리 이동/노트 본문 변환 |
+| `folders.rs` | 가상 폴더 계층, 이름·부모 검증, revision 기반 이름 변경 | 실제 디렉터리 이동/노트 본문 변환 |
 | `notes.rs`, `databases.rs` | 각 객체의 생성/수정/삭제, revision과 값 검증 | UI별 저장 로직 |
 | `query.rs` | 링크 인덱스, 기존 JSON 쿼리, 재생성 가능한 검색 인덱스 | 사용자 SQL 실행·JS 실행 |
 | `sql_query.rs` | 이름 기반 쿼리 catalog, 읽기 전용 SQL 검증, 임시 DuckDB 테이블·결과 제한 | 원본 수정, 외부 DB 연결·파일·네트워크 접근 |
@@ -41,6 +41,9 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `vault.rs`, `backup.rs` | vault 구성, 설정, 휴지통, snapshot | 클라우드 인증/동기화 가정 |
 | `src/lib/useNote.ts` | 편집 초안, 직렬 자동 저장, 충돌 보존 | 전역 탐색과 DB 처리 |
 | `src/lib/useNoteActions.ts` | 노트 관리 전 저장, 선택 revision 유지, 이름 변경·복제·삭제 UI 흐름 | core 검증 복제, 충돌 자동 재시도 |
+| `database_lifecycle.rs`, `src/lib/useDatabaseActions.ts` | DB 이름 변경·전체 행 휴지통/복원 검증과 UI 확인·갱신 연결 | 연결된 노트 삭제, 충돌 자동 재시도 |
+| `folder_lifecycle.rs`, `DeleteFolderDialog` | 하위 트리 revision·개수 검사, 초안 저장 후 폴더 묶음 삭제·복원 | 확인 이후 새로 생긴 내용을 묵시적으로 삭제 |
+| `frontmatter.rs`, `src/lib/frontmatter.ts`, `FrontmatterPanel` | 사용자 YAML 속성의 제한된 파싱, 태그 조회, 원문/속성표 편집 | 앱 관리 헤더 변경, YAML을 실행하거나 본문 링크로 수집 |
 | `src/lib/useTreeEditing.ts`, `InlineTreeName` | 생성 후 인라인 입력, 선택 revision으로 이름 저장, 초안/포커스 복원 | 파일 직접 접근, 충돌 자동 재시도 |
 | `GraphView`, `graphLayout.worker.ts`, `graphLayout.ts` | SVG 탐색, worker 생명주기, 복제한 객체의 힘 기반 배치 | vault 원본 수정, 무한 시뮬레이션 |
 | `src/lib/useWorkspace.ts` | snapshot 로딩, 외부 변경 갱신, vault 선택·등록 목록 제거 | 본문 편집 초안, 실제 vault 파일 삭제 |
@@ -83,12 +86,16 @@ vault/
   records/<uuid>.json      # 독립된 DB row, optional bodyNoteId
   extensions/<id>.json     # 검증된 선언형/코드 plugin/theme
   plugin-data/<id>.json    # 플러그인 전용 설정·데이터, revision 및 백업 대상
-  trash/<uuid>.json        # 삭제된 note/row 원본과 원래 경로
+  trash/<uuid>.json        # 삭제된 note/row, DB+행 또는 폴더+하위 트리 묶음의 원본·경로
 ```
 
 원래 설계의 DB 하위 폴더별 행 배치 대신, 프리뷰에서는 `records/<uuid>.json`에 행을 모으고 `databaseId`로 연결합니다. 노트 제목을 파일명으로 사용하지 않으므로 이름 변경 시 파일 경로가 바뀌지 않습니다. 현재는 Foltra metadata가 있는 관리 파일만 읽습니다. 임의 Markdown 폴더의 즉시 가져오기는 지원하지 않습니다.
 
 DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적으로 실행할 때 새 노트 생성과 `bodyNoteId` 변경을 같은 journal로 기록합니다. 기존 노트 연결도 가능하며, 행을 삭제해도 본문 노트를 함께 삭제하지 않습니다. 본문 노트를 삭제한 행에는 새 본문을 연결할 수 있습니다.
+
+`database.inspect`는 스키마·소속 행의 원본으로 revision과 행 수를 반환합니다. `database.rename`과 `database.delete`는 이 revision을 요구합니다. DB 삭제는 스키마와 소속 행을 하나의 휴지통 항목으로 journal 처리하며, 복원은 모든 경로·행 소유권·대상 충돌을 확인한 뒤 함께 수행합니다. 연결된 노트는 유지합니다. 휴지통 파일 제한인 16 MiB를 넘는 묶음은 삭제 전 거절하며, 먼저 개별 삭제한 행은 DB를 복원한 뒤 복원할 수 있습니다.
+
+`folder.inspect`는 하위 폴더·노트까지 포함한 revision을 반환하고 `folder.delete`가 이를 확인합니다. 휴지통에는 원본 트리와 노트를 한 묶음으로 보관합니다. 복원 위치 충돌은 덮어쓰지 않으며 원래 부모 폴더가 없으면 최상위로 복원합니다. 여러 노트의 링크와 주제 정체성 변경은 단일 `plan_note_batch`로 계산해 중복 쓰기를 피합니다. 사용자 frontmatter는 관리 JSON 헤더 뒤의 `Note.body`에 그대로 보관하며 기존 파일 형식은 변환하지 않습니다([계약과 사용법](FRONTMATTER.md)).
 
 노트 수정·삭제와 행 수정·삭제·본문 연결은 `expectedRevision`이 필수입니다. revision은 원본 파일 전체의 SHA-256입니다. 서로 다른 Foltra 프로세스는 같은 vault 잠금으로 직렬화합니다. 쓰기는 복구 journal → 임시 파일 write/fsync → rename → 디렉터리 fsync → journal 제거 순서입니다. 복구 시 원본이 journal의 before/after 어느 쪽에도 일치하지 않으면 외부 내용을 덮어쓰지 않고 중단합니다.
 
@@ -202,7 +209,7 @@ Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출�
 
 ## 폴더와 휴지통 갱신
 
-폴더는 `folders/<uuid>.json`의 `{id,name,parentId}`로 저장합니다. 노트 metadata의 선택적 `folderId`가 소속을 나타내며 기존 노트는 그대로 최상위에 표시됩니다. 제목·폴더 변경은 UUID 파일 경로를 바꾸지 않습니다. 폴더 이동은 본문 참조를 바꿀 필요가 없으며, 제목 변경은 연결된 본문의 대상을 함께 갱신합니다. 폴더 삭제는 활성 노트와 하위 폴더가 없는 경우만 허용합니다. 휴지통의 노트가 참조하던 폴더가 없어졌다면 최상위로 복원합니다. 백업은 폴더 파일을 포함하고, import는 누락된 부모/노트 폴더·순환 계층을 쓰기 전에 거절합니다. 예전 백업은 폴더 없이 그대로 읽힙니다. 이전 앱 버전으로의 downgrade 보존은 아직 보장하지 않습니다.
+폴더는 `folders/<uuid>.json`의 `{id,name,parentId}`로 저장합니다. 노트 metadata의 선택적 `folderId`가 소속을 나타내며 기존 노트는 그대로 최상위에 표시됩니다. 제목·폴더 변경은 UUID 파일 경로를 바꾸지 않습니다. 폴더 이동은 본문 참조를 바꿀 필요가 없으며, 제목 변경은 연결된 본문의 대상을 함께 갱신합니다. 폴더 삭제는 `folder_lifecycle.rs`가 하위 폴더·노트를 묶어 휴지통으로 이동하며, subtree revision으로 동시 변경을 검사합니다. 복원은 원래 ID·내용·구조를 유지하고 충돌 시 덮어쓰기를 거절합니다. 휴지통의 노트가 참조하던 폴더가 없어졌다면 최상위로 복원합니다. 백업은 폴더 파일을 포함하고, import는 누락된 부모/노트 폴더·순환 계층을 쓰기 전에 거절합니다. 예전 백업은 폴더 없이 그대로 읽힙니다. 이전 앱 버전으로의 downgrade 보존은 아직 보장하지 않습니다.
 
 `workspace.get`은 노트·DB·폴더·휴지통 요약을 같은 잠금 아래에서 반환합니다. `TrashView`는 이 snapshot을 바로 렌더링하며 별도 목록 캐시를 갖지 않습니다. 앱 내부 쓰기는 완료 직후 `refresh()`하고, CLI 등 외부 변경은 기존 3초 주기의 workspace 갱신에 반영됩니다. 휴지통 본문은 snapshot에 넣지 않습니다.
 

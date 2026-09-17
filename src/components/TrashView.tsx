@@ -31,14 +31,16 @@ export function TrashView({
     <section className="page-view">
       <div className="eyebrow">NOTHING LOST ALONG THE WAY</div>
       <h1>휴지통</h1>
-      <p className="page-description">삭제한 노트와 DB 항목을 원래 위치로 복원합니다.</p>
+      <p className="page-description">삭제한 노트·폴더·데이터베이스·DB 항목을 복원합니다.</p>
       {items.map((item) => (
         <div className="trash-row" key={item.id}>
           <Trash2 size={17} />
           <span>
             <strong>{item.title}</strong>
             <small>
-              {item.kind === 'note' ? '노트' : 'DB 항목'} · {new Date(item.deletedAt).toLocaleString('ko-KR')}
+              {{ note: '노트', folder: '폴더', database: '데이터베이스', record: 'DB 항목' }[item.kind] ??
+                item.kind}{' '}
+              · {new Date(item.deletedAt).toLocaleString('ko-KR')}
             </small>
           </span>
           <button

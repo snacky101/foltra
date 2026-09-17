@@ -1,6 +1,7 @@
 import { RangeSet, type EditorState, type Range } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
 import { Decoration, GutterMarker, WidgetType, type DecorationSet } from '@codemirror/view';
+import { frontmatterRange } from './frontmatter';
 
 export class BlockGap extends WidgetType {
   constructor(readonly height: string) {
@@ -54,7 +55,12 @@ export function livePreviewLayout(state: EditorState, active: (from: number, to:
   let previousAfter = '0px';
   let first = true;
   const tree = syntaxTree(state);
-  for (let node = tree.topNode.firstChild; node; node = node.nextSibling) {
+  // yamlFrontmatter mounts the Markdown document beneath the outer document.
+  const markdown = tree.topNode.getChild('Document') ?? tree.topNode;
+  const bodyFrom = frontmatterRange(state.doc.toString())?.bodyFrom ?? 0;
+  previousEnd = state.doc.lineAt(markdown.from).number - 1;
+  for (let node = markdown.firstChild; node; node = node.nextSibling) {
+    if (node.from < bodyFrom || ['Frontmatter', 'Body', 'Document'].includes(node.name)) continue;
     const heading = node.name.match(/^(?:ATX|Setext)Heading([1-6])$/)?.[1];
     const kind = heading
       ? `h${heading}`

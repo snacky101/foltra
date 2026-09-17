@@ -1,5 +1,5 @@
 use crate::{
-    id, new_id, notes,
+    id, new_id,
     storage::{revision, Store},
     text,
     validation::*,
@@ -112,26 +112,4 @@ pub fn update(store: &Store, args: &Value) -> Result<Value> {
     let mut value = serde_json::to_value(folder)?;
     value["revision"] = json!(revision(&raw));
     Ok(value)
-}
-pub fn delete(store: &Store, args: &Value) -> Result<Value> {
-    let folder_id = text(args, "id")?;
-    let file = path(folder_id)?;
-    check_revision(
-        text(args, "expectedRevision")?,
-        &revision(&store.read(&file)?),
-    )?;
-    if folders(store)?
-        .iter()
-        .any(|f| f.parent_id.as_deref() == Some(folder_id))
-        || notes::notes(store)?
-            .iter()
-            .any(|n| n.meta.folder_id.as_deref() == Some(folder_id))
-    {
-        return Err(Error::new(
-            "folder_not_empty",
-            "Move notes and subfolders before deleting this folder",
-        ));
-    }
-    store.commit(vec![(file, None)])?;
-    Ok(json!({"deleted": folder_id}))
 }

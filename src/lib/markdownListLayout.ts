@@ -11,6 +11,7 @@ export function markdownListLayout(doc: Text, tree: ReturnType<typeof parser.par
   const plain = new Set<number>();
   tree.iterate({
     enter({ node, name, from, to }) {
+      if (name === 'Frontmatter') return false;
       if (/^(Bullet|Ordered)List$/.test(name)) {
         for (let number = doc.lineAt(from).number; number <= doc.lineAt(to).number; number++)
           if (!doc.line(number).text.trim()) separators.add(number);

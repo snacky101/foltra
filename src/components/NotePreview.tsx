@@ -1,4 +1,6 @@
 import { HighlightedCode } from './HighlightedCode';
+import { FrontmatterPanel } from './FrontmatterPanel';
+import { frontmatterRange } from '../lib/frontmatter';
 import { SqlQuery } from './SqlQuery';
 import { isQueryLanguage } from '../lib/sqlQuery';
 import { externalLinkUrl, openExternalLink } from '../lib/openExternalLink';
@@ -206,9 +208,14 @@ export function NotePreview({
   openTag,
 }: NotePreviewProps) {
   const navigateTag = useContext(TagNavigation);
-  const previewBody = useMemo(() => separateListParagraphs(body), [body]);
+  const frontmatter = useMemo(() => frontmatterRange(body), [body]);
+  const previewBody = useMemo(
+    () => separateListParagraphs(body.slice(frontmatter?.bodyFrom ?? 0)),
+    [body, frontmatter],
+  );
   return (
     <div className="markdown-preview">
+      {frontmatter && <FrontmatterPanel source={frontmatter.yaml} />}
       <PreviewContext
         value={{ workspace, openNote, openLink, executeQueries, openTag: openTag ?? navigateTag }}
       >

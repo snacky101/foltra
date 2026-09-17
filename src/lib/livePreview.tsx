@@ -1,4 +1,6 @@
 import { noteTags } from './noteTags';
+import { frontmatterRange } from './frontmatter';
+import { frontmatterDecorations } from './livePreviewFrontmatter';
 import { isQueryLanguage } from './sqlQuery';
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, gutterLineClass, type DecorationSet } from '@codemirror/view';
@@ -207,6 +209,8 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
   );
   const hidden = Decoration.replace({});
   ranges.push(...livePreviewLists(state));
+  ranges.push(...frontmatterDecorations(state));
+  const frontmatter = frontmatterRange(state.doc.toString());
   const lineStyles = new Map<number, Set<string>>();
   const styleLine = (at: number, name: string) => {
     const from = state.doc.lineAt(at).from;
@@ -217,6 +221,7 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
   syntaxTree(state).iterate({
     enter(node) {
       const { from, to, name } = node;
+      if (name === 'Frontmatter') return false;
       const active = focused && selectionTouchesLines(state, from, to);
       if (name === 'FencedCode') {
         const info = node.node.getChild('CodeInfo');
@@ -342,6 +347,7 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
   for (const marker of state.doc.toString().matchAll(/ <!-- foltra-anki:[a-f0-9-]{36} -->/g)) {
     const from = marker.index,
       to = from + marker[0].length;
+    if (frontmatter && from < frontmatter.to) continue;
     if (focused && selectionTouchesLines(state, from, to)) continue;
     let node = syntaxTree(state).resolveInner(from, 1);
     let literal = false;

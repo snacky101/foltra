@@ -20,7 +20,8 @@ import { call } from './lib/api';
 import { useWorkspace } from './lib/useWorkspace';
 import { useNote } from './lib/useNote';
 import { useNoteActions, type NoteAction } from './lib/useNoteActions';
-import { moveWorkspaceFocus, rememberWorkspaceFocus } from './lib/workspaceFocus';
+import { useDatabaseActions, type DatabaseAction } from './lib/useDatabaseActions';
+import { focusSidebarTree, moveWorkspaceFocus, rememberWorkspaceFocus } from './lib/workspaceFocus';
 import { useCommandKeys } from './lib/useCommandKeys';
 import { useCloseGuard } from './lib/useCloseGuard';
 import { leaderCandidates, sequenceKeys } from './lib/commands';
@@ -35,6 +36,7 @@ import { VaultPicker } from './components/VaultPicker';
 import { Sidebar } from './components/Sidebar';
 import { NoteContextMenu, type NoteMenuTarget } from './components/NoteContextMenu';
 import { FolderDialog } from './components/FolderDialog';
+import { DeleteDatabaseDialog } from './components/DeleteDatabaseDialog';
 import { useTreeEditing, type FolderAction } from './lib/useTreeEditing';
 import type { EditorHandle } from './components/Editor';
 import type { EditorLocation } from './lib/editorLocation';
@@ -101,6 +103,7 @@ export default function App() {
   const commandLineHost = useRef<HTMLDivElement>(null);
   const selectedVault = useRef('');
   const pendingInsert = useRef<string | null>(null);
+  const pendingFrontmatter = useRef(false);
   const pendingLine = useRef<number | null>(null);
   const pendingLocation = useRef<EditorLocation | null>(null);
   const pendingEditorFocus = useRef(true);
@@ -120,6 +123,7 @@ export default function App() {
   const closeVaultPicker = useCallback(() => setVaultPicker(false), []);
   const closeFolderDialog = useCallback(() => setFolderDialog(null), []);
   const closeNoteMenu = useCallback(() => setNoteMenu(null), []);
+  useEffect(closeNoteMenu, [vault.path, settingsNavigation.opened, closeNoteMenu]);
 
   useEffect(() => {
     localStorage.setItem('foltra:sidebar-collapsed:left', String(sidebarCollapsed));
@@ -164,6 +168,10 @@ export default function App() {
       editor.current.restoreLocation(pendingLocation.current);
       pendingLocation.current = null;
     }
+    if (pendingFrontmatter.current && editor.current) {
+      pendingFrontmatter.current = false;
+      editor.current.editFrontmatter();
+    }
   };
   useEffect(() => {
     if (!preview || settingsNavigation.opened || note.status === 'loading' || !pendingEditorFocus.current)
@@ -181,6 +189,7 @@ export default function App() {
   }, [preview, settingsNavigation.opened, note.status, note.note?.id, noteId, view]);
   const openNote = async (id: string, line?: number) => {
     if (returning.current) return;
+    pendingFrontmatter.current = false;
     if (!(await note.save())) return;
     pendingEditorFocus.current = !preview || !!line;
     if (noteId && (id !== noteId || line)) {
@@ -227,7 +236,7 @@ export default function App() {
   };
   const navigate = async (target: View, dbId?: string) => {
     if (target === 'settings') return openSettings();
-    if (!(await note.save())) return;
+    if (!(await note.save()) || selectedVault.current !== vault.path) return;
     setView(target);
     if (dbId) {
       setDatabaseId(dbId);
@@ -260,15 +269,13 @@ export default function App() {
     }
   };
   const newRow = async () => {
-    if (!databaseId) {
+    const focused = document.activeElement?.closest<HTMLElement>('[data-database-id]')?.dataset.databaseId;
+    const db = workspace?.databases.find((d) => d.id === (focused ?? databaseId));
+    if (!db) {
       setDialog({ kind: 'new-database' });
       return;
     }
-    const db = workspace?.databases.find((d) => d.id === databaseId);
-    const title = db?.properties.find((p) => p.id === 'title');
-    await call(vault.path, 'record.create', { databaseId, values: title ? { title: 'Untitled' } : {} });
-    await vault.refresh();
-    setView('database');
+    await databaseActions.run('new-record', db);
   };
   const treeEditing = useTreeEditing(vault.path, workspace, note.save, vault.refresh, async (id) => {
     await openNote(id);
@@ -286,6 +293,29 @@ export default function App() {
     setToast,
     treeEditing.renameNote,
   );
+  const databaseActions = useDatabaseActions(
+    vault.path,
+    note.save,
+    vault.refresh,
+    (id) => navigate('database', id),
+    (id) => {
+      if (databaseId === id) {
+        setDatabaseId(null);
+        setQuery(undefined);
+      }
+      requestAnimationFrame(focusSidebarTree);
+    },
+    setToast,
+    !settingsNavigation.opened,
+  );
+  useEffect(() => {
+    if (databaseActions.renaming) setSidebarCollapsed(false);
+  }, [databaseActions.renaming?.database.id]);
+  const currentDatabaseAction = (action: DatabaseAction) => {
+    const focused = document.activeElement?.closest<HTMLElement>('[data-database-id]')?.dataset.databaseId;
+    const database = workspace?.databases.find((db) => db.id === (focused ?? databaseId));
+    if (database) return databaseActions.run(action, database);
+  };
   const folderAction = (target: FolderAction) => {
     if (target.kind === 'create') void treeEditing.create('folder', target.parentId).catch(onError);
     else if (target.kind === 'rename') treeEditing.renameFolder(target.folder);
@@ -345,6 +375,18 @@ export default function App() {
     'note.mode.source': () => changeEditorMode('source'),
     'note.mode.read': () => changeEditorMode('read'),
     'note.link': () => setDialog({ kind: 'link' }),
+    'note.frontmatter.edit': async () => {
+      if (!noteId) return;
+      if (
+        (await updateSettings({ editorMode: 'live' })) &&
+        selectedVault.current === vault.path &&
+        note.currentNote()?.id === noteId
+      ) {
+        pendingFrontmatter.current = true;
+        setView('notes');
+        requestAnimationFrame(editorReady);
+      }
+    },
     'note.follow-link': () => editor.current?.followLink(),
     'note.follow-existing-link': () => editor.current?.followLink(false),
     'note.back': () => navigateHistory('back'),
@@ -371,6 +413,7 @@ export default function App() {
       if (folder) setFolderDialog({ kind: 'delete', folder });
     },
     'note.rename': () => {
+      if (document.activeElement?.closest('[data-database-id]')) return currentDatabaseAction('rename');
       const id = document.activeElement?.closest<HTMLElement>('[data-folder-id]')?.dataset.folderId;
       const folder = workspace?.folders.find((f) => f.id === id);
       if (folder) treeEditing.renameFolder(folder);
@@ -389,6 +432,9 @@ export default function App() {
     },
     'sidebar.navigation.compact': () => setCompactNavigation((p) => !p),
     'database.create': () => setDialog({ kind: 'new-database' }),
+    'database.open': () => currentDatabaseAction('open'),
+    'database.rename': () => currentDatabaseAction('rename'),
+    'database.delete': () => currentDatabaseAction('delete'),
     'database.property.edit': () => {
       const database = workspace?.databases.find((db) => db.id === databaseId);
       const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-property-id]')
@@ -461,6 +507,7 @@ export default function App() {
       !!noteMenu ||
       !!noteActions.moving ||
       !!folderDialog ||
+      !!databaseActions.deleting ||
       noteActions.busy,
     onError,
   );
@@ -472,6 +519,7 @@ export default function App() {
     setDatabaseId(null);
     setHistory({ back: [], forward: [] });
     pendingLocation.current = null;
+    pendingFrontmatter.current = false;
     setNoteListOptions(defaultNoteListOptions);
     setTopicOptions((current) => ({ ...defaultTopicOptions, showSources: current.showSources }));
     setQuery(undefined);
@@ -527,8 +575,24 @@ export default function App() {
           folderDialog={folderAction}
           treeEditing={treeEditing}
           createDatabase={() => dispatch('database.create')}
+          databaseAction={(action, database) => void databaseActions.run(action, database).catch(onError)}
+          databaseEditing={
+            databaseActions.renaming
+              ? {
+                  target: {
+                    kind: 'database',
+                    id: databaseActions.renaming.database.id,
+                    name: databaseActions.renaming.database.name,
+                  },
+                  commit: databaseActions.rename,
+                  cancel: databaseActions.cancelRename,
+                }
+              : null
+          }
           switchVault={() => dispatch('vault.switch')}
           noteMenu={setNoteMenu}
+          noteMenuOpen={!!noteMenu}
+          closeNoteMenu={closeNoteMenu}
           moveNote={noteActions.moveTo}
           onError={onError}
         />
@@ -845,8 +909,19 @@ export default function App() {
             target={folderDialog}
             vault={vault.path}
             folders={workspace.folders}
+            save={note.save}
             close={closeFolderDialog}
             refresh={vault.refresh}
+            onDeleted={() => requestAnimationFrame(focusSidebarTree)}
+          />
+        )}
+        {databaseActions.deleting && (
+          <DeleteDatabaseDialog
+            key={`${vault.path}:${databaseActions.deleting.database.id}`}
+            snapshot={databaseActions.deleting}
+            busy={databaseActions.busy}
+            confirm={databaseActions.confirmDelete}
+            close={databaseActions.closeDelete}
           />
         )}
         {noteActions.moving && (
@@ -854,6 +929,7 @@ export default function App() {
             target={{ kind: 'move', note: noteActions.moving, submit: noteActions.move }}
             vault={vault.path}
             folders={workspace.folders}
+            save={note.save}
             close={noteActions.closeMove}
             refresh={vault.refresh}
           />

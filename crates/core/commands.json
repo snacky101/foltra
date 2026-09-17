@@ -72,6 +72,18 @@
     }
   },
   {
+    "id": "note.frontmatter",
+    "title": "Read user frontmatter properties",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "note.link",
     "title": "Get a readable unambiguous note link",
     "readOnly": true,
@@ -225,6 +237,74 @@
       "type": "object",
       "properties": {},
       "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.inspect",
+    "title": "Inspect database and record revision",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.rename",
+    "title": "Rename database",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string",
+          "description": "Schema and records revision returned by database.inspect"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.delete",
+    "title": "Move database and records to trash",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string",
+          "description": "Schema and records revision returned by database.inspect"
+        }
+      },
+      "required": [
+        "id",
+        "expectedRevision"
+      ],
       "additionalProperties": false
     }
   },
@@ -789,6 +869,18 @@
     }
   },
   {
+    "id": "folder.inspect",
+    "title": "Inspect folder subtree and revision",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": { "id": { "type": "string" } },
+      "required": ["id"],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "folder.create",
     "title": "Create folder",
     "readOnly": false,
@@ -837,7 +929,7 @@
   },
   {
     "id": "folder.delete",
-    "title": "Delete folder",
+    "title": "Move folder subtree and notes to trash",
     "readOnly": false,
     "headless": true,
     "argsSchema": {
@@ -847,7 +939,8 @@
           "type": "string"
         },
         "expectedRevision": {
-          "type": "string"
+          "type": "string",
+          "description": "Subtree revision returned by folder.inspect; raw folder revision remains valid for an empty folder"
         }
       },
       "required": [

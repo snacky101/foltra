@@ -22,6 +22,7 @@ export function tagCompletionRange(
   for (let node = syntaxTree(context.state).resolveInner(pos, -1); node; node = node.parent!) {
     if (
       [
+        'Frontmatter',
         'FencedCode',
         'CodeBlock',
         'InlineCode',

@@ -7,6 +7,7 @@ import './styles/layout.css';
 import './styles/components.css';
 import './styles/typography.css';
 import './styles/notes.css';
+import './styles/frontmatter.css';
 import './styles/topics.css';
 import './styles/editor.css';
 import './styles/settings.css';

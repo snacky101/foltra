@@ -34,7 +34,11 @@ export function wikiCompletions(
   if (!context.state.selection.main.empty && !composing()) return null;
   const pos = composing() ? context.state.selection.main.to : context.pos;
   for (let node = syntaxTree(context.state).resolveInner(pos, -1); node; node = node.parent!) {
-    if (['FencedCode', 'CodeBlock', 'InlineCode', 'HTMLBlock', 'CommentBlock'].includes(node.name))
+    if (
+      ['Frontmatter', 'FencedCode', 'CodeBlock', 'InlineCode', 'HTMLBlock', 'CommentBlock'].includes(
+        node.name,
+      )
+    )
       return null;
   }
   const line = context.state.doc.lineAt(pos);

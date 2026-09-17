@@ -1,5 +1,5 @@
 use crate::{notes, storage::Store, text, Error, Result};
-use pulldown_cmark::{Event, Parser, Tag};
+use pulldown_cmark::{Event, Tag};
 use regex::Regex;
 use serde_json::{json, Value};
 use std::{
@@ -16,7 +16,10 @@ pub struct Span {
 }
 pub fn spans(body: &str) -> Vec<Span> {
     let mut excluded = vec![];
-    for (event, range) in Parser::new_ext(body, crate::wiki::options()).into_offset_iter() {
+    if let Some(frontmatter) = crate::frontmatter::range(body) {
+        excluded.push(0..frontmatter.body_from);
+    }
+    for (event, range) in crate::frontmatter::markdown_events(body) {
         if matches!(
             event,
             Event::Start(Tag::CodeBlock(_) | Tag::HtmlBlock | Tag::Link { .. } | Tag::Image { .. })
@@ -42,12 +45,38 @@ pub fn spans(body: &str) -> Vec<Span> {
         })
         .collect()
 }
+
+fn property_tags(body: &str) -> BTreeSet<String> {
+    let Some(properties) = crate::frontmatter::properties(body).ok().flatten() else {
+        return BTreeSet::new();
+    };
+    let values: Vec<_> = match properties.get("tags") {
+        Some(Value::String(value)) => vec![value.as_str()],
+        Some(Value::Array(values)) if values.iter().all(Value::is_string) => {
+            values.iter().filter_map(Value::as_str).collect()
+        }
+        _ => vec![],
+    };
+    values
+        .into_iter()
+        .filter_map(|value| {
+            let value = value.trim();
+            let token = format!("#{}", value.strip_prefix('#').unwrap_or(value));
+            let captures = TOKEN.captures(&token)?;
+            let name = captures.get(2)?;
+            (name.start() == 1 && name.end() == token.len() && name.as_str().chars().count() <= 128)
+                .then(|| name.as_str().to_lowercase())
+        })
+        .collect()
+}
+
 pub fn list(store: &Store) -> Result<Value> {
     let mut tags: BTreeMap<String, usize> = BTreeMap::new();
     for note in notes::notes(store)? {
         for name in spans(&note.body)
             .into_iter()
             .map(|s| s.name)
+            .chain(property_tags(&note.body))
             .collect::<BTreeSet<_>>()
         {
             *tags.entry(name).or_default() += 1;
@@ -61,8 +90,11 @@ pub fn list(store: &Store) -> Result<Value> {
 pub fn search(store: &Store, name: &str) -> Result<Value> {
     let name = name.trim().trim_start_matches('#').to_lowercase();
     Ok(json!(notes::notes(store)?.into_iter().filter_map(|note| {
-        let span=spans(&note.body).into_iter().find(|s|s.name==name)?;
-        let start=note.body[..span.range.start].rfind('\n').map_or(0,|p|p+1);
+        let start = if let Some(span)=spans(&note.body).into_iter().find(|s|s.name==name) {
+            note.body[..span.range.start].rfind('\n').map_or(0,|p|p+1)
+        } else if property_tags(&note.body).contains(&name) {
+            crate::frontmatter::range(&note.body).map_or(0, |frontmatter| frontmatter.body_from)
+        } else { return None; };
         Some(json!({"id":note.meta.id,"title":note.meta.title,"excerpt":note.body[start..].chars().take(180).collect::<String>()}))
     }).take(100).collect::<Vec<_>>()))
 }
@@ -84,8 +116,7 @@ pub fn blocks(store: &Store, args: &Value) -> Result<Value> {
             .collect::<Vec<_>>();
         let mut items = vec![];
         let mut paragraphs = vec![];
-        for (event, range) in Parser::new_ext(&note.body, crate::wiki::options()).into_offset_iter()
-        {
+        for (event, range) in crate::frontmatter::markdown_events(&note.body) {
             match event {
                 Event::Start(Tag::Item) => items.push(range),
                 Event::Start(Tag::Paragraph) => paragraphs.push(range),

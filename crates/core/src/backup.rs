@@ -92,6 +92,12 @@ pub fn import(store: &Store, args: &Value) -> Result<Value> {
                 && value["settings"].is_object()
         } else if path.starts_with("trash/") {
             let item: Value = serde_json::from_str(content)?;
+            if item["kind"] == "database" {
+                crate::database_lifecycle::restoration_files(&item)?;
+            }
+            if item["kind"] == "folder" {
+                crate::folder_lifecycle::validate_bundle(&item)?;
+            }
             path == &format!("trash/{}.json", id(text(&item, "id")?)?)
         } else {
             false

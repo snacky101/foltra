@@ -43,6 +43,7 @@ export function livePreviewLists(state: EditorState) {
   );
   syntaxTree(state).iterate({
     enter({ name, from, to }) {
+      if (name === 'Frontmatter') return false;
       if (['FencedCode', 'CodeBlock', 'Table', 'HTMLBlock', 'HorizontalRule'].includes(name)) return false;
       if (name === 'ListMark') {
         const marker = state.doc.sliceString(from, to);

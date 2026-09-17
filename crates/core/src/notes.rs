@@ -128,22 +128,51 @@ pub(crate) fn plan_note_write(
     note_id: &str,
     replacement: Option<&Note>,
 ) -> Result<Vec<(String, Option<String>)>> {
+    let replacements = replacement.cloned().into_iter().collect::<Vec<_>>();
+    let deleted = if replacement.is_none() {
+        vec![note_id.to_string()]
+    } else {
+        vec![]
+    };
+    plan_note_batch(store, &replacements, &deleted, None)
+}
+
+// A subtree operation must rewrite links and topic identities against one complete before/after
+// snapshot, rather than concatenate single-note plans with conflicting writes for the same source.
+pub(crate) fn plan_note_batch(
+    store: &Store,
+    replacements: &[Note],
+    deleted: &[String],
+    restore_sources: Option<&[Note]>,
+) -> Result<Vec<(String, Option<String>)>> {
     let before = notes(store)?;
-    let previous = before.iter().find(|n| n.meta.id == note_id);
-    let targets_changed = previous.map(|n| &n.meta.title) != replacement.map(|n| &n.meta.title);
+    let targets_changed = !deleted.is_empty()
+        || replacements.iter().any(|replacement| {
+            before
+                .iter()
+                .find(|n| n.meta.id == replacement.meta.id)
+                .map(|n| &n.meta.title)
+                != Some(&replacement.meta.title)
+        });
     let mut after = before.clone();
-    after.retain(|n| n.meta.id != note_id);
-    if let Some(note) = replacement {
-        after.push(note.clone());
-    }
+    after.retain(|n| {
+        !deleted.contains(&n.meta.id)
+            && !replacements
+                .iter()
+                .any(|replacement| replacement.meta.id == n.meta.id)
+    });
+    after.extend_from_slice(replacements);
     let mut writes = vec![];
     for note in &after {
-        let selected = note.meta.id == note_id;
+        let selected = replacements
+            .iter()
+            .any(|replacement| replacement.meta.id == note.meta.id);
         if !selected && !targets_changed {
             continue;
         }
+        let previous = before.iter().find(|n| n.meta.id == note.meta.id);
         let source_targets = if selected && previous.is_none() {
-            &after
+            restore_sources.unwrap_or(&after)
         } else {
             &before
         };
@@ -161,7 +190,7 @@ pub(crate) fn plan_note_write(
         }
         writes.push((note_path(&meta.id)?, Some(raw)));
     }
-    if replacement.is_none() {
+    for note_id in deleted {
         writes.push((note_path(note_id)?, None));
     }
     if targets_changed {

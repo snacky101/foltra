@@ -1,7 +1,7 @@
 import { SettingsNavigation } from './SettingsNavigation';
 import type { SettingsGroup } from '../lib/settingsNavigation';
 import { NoteTree } from './NoteTree';
-import type { Ref } from 'react';
+import { useCallback, useLayoutEffect, useState, type Ref } from 'react';
 import type { FolderAction, useTreeEditing } from '../lib/useTreeEditing';
 import {
   ChevronDown,
@@ -13,10 +13,13 @@ import {
   FolderOpen,
   PanelLeft,
 } from 'lucide-react';
-import type { Workspace, View, NoteSummary } from '../lib/types';
+import type { Workspace, View, NoteSummary, Database } from '../lib/types';
 import { ResizableSidebar } from './ResizableSidebar';
 import { SidebarNavigation } from './SidebarNavigation';
 import type { NoteMenuTarget } from './NoteContextMenu';
+import type { DatabaseAction } from './DatabaseContextMenu';
+import { InlineTreeName } from './InlineTreeName';
+import { SidebarTreeContextMenu, type SidebarMenuTarget } from './SidebarTreeContextMenu';
 
 interface Props {
   settingsOpen: boolean;
@@ -38,8 +41,16 @@ interface Props {
   createNote: (folderId?: string) => void;
   folderDialog: (target: FolderAction) => void;
   createDatabase: () => void;
+  databaseAction: (action: DatabaseAction, database: Database) => void;
+  databaseEditing: {
+    target: { kind: 'database'; id: string; name: string };
+    commit: (name: string) => Promise<void>;
+    cancel: () => void;
+  } | null;
   switchVault: () => void;
   noteMenu: (target: NoteMenuTarget) => void;
+  noteMenuOpen: boolean;
+  closeNoteMenu: () => void;
   moveNote: (note: NoteSummary, folderId: string) => Promise<void>;
   onError: (error: unknown) => void;
   treeEditing: ReturnType<typeof useTreeEditing>;
@@ -63,13 +74,27 @@ export function Sidebar({
   search,
   createNote,
   createDatabase,
+  databaseAction,
+  databaseEditing,
   switchVault,
   noteMenu,
+  noteMenuOpen,
+  closeNoteMenu,
   folderDialog,
   moveNote,
   onError,
   treeEditing,
 }: Props) {
+  const [menu, setMenu] = useState<SidebarMenuTarget | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+  useLayoutEffect(closeMenu, [workspace.vault.id, settingsOpen, collapsed, closeMenu]);
+  useLayoutEffect(() => {
+    if (noteMenuOpen) closeMenu();
+  }, [noteMenuOpen, closeMenu]);
+  const showMenu = (target: SidebarMenuTarget) => {
+    closeNoteMenu();
+    setMenu(target);
+  };
   return (
     <ResizableSidebar side="left" collapsed={collapsed}>
       <aside
@@ -107,42 +132,82 @@ export function Sidebar({
               search={search}
             />
             <div className="sidebar-tree" data-focus-region="sidebar-tree" tabIndex={-1}>
-              <div className="sidebar-section-title">
-                <span>
-                  <ChevronDown size={12} /> DATABASES
-                </span>
-                <button data-sidebar-item aria-label="새 데이터베이스" onClick={createDatabase}>
-                  <Plus size={14} />
-                </button>
-              </div>
-              <div className="database-navigation">
-                {workspace.databases.map((db) => (
-                  <button
-                    data-sidebar-item
-                    data-tree-item
-                    data-database-id={db.id}
-                    key={db.id}
-                    className={view === 'database' && databaseId === db.id ? 'active' : ''}
-                    onClick={() => navigate('database', db.id)}
-                  >
-                    <Table2 size={16} />
-                    <span>{db.name}</span>
-                    <small>{workspace.records.filter((r) => r.databaseId === db.id).length}</small>
-                  </button>
-                ))}
-                {!workspace.databases.length && (
-                  <button data-sidebar-item onClick={createDatabase}>
+              <div
+                className="database-tree"
+                aria-label="데이터베이스 영역"
+                onContextMenu={(event) => {
+                  if ((event.target as HTMLElement).closest('[data-inline-rename]')) return;
+                  event.preventDefault();
+                  event.stopPropagation();
+                  showMenu({ kind: 'databases', x: event.clientX, y: event.clientY });
+                }}
+              >
+                <div className="sidebar-section-title">
+                  <span>
+                    <ChevronDown size={12} /> DATABASES
+                  </span>
+                  <button data-sidebar-item aria-label="새 데이터베이스" onClick={createDatabase}>
                     <Plus size={14} />
-                    <span>데이터베이스 만들기</span>
                   </button>
-                )}
+                </div>
+                <div className="database-navigation">
+                  {workspace.databases.map((db) => (
+                    <div className="database-navigation-row" data-database-id={db.id} key={db.id}>
+                      {databaseEditing?.target.id === db.id ? (
+                        <InlineTreeName
+                          key={db.id}
+                          target={databaseEditing.target}
+                          commit={databaseEditing.commit}
+                          cancel={databaseEditing.cancel}
+                        />
+                      ) : (
+                        <button
+                          data-sidebar-item
+                          data-tree-item
+                          data-database-id={db.id}
+                          className={view === 'database' && databaseId === db.id ? 'active' : ''}
+                          onClick={() => navigate('database', db.id)}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            event.currentTarget.focus();
+                            showMenu({ kind: 'database', database: db, x: event.clientX, y: event.clientY });
+                          }}
+                          onKeyDown={(event) => {
+                            if (event.key === 'ContextMenu' || (event.shiftKey && event.key === 'F10')) {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              const rect = event.currentTarget.getBoundingClientRect();
+                              showMenu({ kind: 'database', database: db, x: rect.left, y: rect.bottom });
+                            }
+                          }}
+                        >
+                          <Table2 size={16} />
+                          <span>{db.name}</span>
+                          <small>{workspace.records.filter((r) => r.databaseId === db.id).length}</small>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  {!workspace.databases.length && (
+                    <button data-sidebar-item onClick={createDatabase}>
+                      <Plus size={14} />
+                      <span>데이터베이스 만들기</span>
+                    </button>
+                  )}
+                </div>
               </div>
               <NoteTree
                 key={workspace.vault.id}
                 workspace={workspace}
                 activeId={view === 'notes' ? noteId : null}
                 openNote={openNote}
-                noteMenu={noteMenu}
+                noteMenu={(target) => {
+                  closeMenu();
+                  noteMenu(target);
+                }}
+                folderMenu={(target) => showMenu({ kind: 'folder', ...target })}
+                rootMenu={(position) => showMenu({ kind: 'notes', ...position })}
                 folderDialog={folderDialog}
                 createNote={createNote}
                 moveNote={moveNote}
@@ -192,6 +257,16 @@ export function Sidebar({
             <ChevronsUpDown size={14} />
           </button>
         </div>
+        {menu && !settingsOpen && !collapsed && (
+          <SidebarTreeContextMenu
+            target={menu}
+            close={closeMenu}
+            createNote={createNote}
+            createDatabase={createDatabase}
+            folderAction={folderDialog}
+            databaseAction={databaseAction}
+          />
+        )}
       </aside>
     </ResizableSidebar>
   );

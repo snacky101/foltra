@@ -9,6 +9,8 @@ import { EditorState, Compartment } from '@codemirror/state';
 import { EditorView, keymap, drawSelection, highlightActiveLine, panels } from '@codemirror/view';
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
+import { yamlFrontmatter } from '@codemirror/lang-yaml';
+import { frontmatterRange } from '../lib/frontmatter';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { vim, getCM } from '@replit/codemirror-vim';
 import { codeLanguage } from '../lib/codeLanguages';
@@ -50,6 +52,7 @@ export interface EditorHandle {
   applyPluginEdit: (snapshot: PluginEditorSnapshot, text: string) => boolean;
   focus: () => void;
   insert: (text: string) => void;
+  editFrontmatter: () => void;
   jump: (line: number) => void;
   followLink: (createIfMissing?: boolean) => void;
   getLocation: () => EditorLocation | null;
@@ -117,6 +120,14 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       editor.dispatch(editor.state.replaceSelection(text));
       editor.focus();
     },
+    editFrontmatter: () => {
+      const editor = view.current;
+      if (!editor || editor.composing) return;
+      if (!frontmatterRange(editor.state.doc.toString()))
+        editor.dispatch({ changes: { from: 0, insert: '---\ntags: []\n---\n\n' }, userEvent: 'input' });
+      editor.dispatch({ selection: { anchor: editor.state.doc.line(2).from }, scrollIntoView: true });
+      editor.focus();
+    },
     jump: (number) => {
       const editor = view.current;
       if (!editor) return;
@@ -140,10 +151,12 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           cursorConfig.current.of(editorCursorExtension(latest.current.workspace.settings)),
           lineNumberConfig.current.of(editorLineNumbers(latest.current.workspace.settings.lineNumbers)),
           highlightActiveLine(),
-          markdown({
-            extensions: [GFM],
-            addKeymap: false,
-            codeLanguages: (name) => codeLanguage(name, true),
+          yamlFrontmatter({
+            content: markdown({
+              extensions: [GFM],
+              addKeymap: false,
+              codeLanguages: (name) => codeLanguage(name, true),
+            }),
           }),
           markdownEditing,
           imagePasteExtension(() => ({

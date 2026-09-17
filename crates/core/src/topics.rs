@@ -1,5 +1,5 @@
 use crate::{notes, storage::Store, text, wiki::resolve_note, Error, Note, Result};
-use pulldown_cmark::{Event, LinkType, Parser, Tag, TagEnd};
+use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
 use serde::Serialize;
 use serde_json::{json, Value};
 use std::{
@@ -55,8 +55,7 @@ fn index(store: &Store) -> Result<Index> {
         let mut paragraph_end = 0;
         let mut list_indent = 0;
         let mut inline_depth = 0;
-        for (event, range) in Parser::new_ext(&note.body, crate::wiki::options()).into_offset_iter()
-        {
+        for (event, range) in crate::frontmatter::markdown_events(&note.body) {
             // Do not split a multiline inline construct when it crosses a list boundary.
             match &event {
                 Event::Start(

@@ -1,5 +1,5 @@
 use crate::Note;
-use pulldown_cmark::{Event, LinkType, Options, Parser, Tag};
+use pulldown_cmark::{Event, LinkType, Options, Tag};
 use std::ops::Range;
 
 pub fn options() -> Options {
@@ -62,30 +62,28 @@ impl WikiLink<'_> {
 
 // Use Markdown source ranges so rewrites preserve aliases, whitespace and literal examples.
 pub fn spans(body: &str) -> impl Iterator<Item = WikiLink<'_>> {
-    Parser::new_ext(body, options())
-        .into_offset_iter()
-        .filter_map(move |(event, range)| {
-            if !matches!(
-                event,
-                Event::Start(Tag::Link {
-                    link_type: LinkType::WikiLink { .. },
-                    ..
-                })
-            ) {
-                return None;
-            }
-            let raw = body[range.clone()].strip_prefix("[[")?.strip_suffix("]]")?;
-            let (destination, alias) = raw
-                .split_once('|')
-                .map_or((raw, None), |(a, b)| (a, Some(b)));
-            let split = destination.find('#').unwrap_or(destination.len());
-            Some(WikiLink {
-                range,
-                name: &destination[..split],
-                suffix: &destination[split..],
-                alias,
+    crate::frontmatter::markdown_events(body).filter_map(move |(event, range)| {
+        if !matches!(
+            event,
+            Event::Start(Tag::Link {
+                link_type: LinkType::WikiLink { .. },
+                ..
             })
+        ) {
+            return None;
+        }
+        let raw = body[range.clone()].strip_prefix("[[")?.strip_suffix("]]")?;
+        let (destination, alias) = raw
+            .split_once('|')
+            .map_or((raw, None), |(a, b)| (a, Some(b)));
+        let split = destination.find('#').unwrap_or(destination.len());
+        Some(WikiLink {
+            range,
+            name: &destination[..split],
+            suffix: &destination[split..],
+            alias,
         })
+    })
 }
 
 pub fn rewrite(body: &str, before: &[Note], after: &[Note], normalize: bool) -> String {

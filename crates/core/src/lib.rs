@@ -1,10 +1,13 @@
 mod anki_bridge;
 mod attachments;
 mod backup;
+mod database_lifecycle;
 mod database_schema;
 mod databases;
 mod extensions;
+mod folder_lifecycle;
 mod folders;
+mod frontmatter;
 mod model;
 mod notes;
 mod plugin_manifest;
@@ -153,6 +156,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
             let note = notes::read_note(store, text(&args, "id")?)?;
             Ok(json!(wiki::note_link(&note, &notes)))
         }
+        "note.frontmatter" => frontmatter::inspect(store, &args),
         "note.create" => notes::create_note(store, &args),
         "note.open-link" => notes::open_link(store, &args),
         "note.update" => notes::update_note(store, &args),
@@ -160,13 +164,17 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "attachment.import" => attachments::import(store, &args),
         "attachment.read" => attachments::read(store, &args),
         "folder.list" => folders::list(store),
+        "folder.inspect" => folder_lifecycle::inspect(store, &args),
         "folder.create" => folders::create(store, &args),
         "folder.update" => folders::update(store, &args),
-        "folder.delete" => folders::delete(store, &args),
+        "folder.delete" => folder_lifecycle::delete(store, &args),
         "trash.list" => vault::trash(store),
         "trash.restore" => vault::restore(store, &args),
         "database.create" => databases::create_database(store, &args),
         "database.list" => Ok(serde_json::to_value(databases::databases(store)?)?),
+        "database.inspect" => database_lifecycle::inspect(store, &args),
+        "database.rename" => database_lifecycle::rename(store, &args),
+        "database.delete" => database_lifecycle::delete(store, &args),
         "database.property.add" => databases::add_property(store, &args),
         "database.property.preview" => database_schema::preview(store, &args),
         "database.property.update" => database_schema::update(store, &args),

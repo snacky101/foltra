@@ -30,6 +30,16 @@ export function rememberWorkspaceFocus(target: EventTarget) {
   const region = target.closest<HTMLElement>('[data-focus-region]');
   if (region) lastFocus.set(region, target);
 }
+export function focusSidebarTree() {
+  const tree = document.querySelector<HTMLElement>('[data-focus-region="sidebar-tree"]');
+  if (!tree || tree.closest('[hidden], [inert]') || !tree.getClientRects().length) return;
+  const items = [...tree.querySelectorAll<HTMLElement>('[data-tree-item]:not([disabled])')].filter(
+    (item) => item.getClientRects().length,
+  );
+  const target = items.find((item) => item.classList.contains('active')) ?? items[0] ?? tree;
+  target.focus({ preventScroll: true });
+  target.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+}
 function focusRegion(name: FocusRegion) {
   const region = document.querySelector<HTMLElement>(`[data-focus-region="${name}"]`);
   if (!region || region.closest('[inert], [hidden]') || !region.getClientRects().length) return;

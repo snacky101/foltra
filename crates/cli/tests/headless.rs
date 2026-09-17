@@ -41,6 +41,166 @@ fn independent_processes_share_the_same_vault_and_command_contract() {
         .iter()
         .any(|c| c["id"] == "record.update"));
 }
+
+#[test]
+fn agents_can_discover_rename_delete_and_restore_databases_through_shared_commands() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    cli(path, &["vault", "init", "--name", "Database CLI"]);
+    let specs = cli(path, &["commands", "list"]);
+    for (command, read_only) in [
+        ("database.inspect", true),
+        ("database.rename", false),
+        ("database.delete", false),
+    ] {
+        let spec = specs
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|spec| spec["id"] == command)
+            .unwrap();
+        assert_eq!(spec["headless"], true);
+        assert_eq!(spec["readOnly"], read_only);
+        if !read_only {
+            assert!(spec["argsSchema"]["required"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("expectedRevision")));
+        }
+    }
+    let db = cli(path, &["db", "create", "--name", "Before"]);
+    let id = db["id"].as_str().unwrap();
+    let inspection = cli(path, &["db", "inspect", "--id", id]);
+    let renamed = cli(
+        path,
+        &[
+            "db",
+            "rename",
+            "--id",
+            id,
+            "--name",
+            "After",
+            "--expected-revision",
+            inspection["revision"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(renamed["name"], "After");
+    let current = cli(path, &["db", "inspect", "--id", id]);
+    let removed = cli(
+        path,
+        &[
+            "db",
+            "delete",
+            "--id",
+            id,
+            "--expected-revision",
+            current["revision"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(cli(path, &["db", "list"]), json!([]));
+    cli(
+        path,
+        &[
+            "trash",
+            "restore",
+            "--id",
+            removed["trashId"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(cli(path, &["db", "list"]), json!([renamed]));
+}
+
+#[test]
+fn folder_subtrees_can_be_inspected_deleted_and_restored_without_ui() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    cli(path, &["vault", "init", "--name", "Folder CLI"]);
+    let specs = cli(path, &["commands", "list"]);
+    assert!(specs
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|spec| spec["id"] == "folder.inspect"
+            && spec["readOnly"] == true
+            && spec["headless"] == true));
+    let folder = cli(path, &["folder", "create", "--name", "Projects"]);
+    let id = folder["id"].as_str().unwrap();
+    let note = cli(
+        path,
+        &["note", "create", "--title", "Inside", "--folder-id", id],
+    );
+    let inspection = cli(path, &["folder", "inspect", "--id", id]);
+    assert_eq!(inspection["noteCount"], 1);
+    let removed = cli(
+        path,
+        &[
+            "folder",
+            "delete",
+            "--id",
+            id,
+            "--expected-revision",
+            inspection["revision"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(cli(path, &["note", "list"]), json!([]));
+    cli(
+        path,
+        &[
+            "trash",
+            "restore",
+            "--id",
+            removed["trashId"].as_str().unwrap(),
+        ],
+    );
+    assert_eq!(
+        cli(
+            path,
+            &["note", "read", "--id", note["id"].as_str().unwrap()]
+        ),
+        note
+    );
+}
+
+#[test]
+fn user_frontmatter_is_discoverable_and_readable_without_a_ui() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    cli(path, &["vault", "init", "--name", "Frontmatter CLI"]);
+    let specs = cli(path, &["commands", "list"]);
+    assert!(specs
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|spec| spec["id"] == "note.frontmatter"
+            && spec["readOnly"] == true
+            && spec["headless"] == true));
+    let note = cli(
+        path,
+        &[
+            "note",
+            "create",
+            "--title",
+            "Properties",
+            "--body",
+            "---\nstatus: draft\ntags: [work]\n---\nBody",
+        ],
+    );
+    let result = cli(
+        path,
+        &["note", "frontmatter", "--id", note["id"].as_str().unwrap()],
+    );
+    assert_eq!(
+        result,
+        json!({"properties":{"status":"draft","tags":["work"]},"error":null})
+    );
+    assert_eq!(
+        cli(
+            path,
+            &["note", "read", "--id", note["id"].as_str().unwrap()]
+        ),
+        note
+    );
+}
 #[test]
 fn stale_cli_write_returns_conflict_exit_code_and_keeps_current_content() {
     let dir = tempfile::tempdir().unwrap();

@@ -18,6 +18,8 @@ duckdb = { version = "1.10505.0", features = ["bundled"] }
 sqlparser = { version = "0.63", features = ["visitor"] }
 dirs = "6"
 pulldown-cmark = { version = "0.13", default-features = false }
+saphyr = { version = "0.0.12", default-features = false }
+saphyr-parser = "0.0.12"
 rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
 
 ureq = { version = "3", default-features = false, features = ["json"] }

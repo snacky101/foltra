@@ -1,5 +1,5 @@
 import { lazy, Suspense, type RefObject, type Dispatch, type SetStateAction } from 'react';
-import { FileText, Link2, Loader2, Plus, Trash2 } from 'lucide-react';
+import { FileText, Link2, Loader2, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Backlinks } from './Backlinks';
 import type { EditorHandle } from './Editor';
 import type { Workspace } from '../lib/types';
@@ -81,6 +81,14 @@ export function NotePane({
                 connections
               </span>
               <span>Personal knowledge</span>
+              <button
+                className="icon-button"
+                aria-label="노트 속성 편집"
+                title="노트 속성 · frontmatter 편집"
+                onClick={() => dispatch('note.frontmatter.edit')}
+              >
+                <SlidersHorizontal size={13} />
+              </button>
               <button
                 className="icon-button"
                 aria-label="현재 노트 삭제"

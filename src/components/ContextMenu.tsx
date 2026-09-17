@@ -1,4 +1,5 @@
 import { useLayoutEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import type { LucideIcon } from 'lucide-react';
 export interface MenuItem {
   id: string;
@@ -33,17 +34,26 @@ export function ContextMenu({
     return () => {
       window.removeEventListener('pointerdown', outside);
       window.removeEventListener('resize', close);
-      if (element.contains(document.activeElement) || document.activeElement === document.body)
-        previous?.focus();
+      if (
+        (element.contains(document.activeElement) || document.activeElement === document.body) &&
+        previous?.isConnected &&
+        !previous.closest('[inert], [hidden]')
+      )
+        previous.focus();
     };
-  }, [position.x, position.y, close]);
-  return (
+  }, [position, close]);
+  return createPortal(
     <div
       ref={menu}
       className="note-context-menu"
       role="menu"
       aria-label={`${title} 메뉴`}
-      onContextMenu={(e) => e.preventDefault()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onClick={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
       onKeyDown={(e) => {
         if (e.nativeEvent.isComposing) return;
         e.stopPropagation();
@@ -86,6 +96,7 @@ export function ContextMenu({
           <span>{label}</span>
         </button>
       ))}
-    </div>
+    </div>,
+    document.body,
   );
 }

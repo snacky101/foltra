@@ -18,7 +18,7 @@ interface LinkHandlers {
   openMarkdown: (target: string) => void;
 }
 
-const excludedNodes = new Set(['FencedCode', 'CodeBlock', 'InlineCode', 'HTMLBlock', 'Image']);
+const excludedNodes = new Set(['Frontmatter', 'FencedCode', 'CodeBlock', 'InlineCode', 'HTMLBlock', 'Image']);
 
 function excluded(node: SyntaxNode): boolean {
   for (let parent: SyntaxNode | null = node; parent; parent = parent.parent) {

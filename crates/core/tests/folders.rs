@@ -62,13 +62,13 @@ fn moving_and_renaming_preserve_note_identity_body_and_links() {
         &v,
         "folder.delete",
         json!({"id":parent["id"],"expectedRevision":parent["revision"]}),
-        "folder_not_empty",
+        "conflict",
     );
     reject(
         &v,
         "folder.delete",
         json!({"id":renamed["id"],"expectedRevision":renamed["revision"]}),
-        "folder_not_empty",
+        "conflict",
     );
     let root = call(
         &v,
@@ -133,7 +133,8 @@ fn workspace_trash_updates_for_notes_records_and_restores_without_missing_folder
         call(&v, "trash.restore", json!({"id":item["id"]}));
     }
     let ws = call(&v, "workspace.get", json!({}));
-    assert_eq!(ws["trash"], json!([]));
+    assert_eq!(ws["trash"].as_array().unwrap().len(), 1);
+    assert_eq!(ws["trash"][0]["kind"], "folder");
     assert_eq!(ws["notes"][0]["id"], note["id"]);
     assert!(ws["notes"][0]["folderId"].is_null());
     assert_eq!(

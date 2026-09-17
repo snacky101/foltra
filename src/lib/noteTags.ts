@@ -1,5 +1,6 @@
 import { parser, GFM } from '@lezer/markdown';
 import type { Tree } from '@lezer/common';
+import { frontmatterRange } from './frontmatter';
 const markdown = parser.configure(GFM);
 export interface NoteTag {
   name: string;
@@ -18,6 +19,8 @@ export function tagTokens(body: string): NoteTag[] {
 }
 export function noteTags(body: string, tree: Tree = markdown.parse(body)): NoteTag[] {
   const excluded: { from: number; to: number }[] = [];
+  const frontmatter = frontmatterRange(body);
+  if (frontmatter) excluded.push(frontmatter);
   tree.iterate({
     enter(node) {
       if (

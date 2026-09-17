@@ -47,9 +47,14 @@ pub fn trash(store: &Store) -> Result<Value> {
     let mut out = vec![];
     for path in store.files("trash", "json")? {
         let mut item: Value = serde_json::from_str(&store.read(&path)?)?;
-        item.as_object_mut()
-            .ok_or_else(|| Error::new("invalid_data", "Trash entry must be an object"))?
-            .remove("content");
+        let metadata = item
+            .as_object_mut()
+            .ok_or_else(|| Error::new("invalid_data", "Trash entry must be an object"))?;
+        metadata.remove("content");
+        metadata.remove("records");
+        metadata.remove("folders");
+        metadata.remove("notes");
+        metadata.remove("linkTargets");
         out.push(item);
     }
     out.sort_by(|a, b| b["deletedAt"].as_str().cmp(&a["deletedAt"].as_str()));
@@ -59,6 +64,18 @@ pub fn trash(store: &Store) -> Result<Value> {
 pub fn restore(store: &Store, args: &Value) -> Result<Value> {
     let path = format!("trash/{}.json", id(text(args, "id")?)?);
     let item: Value = serde_json::from_str(&store.read(&path)?)?;
+    if text(&item, "id")? != text(args, "id")? {
+        return Err(Error::new(
+            "invalid_data",
+            "Trash ID does not match filename",
+        ));
+    }
+    if item["kind"] == "database" {
+        return crate::database_lifecycle::restore(store, &item, &path);
+    }
+    if item["kind"] == "folder" {
+        return crate::folder_lifecycle::restore(store, &item, &path);
+    }
     let original = text(&item, "originalPath")?;
     if store.optional(original)?.is_some() {
         return Err(Error::new("conflict", "The destination already exists"));
@@ -67,7 +84,12 @@ pub fn restore(store: &Store, args: &Value) -> Result<Value> {
     // A trash entry may restore only a managed note or record with a matching ID.
     let expected = match text(&item, "kind")? {
         "note" => note_path(&Note::parse(content)?.meta.id)?,
-        "record" => record_path(&serde_json::from_str::<Record>(content)?.id)?,
+        "record" => {
+            let record: Record = serde_json::from_str(content)?;
+            let database = read_database(store, &record.database_id)?;
+            validate_values(&database, &record.values)?;
+            record_path(&record.id)?
+        }
         _ => return Err(Error::new("invalid_data", "Unknown trash item type")),
     };
     if expected != original {

@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText, Folder, Table2 } from 'lucide-react';
 import { CoreError } from '../lib/api';
-import type { TreeEdit } from '../lib/useTreeEditing';
 
 export function InlineTreeName({
   target,
@@ -9,7 +8,7 @@ export function InlineTreeName({
   commit,
   cancel,
 }: {
-  target: TreeEdit;
+  target: { kind: 'note' | 'folder' | 'database'; id: string; name: string };
   expanded?: boolean;
   commit: (name: string) => Promise<void>;
   cancel: () => void;
@@ -67,14 +66,31 @@ export function InlineTreeName({
     }
   };
   return (
-    <div className="tree-inline-editor" data-inline-rename>
-      <span aria-hidden="true">
-        {target.kind === 'folder' && (expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
-      </span>
-      {target.kind === 'folder' ? <Folder size={15} /> : <FileText size={15} />}
+    <div
+      className={`tree-inline-editor${target.kind === 'database' ? ' database-inline-editor' : ''}`}
+      data-inline-rename
+    >
+      {target.kind !== 'database' && (
+        <span aria-hidden="true">
+          {target.kind === 'folder' && (expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
+        </span>
+      )}
+      {target.kind === 'folder' ? (
+        <Folder size={15} />
+      ) : target.kind === 'database' ? (
+        <Table2 size={16} />
+      ) : (
+        <FileText size={15} />
+      )}
       <input
         ref={input}
-        aria-label={target.kind === 'folder' ? '폴더 이름 변경' : '노트 이름 변경'}
+        aria-label={
+          target.kind === 'folder'
+            ? '폴더 이름 변경'
+            : target.kind === 'database'
+              ? '데이터베이스 이름 변경'
+              : '노트 이름 변경'
+        }
         value={name}
         maxLength={240}
         readOnly={saving}

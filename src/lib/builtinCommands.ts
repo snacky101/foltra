@@ -65,6 +65,7 @@ const definitions = [
     ],
   },
   { id: 'note.link', title: '노트 연결 삽입', group: '노트', bindings: [{ keys: 'll', leader: true }] },
+  { id: 'note.frontmatter.edit', title: '노트 속성 · frontmatter 편집', group: '노트' },
   {
     id: 'note.back',
     title: '이전 노트 위치로 돌아가기',
@@ -94,7 +95,7 @@ const definitions = [
   { id: 'note.move', title: '노트를 폴더로 이동', group: '노트', bindings: [{ keys: 'nm', leader: true }] },
   { id: 'folder.create', title: '새 폴더', group: '폴더' },
   { id: 'folder.rename', title: '선택한 폴더 이름 변경', group: '폴더' },
-  { id: 'folder.delete', title: '선택한 빈 폴더 삭제', group: '폴더' },
+  { id: 'folder.delete', title: '선택한 폴더를 휴지통으로 이동', group: '폴더' },
   {
     id: 'note.rename',
     title: '노트 이름 변경',
@@ -130,6 +131,9 @@ const definitions = [
     group: '데이터베이스',
     bindings: [{ keys: 'dc', leader: true }],
   },
+  { id: 'database.open', title: '선택한 데이터베이스 열기', group: '데이터베이스' },
+  { id: 'database.rename', title: '데이터베이스 이름 변경', group: '데이터베이스' },
+  { id: 'database.delete', title: '데이터베이스를 휴지통으로 이동', group: '데이터베이스' },
   {
     id: 'database.property.edit',
     title: '컬럼 타입 변경',

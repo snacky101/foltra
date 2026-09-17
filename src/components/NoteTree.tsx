@@ -1,19 +1,9 @@
-import { useCallback, useEffect, useRef, useState, type DragEvent } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Folder as FolderIcon,
-  FolderPlus,
-  Pencil,
-  Plus,
-  Trash2,
-} from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { ChevronDown, ChevronRight, FileText, Folder as FolderIcon, FolderPlus, Plus } from 'lucide-react';
 import type { Folder, NoteSummary, Workspace } from '../lib/types';
 import type { NoteMenuTarget } from './NoteContextMenu';
 import type { FolderAction, useTreeEditing } from '../lib/useTreeEditing';
 import { InlineTreeName } from './InlineTreeName';
-import { ContextMenu } from './ContextMenu';
 
 const noteDragType = 'application/x-foltra-note';
 
@@ -22,6 +12,8 @@ export function NoteTree({
   activeId,
   openNote,
   noteMenu,
+  folderMenu,
+  rootMenu,
   folderDialog,
   createNote,
   moveNote,
@@ -32,6 +24,8 @@ export function NoteTree({
   activeId: string | null;
   openNote: (id: string) => void;
   noteMenu: (target: NoteMenuTarget) => void;
+  folderMenu: (target: { folder: Folder; x: number; y: number }) => void;
+  rootMenu: (position: { x: number; y: number }) => void;
   folderDialog: (target: FolderAction) => void;
   createNote: (folderId?: string) => void;
   moveNote: (note: NoteSummary, folderId: string) => Promise<void>;
@@ -39,7 +33,6 @@ export function NoteTree({
   treeEditing: ReturnType<typeof useTreeEditing>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
-  const [menu, setMenu] = useState<{ folder: Folder; x: number; y: number } | null>(null);
   const { editing, commit, cancel } = treeEditing;
   useEffect(() => {
     if (!editing) return;
@@ -51,7 +44,6 @@ export function NoteTree({
     }
     setCollapsed((old) => new Set([...old].filter((id) => !parents.has(id))));
   }, [editing?.id]);
-  const closeMenu = useCallback(() => setMenu(null), []);
   const dragSource = useRef<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
@@ -137,14 +129,16 @@ export function NoteTree({
                   onClick={() => toggle(folder.id)}
                   onContextMenu={(e) => {
                     e.preventDefault();
+                    e.stopPropagation();
                     e.currentTarget.focus();
-                    setMenu({ folder, x: e.clientX, y: e.clientY });
+                    folderMenu({ folder, x: e.clientX, y: e.clientY });
                   }}
                   onKeyDown={(e) => {
                     if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
                       e.preventDefault();
+                      e.stopPropagation();
                       const r = e.currentTarget.getBoundingClientRect();
-                      setMenu({ folder, x: r.left, y: r.bottom });
+                      folderMenu({ folder, x: r.left, y: r.bottom });
                     }
                   }}
                 >
@@ -180,7 +174,6 @@ export function NoteTree({
                   event.dataTransfer.effectAllowed = 'move';
                   dragSource.current = note.id;
                   setDragging(note.id);
-                  closeMenu();
                 }}
                 onDragEnd={endDrag}
                 data-sidebar-item
@@ -191,12 +184,14 @@ export function NoteTree({
                 onClick={() => openNote(note.id)}
                 onContextMenu={(e) => {
                   e.preventDefault();
+                  e.stopPropagation();
                   e.currentTarget.focus();
                   noteMenu({ note, x: e.clientX, y: e.clientY });
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
                     e.preventDefault();
+                    e.stopPropagation();
                     const r = e.currentTarget.getBoundingClientRect();
                     noteMenu({ note, x: r.left + 12, y: r.bottom });
                   }
@@ -211,7 +206,16 @@ export function NoteTree({
     </>
   );
   return (
-    <>
+    <div
+      className="note-tree"
+      aria-label="노트 영역"
+      onContextMenu={(event) => {
+        if ((event.target as HTMLElement).closest('[data-inline-rename]')) return;
+        event.preventDefault();
+        event.stopPropagation();
+        rootMenu({ x: event.clientX, y: event.clientY });
+      }}
+    >
       <div
         className={`sidebar-section-title notes-root${dragging ? ' note-drag-active' : ''}${dropTarget === '' ? ' note-drop-target' : ''}`}
         aria-label="노트 최상위 폴더"
@@ -253,36 +257,7 @@ export function NoteTree({
             <span>첫 노트 작성하기</span>
           </button>
         )}
-        {menu && (
-          <ContextMenu
-            title={menu.folder.name}
-            position={menu}
-            close={closeMenu}
-            items={[
-              { id: 'note', label: '여기에 새 노트', Icon: Plus, run: () => createNote(menu.folder.id) },
-              {
-                id: 'folder',
-                label: '하위 폴더 만들기',
-                Icon: FolderPlus,
-                run: () => folderDialog({ kind: 'create', parentId: menu.folder.id }),
-              },
-              {
-                id: 'rename',
-                label: '이름 변경',
-                Icon: Pencil,
-                run: () => folderDialog({ kind: 'rename', folder: menu.folder }),
-              },
-              {
-                id: 'delete',
-                label: '빈 폴더 삭제',
-                Icon: Trash2,
-                danger: true,
-                run: () => folderDialog({ kind: 'delete', folder: menu.folder }),
-              },
-            ]}
-          />
-        )}
       </div>
-    </>
+    </div>
   );
 }
