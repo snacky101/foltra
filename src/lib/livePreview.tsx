@@ -1,6 +1,6 @@
 import { noteTags } from './noteTags';
 import { frontmatterRange } from './frontmatter';
-import { frontmatterDecorations } from './livePreviewFrontmatter';
+import { frontmatterDecorations, requestFrontmatterProperty } from './livePreviewFrontmatter';
 import { isQueryLanguage } from './sqlQuery';
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, gutterLineClass, type DecorationSet } from '@codemirror/view';
@@ -208,7 +208,7 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
     (from, to) => focused && selectionTouchesLines(state, from, to),
   );
   const hidden = Decoration.replace({});
-  ranges.push(...livePreviewLists(state));
+  ranges.push(...livePreviewLists(state, focused));
   ranges.push(...frontmatterDecorations(state));
   const frontmatter = frontmatterRange(state.doc.toString());
   const lineStyles = new Map<number, Set<string>>();
@@ -262,7 +262,17 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
         );
         return false;
       }
-      if (name === 'FencedCode' || name === 'HorizontalRule') {
+      if (name === 'HorizontalRule') {
+        // Keep an actual editor line so native arrows and Vim motions can enter it.
+        // The inactive rule is drawn over hidden text without changing its geometry.
+        styleLine(from, 'cm-live-rule-line');
+        if (!active) {
+          styleLine(from, 'cm-live-rule-preview');
+          ranges.push(Decoration.mark({ class: 'cm-live-rule-source' }).range(from, to));
+        }
+        return false;
+      }
+      if (name === 'FencedCode') {
         if (!active)
           ranges.push(
             Decoration.replace({
@@ -287,7 +297,12 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
         }
         return false;
       }
-      if (/^(ATX|Setext)Heading[1-6]$/.test(name)) styleLine(from, `cm-live-heading cm-live-h${name.at(-1)}`);
+      if (/^(ATX|Setext)Heading[1-6]$/.test(name)) {
+        const first = state.doc.lineAt(from).number;
+        const last = name.startsWith('Setext') ? state.doc.lineAt(to).number - 1 : first;
+        for (let line = first; line <= last; line++)
+          styleLine(state.doc.line(line).from, `cm-live-heading cm-live-h${name.at(-1)}`);
+      }
       if (name === 'Blockquote') {
         for (let line = state.doc.lineAt(from).number; line <= state.doc.lineAt(to).number; line++)
           styleLine(state.doc.line(line).from, 'cm-live-quote');
@@ -384,7 +399,9 @@ export function livePreviewExtension(context: () => Context, initiallyFocused = 
       return transaction.docChanged ||
         transaction.selection ||
         focused !== value.focused ||
-        transaction.effects.some((effect) => effect.is(refreshLivePreview)) ||
+        transaction.effects.some(
+          (effect) => effect.is(refreshLivePreview) || effect.is(requestFrontmatterProperty),
+        ) ||
         syntaxTree(transaction.startState) !== syntaxTree(transaction.state)
         ? { focused, decorations: livePreviewDecorations(transaction.state, context(), focused) }
         : value;
@@ -396,6 +413,19 @@ export function livePreviewExtension(context: () => Context, initiallyFocused = 
   });
   return [
     field,
+    EditorView.updateListener.of(({ view, state }) => {
+      if (state.field(field).focused === view.hasFocus) return;
+      // A newer transaction can discard CodeMirror's queued focus effect.
+      // Let its native focusChanged notification run before recovering a dropped effect.
+      queueMicrotask(() => {
+        queueMicrotask(() => {
+          if (!view.dom.isConnected) return;
+          const current = view.state.field(field, false);
+          if (current && current.focused !== view.hasFocus)
+            view.dispatch({ effects: focusLivePreview.of(view.hasFocus) });
+        });
+      });
+    }),
     tableNavigation,
     EditorView.domEventHandlers({
       mousedown(event) {

@@ -46,7 +46,7 @@
 .settings-open > .sidebar-settings-content,
 .settings-open > .workspace-settings-content {
   opacity: 1;
-  transform: translateX(0);
+  transform: none;
   visibility: visible;
   pointer-events: auto;
   transition-delay: 0ms;

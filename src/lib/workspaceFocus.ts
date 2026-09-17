@@ -1,3 +1,5 @@
+import { moveCalendarFocus } from './calendar';
+
 export type FocusDirection = 'left' | 'down' | 'up' | 'right';
 export type FocusRegion =
   | 'sidebar-navigation'
@@ -43,24 +45,35 @@ export function focusSidebarTree() {
 function focusRegion(name: FocusRegion) {
   const region = document.querySelector<HTMLElement>(`[data-focus-region="${name}"]`);
   if (!region || region.closest('[inert], [hidden]') || !region.getClientRects().length) return;
-  const previous = lastFocus.get(region);
+  let previous = lastFocus.get(region);
   const links =
     name === 'backlinks'
-      ? [...region.querySelectorAll<HTMLElement>('[data-backlink-item]:not(:disabled)')].filter(
-          (item) => item.getClientRects().length,
-        )
+      ? [
+          ...region.querySelectorAll<HTMLElement>(
+            '[data-backlink-item]:not(:disabled), [data-plugin-calendar] [data-calendar-date][tabindex="0"]:not(:disabled)',
+          ),
+        ].filter((item) => item.getClientRects().length)
       : null;
   if (links && !links.length) return;
   const firstVisible = (selector: string) =>
     [...region.querySelectorAll<HTMLElement>(selector)].find(
       (item) => !item.closest('[hidden], [inert]') && item.getClientRects().length,
     );
+  const table = name === 'main' ? firstVisible('.database-view .data-table') : undefined;
+  if (table) {
+    const row = previous?.closest<HTMLElement>('tbody tr[tabindex="0"]');
+    previous =
+      row && table.contains(row) && !row.closest('[hidden], [inert]') && row.getClientRects().length
+        ? row
+        : (firstVisible('.database-view .data-table tbody tr[tabindex="0"]') ??
+          firstVisible('.database-view .new-row'));
+  }
   const target =
     previous?.isConnected &&
     !previous.matches(':disabled') &&
     !previous.closest('[hidden], [inert]') &&
     previous.getClientRects().length &&
-    (!links || links.includes(previous))
+    (!links || links.includes(previous) || previous.closest('[data-plugin-calendar]'))
       ? previous
       : (links?.[0] ??
         firstVisible(
@@ -83,6 +96,7 @@ export function moveWorkspaceFocus(direction: FocusDirection) {
   else if (next) focusRegion(next);
 }
 export function moveSidebarFocus(target: HTMLElement, key: string): boolean {
+  if (target.closest('[data-plugin-calendar]')) return moveCalendarFocus(target, key);
   const origin = target.closest<HTMLElement>('[data-focus-region]');
   const name = origin?.dataset.focusRegion ?? '';
   if (!origin || (!name.startsWith('sidebar-') && name !== 'backlinks' && name !== 'settings-navigation'))

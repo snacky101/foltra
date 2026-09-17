@@ -9,8 +9,9 @@ import {
   Search,
 } from 'lucide-react';
 import { useTopics, type TopicOptions } from '../lib/useTopics';
-import type { TopicBlock, TopicSort, Workspace } from '../lib/types';
+import type { Settings, TopicBlock, TopicSort, Workspace } from '../lib/types';
 import { Select } from './Select';
+import { TopicFolderFilter } from './TopicFolderFilter';
 
 const NotePreview = lazy(() => import('./NotePreview').then((module) => ({ default: module.NotePreview })));
 
@@ -21,6 +22,7 @@ export function TopicsView({
   toggleSources,
   openNote,
   openLink,
+  updateSettings,
 }: {
   workspace: Workspace;
   options: TopicOptions;
@@ -28,8 +30,12 @@ export function TopicsView({
   toggleSources: () => void;
   openNote: (id: string, line?: number) => void;
   openLink: (target: string) => void;
+  updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
 }) {
-  const { topics, topic, data, error, reload, saving, move } = useTopics(workspace, options);
+  const { topics, topic, data, error, reload, saving, move, scopeKey } = useTopics(workspace, options);
+  const folderFilter = workspace.settings.topicFolders ?? { include: [], exclude: [] };
+  const filtered = folderFilter.include.length + folderFilter.exclude.length > 0;
+  const previousScope = useRef(scopeKey);
   const [search, setSearch] = useState('');
   const [drag, setDrag] = useState<{
     source: string;
@@ -59,6 +65,13 @@ export function TopicsView({
     endDrag();
     return cancelPageHover;
   }, [workspace.path, topic?.id]);
+  useEffect(() => {
+    if (previousScope.current === scopeKey) return;
+    previousScope.current = scopeKey;
+    endDrag();
+    focusCard.current = null;
+    if (currentOptions.current.offset !== 0) onChange({ ...currentOptions.current, offset: 0 });
+  }, [scopeKey, onChange]);
   useEffect(() => {
     if (drag && data && drag.revision !== data.orderRevision) endDrag();
   }, [data?.orderRevision, drag]);
@@ -107,6 +120,7 @@ export function TopicsView({
       <p className="topics-description">
         <code>[[주제]]</code>가 담긴 문단과 목록을 모아 봅니다. 목록은 하위 항목까지 포함합니다.
       </p>
+      <TopicFolderFilter folders={workspace.folders} value={folderFilter} updateSettings={updateSettings} />
       {error && (
         <div className="topics-error" role="alert">
           {error}
@@ -120,7 +134,14 @@ export function TopicsView({
           주제를 불러오는 중…
         </p>
       )}
-      {topics?.length === 0 && (
+      {topics?.length === 0 && filtered && (
+        <div className="topics-empty">
+          <Layers3 size={28} />
+          <h2>선택한 폴더에 주제가 없습니다.</h2>
+          <p>폴더 선택을 바꾸거나 필터를 해제해 다른 노트의 주제를 볼 수 있습니다.</p>
+        </div>
+      )}
+      {topics?.length === 0 && !filtered && (
         <div className="topics-empty">
           <Layers3 size={28} />
           <h2>하나의 주제, 여러 날의 기록</h2>

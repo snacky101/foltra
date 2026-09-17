@@ -38,7 +38,18 @@ export interface EditorSnapshot {
   selection: string;
 }
 export interface ViewNode {
-  type: 'stack' | 'row' | 'grid' | 'card' | 'text' | 'heading' | 'button' | 'input' | 'select' | 'checkbox';
+  type:
+    | 'stack'
+    | 'row'
+    | 'grid'
+    | 'card'
+    | 'text'
+    | 'heading'
+    | 'button'
+    | 'input'
+    | 'select'
+    | 'checkbox'
+    | 'calendar';
   text?: string;
   label?: string;
   value?: string;
@@ -52,6 +63,15 @@ export interface ViewNode {
   checked?: boolean;
   disabled?: boolean;
   options?: string[];
+  /** Calendar only: valid Gregorian YYYY-MM, years 0001–9999. */
+  month?: string;
+  /** Calendar only: local YYYY-MM-DD used to highlight today (may be outside month). */
+  today?: string;
+  /** Calendar only: unique real dates in month, at most 31. */
+  markedDates?: string[];
+  previousAction?: string;
+  nextAction?: string;
+  todayAction?: string;
 }
 export interface Action {
   id: string;

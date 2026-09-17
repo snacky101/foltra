@@ -4,7 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { call } from '../lib/api';
 import { defaultTopicOptions } from '../lib/useTopics';
-import type { TopicBlock, TopicBlocks, TopicSort, Workspace } from '../lib/types';
+import type { Settings, TopicBlock, TopicBlocks, TopicSort, Workspace } from '../lib/types';
 import { TopicsView } from './TopicsView';
 
 vi.mock('../lib/api', () => ({ call: vi.fn() }));
@@ -17,8 +17,10 @@ let revision: string;
 let rejectMove: boolean;
 let workspace: Workspace;
 const openNote = vi.fn();
+const updateSettings = vi.fn<(patch: Partial<Settings>) => Promise<boolean>>();
 function App() {
   const [options, onChange] = useState(defaultTopicOptions);
+  const [, refresh] = useState(0);
   return (
     <TopicsView
       workspace={workspace}
@@ -27,6 +29,11 @@ function App() {
       toggleSources={() => onChange({ ...options, showSources: !options.showSources })}
       openNote={openNote}
       openLink={() => {}}
+      updateSettings={async (patch) => {
+        const saved = await updateSettings(patch);
+        if (saved) refresh((value) => value + 1);
+        return saved;
+      }}
     />
   );
 }
@@ -70,7 +77,21 @@ beforeEach(async () => {
   custom = null;
   revision = 'v1';
   rejectMove = false;
-  workspace = { path: '/topic-qa', notes: [], topicOrderRevision: 'file1' } as unknown as Workspace;
+  workspace = {
+    path: '/topic-qa',
+    notes: [],
+    folders: [
+      { id: 'work', name: 'Work', parentId: null, revision: 'w1' },
+      { id: 'child', name: 'Ideas', parentId: 'work', revision: 'i1' },
+      { id: 'archive', name: 'Archive', parentId: null, revision: 'a1' },
+    ],
+    settings: { topicFolders: { include: [], exclude: [] } },
+    topicOrderRevision: 'file1',
+  } as unknown as Workspace;
+  updateSettings.mockImplementation(async (patch) => {
+    workspace = { ...workspace, settings: { ...workspace.settings, ...patch } };
+    return true;
+  });
   vi.mocked(call).mockImplementation(async (_path, command, args) => {
     const a = args as Record<string, unknown>;
     if (command === 'topics.list')
@@ -131,6 +152,7 @@ test('dragging a handle shows the insertion edge, saves once and selects custom 
     placement: 'before',
     sort: 'newest',
     expectedRevision: 'v1',
+    folders: { include: [], exclude: [] },
   });
   await choose('노트 생성일 최신순');
   expect(ids()).toEqual(['c0', 'c1', 'c2']);
@@ -230,3 +252,185 @@ test('pending writes block duplicate moves and retain display preferences change
   expect(ids()).toEqual(['c2', 'c0', 'c1']);
   expect(button('원본 노트 정보 표시').getAttribute('aria-pressed')).toBe('true');
 });
+
+const folderCheckbox = (name: string) => host.querySelector<HTMLInputElement>(`input[aria-label="${name}"]`)!;
+async function toggleFolder(name: string) {
+  await act(async () => folderCheckbox(name).click());
+}
+const lastArgs = (command: string) =>
+  vi
+    .mocked(call)
+    .mock.calls.filter(([, name]) => name === command)
+    .at(-1)?.[2];
+
+test('folder include and exclude settings reach catalog, page and reorder requests, including root-only selection', async () => {
+  await act(async () => button('폴더 필터').click());
+  expect(host.textContent).toContain('하위 폴더도 적용');
+  expect(folderCheckbox('Work / Ideas 포함')).not.toBeNull();
+  await toggleFolder('Work 포함');
+  await toggleFolder('Archive 제외');
+  await toggleFolder('최상위 노트 포함');
+  const folders = { include: ['work', ''], exclude: ['archive'] };
+  expect(updateSettings).toHaveBeenLastCalledWith({ topicFolders: folders });
+  expect(lastArgs('topics.list')).toEqual({ folders });
+  expect(lastArgs('topics.blocks')).toMatchObject({ folders, offset: 0 });
+  await act(async () => dragEvent(handle('c2'), 'dragstart'));
+  await act(async () => dragEvent(elements()[0], 'drop', -1));
+  expect(lastArgs('topics.reorder')).toMatchObject({ folders, source: 'c2', target: 'c0' });
+  await toggleFolder('Work 제외');
+  expect(workspace.settings.topicFolders).toEqual({ ...folders, exclude: ['archive', 'work'] });
+  expect(folderCheckbox('Work 포함').checked).toBe(true);
+  expect(folderCheckbox('Work 제외').checked).toBe(true);
+});
+
+test('folder scope changes reset pagination and drag state; note moves and reparented folders refresh the catalog', async () => {
+  cards = Array.from({ length: 55 }, (_, i) => ({ ...cards[0], id: `c${i}`, line: i + 1 }));
+  workspace = {
+    ...workspace,
+    notes: [
+      { id: 'note', title: 'Source', folderId: 'work', revision: 'same', createdAt: '', updatedAt: '' },
+    ],
+  };
+  await act(async () => root.render(<App />));
+  await act(async () => button('다음').click());
+  expect(lastArgs('topics.blocks')).toMatchObject({ offset: 50 });
+  await act(async () => dragEvent(handle('c50'), 'dragstart'));
+  await toggleFolder('Work 포함');
+  expect(lastArgs('topics.blocks')).toMatchObject({ offset: 0, folders: { include: ['work'], exclude: [] } });
+  expect(host.querySelector('.dragging,.drag-off-page')).toBeNull();
+  for (const change of [
+    () => {
+      workspace = { ...workspace, notes: [{ ...workspace.notes[0], folderId: 'child' }] };
+    },
+    () => {
+      workspace = {
+        ...workspace,
+        folders: workspace.folders.map((folder) =>
+          folder.id === 'child' ? { ...folder, parentId: 'archive' } : folder,
+        ),
+      };
+    },
+  ]) {
+    const count = vi.mocked(call).mock.calls.filter(([, name]) => name === 'topics.list').length;
+    change();
+    await act(async () => root.render(<App />));
+    expect(vi.mocked(call).mock.calls.filter(([, name]) => name === 'topics.list')).toHaveLength(count + 1);
+  }
+});
+
+test('missing selected folders stay removable and empty results keep filter recovery available', async () => {
+  const implementation = vi.mocked(call).getMockImplementation()!;
+  vi.mocked(call).mockImplementation(async (path, command, args) => {
+    if (
+      command === 'topics.list' &&
+      (args as { folders: Settings['topicFolders'] }).folders.include.includes('deleted')
+    )
+      return [];
+    return implementation(path, command, args);
+  });
+  workspace = {
+    ...workspace,
+    settings: { ...workspace.settings, topicFolders: { include: ['deleted'], exclude: [] } },
+  };
+  await act(async () => root.render(<App />));
+  expect(host.textContent).toContain('선택한 폴더에 주제가 없습니다.');
+  expect(lastArgs('topics.list')).toEqual({ folders: { include: ['deleted'], exclude: [] } });
+  await act(async () => button('폴더 필터').click());
+  expect(folderCheckbox('없는 폴더 (deleted) 포함').checked).toBe(true);
+  expect(folderCheckbox('없는 폴더 (deleted) 제외').disabled).toBe(true);
+  await toggleFolder('없는 폴더 (deleted) 포함');
+  expect(ids()).toHaveLength(3);
+  expect(host.textContent).not.toContain('없는 폴더');
+  await toggleFolder('Archive 제외');
+  await act(async () => button('필터 해제').click());
+  expect(workspace.settings.topicFolders).toEqual({ include: [], exclude: [] });
+});
+
+test('reordering workspace summaries after an ordinary note edit does not reset the selected page', async () => {
+  cards = Array.from({ length: 55 }, (_, i) => ({ ...cards[0], id: `c${i}`, line: i + 1 }));
+  workspace = {
+    ...workspace,
+    notes: ['a', 'b'].map((id) => ({
+      id,
+      title: id,
+      folderId: 'work',
+      revision: 'same',
+      createdAt: '',
+      updatedAt: '',
+    })),
+  };
+  await act(async () => root.render(<App />));
+  await act(async () => button('다음').click());
+  workspace = {
+    ...workspace,
+    notes: [...workspace.notes].reverse().map((note) => ({ ...note, revision: 'updated' })),
+    folders: [...workspace.folders].reverse(),
+  };
+  await act(async () => root.render(<App />));
+  expect(lastArgs('topics.blocks')).toMatchObject({ offset: 50 });
+  expect(ids()).toEqual(['c50', 'c51', 'c52', 'c53', 'c54']);
+});
+
+test('pending folder saves block additional toggles and failed saves preserve the original selection', async () => {
+  let finish!: (saved: boolean) => void;
+  updateSettings.mockImplementation(
+    () =>
+      new Promise<boolean>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await act(async () => button('폴더 필터').click());
+  await toggleFolder('Work 포함');
+  expect(folderCheckbox('Work 포함').checked).toBe(false);
+  expect(folderCheckbox('Archive 제외').matches(':disabled')).toBe(true);
+  await toggleFolder('Archive 제외');
+  expect(updateSettings).toHaveBeenCalledTimes(1);
+  await act(async () => finish(false));
+  expect(folderCheckbox('Work 포함').matches(':disabled')).toBe(false);
+  expect(workspace.settings.topicFolders).toEqual({ include: [], exclude: [] });
+});
+
+test('a completed move from the previous folder scope does not change sorting in the current scope', async () => {
+  const implementation = vi.mocked(call).getMockImplementation()!;
+  let finish!: () => void;
+  vi.mocked(call).mockImplementation(async (path, command, args) => {
+    if (command === 'topics.reorder')
+      await new Promise<void>((resolve) => {
+        finish = resolve;
+      });
+    return implementation(path, command, args);
+  });
+  await act(async () => dragEvent(handle('c2'), 'dragstart'));
+  await act(async () => dragEvent(elements()[0], 'drop', -1));
+  await toggleFolder('Work 포함');
+  await act(async () => finish());
+  expect(button('주제 카드 정렬').textContent).toContain('최신순');
+  expect(ids()).toEqual(['c0', 'c1', 'c2']);
+});
+
+test.each(['topics.list', 'topics.blocks'])(
+  'a late %s response cannot replace the current folder selection',
+  async (delayedCommand) => {
+    const implementation = vi.mocked(call).getMockImplementation()!;
+    let finish!: () => void;
+    vi.mocked(call).mockImplementation(async (path, command, args) => {
+      const folders = (args as { folders: Settings['topicFolders'] }).folders;
+      if (command === delayedCommand && folders.include.includes('work') && folders.exclude.length === 0) {
+        await new Promise<void>((resolve) => {
+          finish = resolve;
+        });
+        if (command === 'topics.list')
+          return [{ id: 'name:Old', title: 'Old scope', noteId: null, blockCount: 1, noteCount: 1 }];
+        const page = (await implementation(path, command, args)) as TopicBlocks;
+        return { ...page, blocks: [{ ...cards[0], id: 'old', body: 'Old scope' }] };
+      }
+      return implementation(path, command, args);
+    });
+    await toggleFolder('Work 포함');
+    await toggleFolder('Archive 제외');
+    expect(ids()).toEqual(['c0', 'c1', 'c2']);
+    await act(async () => finish());
+    expect(host.textContent).not.toContain('Old scope');
+    expect(ids()).toEqual(['c0', 'c1', 'c2']);
+  },
+);

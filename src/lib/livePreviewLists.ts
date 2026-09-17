@@ -1,23 +1,37 @@
 import type { EditorState, Range } from '@codemirror/state';
 import { syntaxTree } from '@codemirror/language';
-import { Decoration, WidgetType } from '@codemirror/view';
+import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { BlockGap } from './livePreviewLayout';
 import { markdownListLayout } from './markdownListLayout';
+import { taskPrefix, type TaskStatus } from './markdownTasks';
+import { taskIconDOM } from '../components/TaskIcon';
 
 class ListMarker extends WidgetType {
   constructor(
     readonly marker: string,
     readonly bullet: boolean,
+    readonly task: TaskStatus | null = null,
+    readonly taskFrom: number | null = null,
   ) {
     super();
   }
   eq(other: ListMarker) {
-    return this.marker === other.marker;
+    return this.marker === other.marker && this.task === other.task && this.taskFrom === other.taskFrom;
   }
-  toDOM() {
+  toDOM(view: EditorView) {
     const dom = document.createElement('span');
-    dom.className = `cm-live-list-marker${this.bullet ? ' cm-live-bullet' : ''}`;
-    dom.textContent = this.bullet ? '\u00a0' : this.marker;
+    dom.className = `cm-live-list-marker${this.task ? ' cm-live-task' : this.bullet ? ' cm-live-bullet' : ''}`;
+    dom.textContent = this.bullet || this.task ? '\u00a0' : this.marker;
+    if (this.task) {
+      dom.append(taskIconDOM(this.task));
+      dom.title = '클릭하여 작업 상태 편집';
+      dom.onmousedown = (event) => {
+        if (event.button !== 0 || event.shiftKey || event.metaKey || event.ctrlKey || event.altKey) return;
+        event.preventDefault();
+        view.dispatch({ selection: { anchor: this.taskFrom! + 1 }, scrollIntoView: true });
+        view.focus();
+      };
+    }
     return dom;
   }
   coordsAt(dom: HTMLElement, pos: number) {
@@ -34,7 +48,7 @@ class ListMarker extends WidgetType {
 }
 
 // List prefixes keep their Markdown in the document but occupy the same width as reading mode.
-export function livePreviewLists(state: EditorState) {
+export function livePreviewLists(state: EditorState, focused = true) {
   const ranges: Range<Decoration>[] = [];
   const { lines, separators, paragraphBreaks } = markdownListLayout(
     state.doc,
@@ -42,19 +56,34 @@ export function livePreviewLists(state: EditorState) {
     state.tabSize,
   );
   syntaxTree(state).iterate({
-    enter({ name, from, to }) {
+    enter({ node, name, from, to }) {
       if (name === 'Frontmatter') return false;
       if (['FencedCode', 'CodeBlock', 'Table', 'HTMLBlock', 'HorizontalRule'].includes(name)) return false;
       if (name === 'ListMark') {
         const marker = state.doc.sliceString(from, to);
         const space = state.doc.sliceString(to, state.doc.lineAt(to).to).match(/^[ \t]+/)?.[0].length ?? 0;
+        const rest = state.doc.sliceString(to + space, state.doc.lineAt(to).to);
+        const inline = ['Paragraph', 'Task'].includes(node.nextSibling?.name ?? '');
+        const task = inline ? taskPrefix(rest) : null;
+        const taskFrom = to + space;
+        // Keep the whole prefix editable while a state is being deleted or replaced.
+        // Unknown/empty states remain literal text; they do not become task icons.
+        const editablePrefix = inline ? /^\[[^\]\r\n]?\](?=[ \t]|$)/.exec(rest)?.[0] : null;
+        const editing =
+          editablePrefix &&
+          focused &&
+          state.selection.ranges.some((range) =>
+            range.empty
+              ? range.head >= from && range.head < taskFrom + editablePrefix.length
+              : range.from < taskFrom + editablePrefix.length && range.to > from,
+          );
+        const taskEnd = task ? task.length + (rest.slice(task.length).match(/^[ \t]+/)?.[0].length ?? 0) : 0;
         // Keep native caret/IME text outside the fixed-width marker, including empty items.
-        if (space)
+        if (space && !editing && (!task || task.hasSeparator))
           ranges.push(
-            Decoration.replace({ widget: new ListMarker(marker, /^[-+*]$/.test(marker)) }).range(
-              from,
-              to + space,
-            ),
+            Decoration.replace({
+              widget: new ListMarker(marker, /^[-+*]$/.test(marker), task?.status, task ? taskFrom : null),
+            }).range(from, to + space + taskEnd),
           );
         return false;
       }

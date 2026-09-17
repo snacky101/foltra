@@ -205,6 +205,12 @@ fn validate_query(db: &Database, query: &Query) -> Result<()> {
     Ok(())
 }
 fn compare(a: &Value, b: &Value) -> std::cmp::Ordering {
+    match (a.is_null(), b.is_null()) {
+        (true, true) => return std::cmp::Ordering::Equal,
+        (true, false) => return std::cmp::Ordering::Less,
+        (false, true) => return std::cmp::Ordering::Greater,
+        _ => {}
+    }
     match (a.as_f64(), b.as_f64()) {
         (Some(a), Some(b)) => a.total_cmp(&b),
         _ if a.is_boolean() && b.is_boolean() => a.as_bool().cmp(&b.as_bool()),

@@ -30,6 +30,10 @@ const settings = {
   editorMode: 'live' as const,
   slash: false,
   lineNumbers: 'none' as const,
+  databaseFontSize: 14,
+  editorFontFamily: '',
+  databaseFontFamily: '',
+  topicFolders: { include: [], exclude: [] },
   cursorShape: 'bar' as const,
   cursorFollowVim: true,
   cursorBlink: 'blink' as const,
@@ -41,6 +45,39 @@ const settings = {
   keybindings: {},
 };
 describe('keyboard routing contract', () => {
+  it('property addition has its own configurable shortcut and preserves the YAML edit command', () => {
+    const commands = createBuiltinCommands({} as Record<BuiltinCommandId, () => void>);
+    const add = commands.find((command) => command.id === 'note.frontmatter.add')!;
+    const edit = commands.find((command) => command.id === 'note.frontmatter.edit')!;
+    expect(bindingsFor(add, settings)).toEqual([{ keys: 'Mod+;', leader: false }]);
+    expect(parseBindingText('Mod+;')).toEqual({ keys: 'Mod+;', leader: false });
+    expect(
+      shortcutMatches(
+        { key: 'Process', code: 'Semicolon', metaKey: true, ctrlKey: false, altKey: false, shiftKey: false },
+        'Mod+;',
+        'meta',
+      ),
+    ).toBe(true);
+    expect(bindingsFor(edit, settings)).toEqual([]);
+    expect(
+      bindingsFor(add, { ...settings, keybindings: { [add.id]: [{ keys: 'pa', leader: true }] } }),
+    ).toEqual([{ keys: 'pa', leader: true }]);
+    expect(bindingsFor(add, { ...settings, keybindings: { [add.id]: [] } })).toEqual([]);
+  });
+  it.each([':', 'Process'])('matches Shift+; without treating it as the unshifted shortcut (%s)', (key) => {
+    const event = {
+      key,
+      code: 'Semicolon',
+      metaKey: true,
+      ctrlKey: false,
+      altKey: false,
+      shiftKey: true,
+    };
+    expect(parseBindingText('Mod+Shift+;')).toEqual({ keys: 'Mod+Shift+;', leader: false });
+    expect(shortcutMatches(event, 'Mod+Shift+;', 'meta')).toBe(true);
+    expect(shortcutMatches(event, 'Mod+;', 'meta')).toBe(false);
+    expect(shortcutMatches({ ...event, key: ';', shiftKey: false }, 'Mod+Shift+;', 'meta')).toBe(false);
+  });
   it.each([
     ['note.back', 'Ctrl+o', 'KeyO', 'ㅐ'],
     ['note.forward', 'Ctrl+i', 'KeyI', 'ㅑ'],

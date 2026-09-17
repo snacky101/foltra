@@ -102,7 +102,7 @@ export function SearchDialog({
             aria-selected={selected === index}
             className={selected === index ? 'selected' : ''}
             tabIndex={-1}
-            onMouseEnter={() => setSelected(index)}
+            onMouseMove={() => setSelected(index)}
             onClick={() => choose(result.id)}
           >
             <strong>

@@ -1,5 +1,7 @@
 import { settingsGroups, type SettingsGroup } from '../lib/settingsNavigation';
 import { CursorSettings } from './CursorSettings';
+import { TaskMarkerHelp } from './TaskMarkerHelp';
+import { FontFamilySetting } from './FontFamilySetting';
 import { ExtensionsView } from './ExtensionsView';
 import { ThemeSettings } from './ThemeSettings';
 import { Select } from './Select';
@@ -182,7 +184,7 @@ export const SettingsView = memo(
         <p className="page-description">{currentGroup.description}</p>
         <div className="settings-group" hidden={group !== 'extensions'}>
           <ExtensionsView
-            key={workspace.vault.id}
+            key={`${workspace.path}:${workspace.vault.id}`}
             kind="plugin"
             pluginErrors={pluginErrors}
             beforeDisable={beforeDisablePlugin}
@@ -195,6 +197,12 @@ export const SettingsView = memo(
         </div>
         <div className="settings-group" hidden={group !== 'editor'}>
           <section className="settings-section">
+            <FontFamilySetting
+              key={workspace.vault.id}
+              label="편집기"
+              value={settings.editorFontFamily ?? ''}
+              onChange={(editorFontFamily) => update({ editorFontFamily })}
+            />
             <div className="setting-row">
               <span>
                 <strong>노트 보기 모드</strong>
@@ -252,6 +260,34 @@ export const SettingsView = memo(
                 onChange={(e) => void update({ showUnresolvedLinks: e.target.checked })}
               />
             </label>
+          </section>
+          <TaskMarkerHelp />
+        </div>
+        <div className="settings-group" hidden={group !== 'database'}>
+          <section className="settings-section">
+            <FontFamilySetting
+              key={workspace.vault.id}
+              label="데이터베이스"
+              value={settings.databaseFontFamily ?? ''}
+              onChange={(databaseFontFamily) => update({ databaseFontFamily })}
+            />
+            <div className="setting-row">
+              <span>
+                <strong>글자 크기</strong>
+                <small>표·보드·타임라인에 적용합니다. 현재 vault에 저장됩니다.</small>
+              </span>
+              <Select
+                aria-label="데이터베이스 글자 크기"
+                value={String(settings.databaseFontSize ?? 14)}
+                onValueChange={(value) => void update({ databaseFontSize: Number(value) })}
+              >
+                {Array.from({ length: 9 }, (_, index) => index + 12).map((size) => (
+                  <option key={size} value={String(size)}>
+                    {size} px{size === 14 ? ' · 기본' : ''}
+                  </option>
+                ))}
+              </Select>
+            </div>
           </section>
         </div>
         <div className="settings-group" hidden={group !== 'cursor'}>
@@ -342,5 +378,5 @@ export const SettingsView = memo(
       </section>
     );
   },
-  (previous, next) => !previous.active && !next.active,
+  (previous, next) => !previous.active && !next.active && previous.workspace.path === next.workspace.path,
 );

@@ -13,6 +13,8 @@ export function Modal({
   className?: string;
 }) {
   const ref = useRef<HTMLDivElement>(null);
+  const closeRef = useRef(close);
+  closeRef.current = close;
   useEffect(() => {
     const previous = document.activeElement as HTMLElement;
     const frame = requestAnimationFrame(() =>
@@ -22,9 +24,10 @@ export function Modal({
       )?.focus(),
     );
     const key = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && !event.isComposing) {
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.key === 'Escape') {
         event.stopPropagation();
-        close();
+        closeRef.current();
       }
       if (event.key === 'Tab') {
         const items = [
@@ -48,7 +51,7 @@ export function Modal({
       window.removeEventListener('keydown', key);
       previous?.focus();
     };
-  }, [close]);
+  }, []);
   return (
     <div
       className="modal-backdrop"

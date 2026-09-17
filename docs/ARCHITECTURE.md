@@ -28,6 +28,7 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `notes.rs`, `databases.rs` | 각 객체의 생성/수정/삭제, revision과 값 검증 | UI별 저장 로직 |
 | `query.rs` | 링크 인덱스, 기존 JSON 쿼리, 재생성 가능한 검색 인덱스 | 사용자 SQL 실행·JS 실행 |
 | `sql_query.rs` | 이름 기반 쿼리 catalog, 읽기 전용 SQL 검증, 임시 DuckDB 테이블·결과 제한 | 원본 수정, 외부 DB 연결·파일·네트워크 접근 |
+| `sql_rename.rs` | 컬럼 이름 변경에 따른 저장된 SQL 식별자 참조 분석·원문 범위 갱신 | 문자열 일괄 치환, 확장 코드 변경, 모호한 참조 추측 |
 | `SqlQuery`, `SqlQueryDialog`, `src/lib/sqlQuery.ts` | SQL 삽입·표 표시, 요청 수명과 DB 변경 갱신, 쿼리 fence 구분 | UI별 SQL 평가·저장 규칙 |
 | `wiki.rs` | 제목/UUID 대상 해석, alias 보존, Markdown 소스 범위 기반 참조 갱신 | UI별 링크 저장 규칙 |
 | `topics.rs`, `topic_order.rs` | Markdown 문단·목록 경계·주제 식별·카드 조회·revision 기반 표시 순서와 내용 대응 | 원문 복제·UI 상태·임의 코드 실행 |
@@ -123,7 +124,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 `query.catalog`는 활성 DB와 컬럼의 표시 이름을 SQL 식별자로 제공하고, 이스케이프한 `SELECT` 예제를 함께 반환합니다. ASCII 대소문자를 무시한 중복 이름이나 컬럼의 예약 메타데이터 이름 충돌은 ID 접미사로 구분합니다. `query.sql {sql}`은 GUI와 CLI가 공유하는 읽기 전용 명령입니다. 기존 `query.run`의 JSON 계약은 유지합니다.
 
-`sql_query.rs`는 PostgreSQL 문법 parser로 단일 조회를 검사하고 다시 직렬화한 뒤, 요청마다 새 in-memory DuckDB에 활성 DB/행의 사본을 적재해 평가합니다. 테이블은 엔진 내장 테이블 이름과 충돌하지 않도록 `vault` schema에 만들고 `search_path`를 지정하므로 사용자는 DB 이름만으로 조회할 수 있습니다. 원본 Markdown·JSON과 기존 SQLite 검색 인덱스를 대체하지 않으며 DB/컬럼 이름 변경 시 노트 속 SQL을 자동 수정하지 않습니다. 숫자는 `DOUBLE`, 체크박스는 `BOOLEAN`, 날짜는 `DATE`, 나머지는 `VARCHAR`로 조회하고 빈 날짜는 `NULL`로 투영합니다. `__id`, `__note`, `__created_at`, `__updated_at` 메타데이터도 제공하며 원본 값과 revision은 바꾸지 않습니다.
+`sql_query.rs`는 PostgreSQL 문법 parser로 단일 조회를 검사하고 다시 직렬화한 뒤, 요청마다 새 in-memory DuckDB에 활성 DB/행의 사본을 적재해 평가합니다. 테이블은 엔진 내장 테이블 이름과 충돌하지 않도록 `vault` schema에 만들고 `search_path`를 지정하므로 사용자는 DB 이름만으로 조회할 수 있습니다. 원본 Markdown·JSON과 기존 SQLite 검색 인덱스를 대체하지 않습니다. 컬럼 이름 변경은 별도 `sql_rename.rs`에서 노트 속 SQL 참조를 갱신하며, DB 자체의 이름 변경은 아직 자동 갱신하지 않습니다. 숫자는 `DOUBLE`, 체크박스는 `BOOLEAN`, 날짜는 `DATE`, 나머지는 `VARCHAR`로 조회하고 빈 날짜는 `NULL`로 투영합니다. `__id`, `__note`, `__created_at`, `__updated_at` 메타데이터도 제공하며 조회는 원본 값과 revision을 바꾸지 않습니다.
 
 쓰기·외부 I/O·확장 로딩·재귀 조회를 차단하고 함수를 허용 목록으로 제한합니다. 배열·튜플·맵·구조체 생성, `overlay`와 사용자 지정 연산자는 거절하며 `CAST`와 타입 지정 문자열은 허용된 scalar 타입만 받습니다. 암묵적인 행 표현식 등을 통한 중첩 타입 결과도 결과 스키마 검사에서 거절합니다. SQL 크기/파서 깊이, 원본 DB·행·적재량, 결과 행·열·셀·문자열 크기를 제한합니다. SQL 평가에는 3초 후 interrupt를 요청하며, 적재 시간까지 포함한 전체 요청 시간 제한은 아닙니다. DuckDB의 128 MB 메모리 예산·단일 스레드·디스크 spill 비활성 설정은 별도 OS 프로세스 격리나 앱 전체 메모리 상한을 보장하지 않습니다. 현재 수치와 `CURRENT_DATE`·날짜 간격을 포함한 지원 문법은 [SQL.md](SQL.md)에 기록합니다.
 
@@ -135,7 +136,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 플러그인 관리 UI는 설정의 `extensions` 그룹에, 테마 설치·제거·선택은 `theme` 그룹에 있습니다. `extensions.open` 명령은 현재 작업을 저장한 뒤 확장 그룹을 직접 열며, 기존 작업 뷰는 유지합니다. 플러그인은 `ExtensionsView`, 테마는 `ThemeSettings`에서 관리합니다. 테마 기본 선택지는 Paper & Pine과 Midnight이고, 카탈로그와 파일로 추가한 테마는 선택 카드에서 바로 삭제합니다. 사용 중인 테마 삭제와 Paper 복귀는 코어의 한 저장 트랜잭션입니다. 파일 종류가 다른 경우 올바른 설정 그룹을 안내합니다.
 
-`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki만 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
+`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki와 일지 캘린더를 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
 
 1. JSON 설치 시 `extensions.rs`가 허용 필드, command/action, theme token을 검사합니다. 읽을 때도 다시 검사합니다.
 2. core `commands.list`가 `plugin.<extension-id>.<command-id>`를 반환합니다. UI도 같은 ID를 팔레트와 단축키 설정에 등록합니다.
@@ -145,13 +146,17 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 카탈로그와 파일로 설치한 패키지를 하나의 목록으로 보여 주고, ‘설치된 것만’ 스위치로 현재 vault에 설치된 항목을 거릅니다. 필터를 바꿔도 검색어는 유지합니다. 같은 ID의 카탈로그 항목보다 실제 설치된 manifest의 이름·버전·내용을 우선하며, 설치 상태와 제거 버튼은 필터와 관계없이 표시합니다.
 
-기존 `template`, `query`, 내장 `view` 외에 SDK v1 `script` 명령을 지원합니다. `runtime`에 담긴 번들 JS 모듈은 core의 QuickJS에서 호출마다 새 문맥으로 실행됩니다. TypeScript 패키징은 `scripts/pack-plugin.mjs`, 작성 타입은 `packages/plugin-sdk/`에 있습니다. 새 화면의 구조/동작을 플러그인 코드가 계산하고 `PluginView`가 검증된 tree를 React로 표시합니다. 배포 확장 소스는 `examples/code/anki/`에 있습니다. 캘린더·칸반·편집 도구는 SDK 회귀 테스트용 fixture로만 유지하며 `npm test`에서 빌드합니다.
+기존 `template`, `query`, 내장 `view` 외에 SDK v1 `script` 명령을 지원합니다. `runtime`에 담긴 번들 JS 모듈은 core의 QuickJS에서 호출마다 새 문맥으로 실행됩니다. TypeScript 패키징은 `scripts/pack-plugin.mjs`, 작성 타입은 `packages/plugin-sdk/`에 있습니다. 새 화면의 구조/동작을 플러그인 코드가 계산하고 `PluginView`가 검증된 tree를 React로 표시합니다. 배포 확장 소스는 `examples/code/anki/`와 `examples/code/calendar/`에 있습니다. 칸반·편집 도구 등의 SDK 회귀 패키지는 fixture로만 유지하며 `npm test`에서 빌드합니다.
+
+`extension.update {manifest,expectedDigest}`는 설치된 패키지의 semantic digest와 ID·kind를 확인하고 manifest만 원자적으로 교체합니다. 플러그인 설정·카드 연결 데이터·사용자 문서는 유지합니다. 카탈로그의 더 높은 정식 버전에만 업데이트 버튼을 표시하며, 바뀐 코드의 기존 승인은 유효하지 않아 사용자가 다시 활성화합니다. 파일 설치는 여전히 같은 ID를 덮어쓰지 않습니다.
+
+`runtime.views[].placement`는 기본 `main` 또는 `right-sidebar`를 선언합니다. 우측 뷰도 공통 직렬 세션·승인·오류 격리·갱신 경로를 사용하며 `PluginSidebarViews`가 연결 목록 아래에 표시합니다. `calendar` 노드는 실제 날짜·월과 최대 31개 점 표시 날짜, 선언된 action만 허용합니다. 일지 캘린더는 지역 날짜의 현재 월로 시작하며 `YYYY-MM-DD` 제목의 노트를 읽고 생성·이름 변경·삭제를 반영합니다. 키보드 이동은 기존 workspace 명령 라우터를 사용합니다.
 
 `usePlugins`는 활성 패키지별 직렬 세션, JSON 상태, load/unload, 변경 이벤트와 오류 중단을 담당합니다. `pluginSession`은 vault나 패키지가 바뀌면 대기 요청을 취소하고 늦은 응답을 버립니다. Core invocation은 최대 500ms/32MiB JS heap/512KiB stack/64 host calls/512KiB output으로 제한하며, DOM·Node·파일·네트워크는 노출하지 않습니다. 권한을 가진 명령/뷰 action만 데이터를 쓸 수 있습니다. 렌더링과 변경 이벤트는 읽기 전용이며 UI 결과는 고유한 패키지의 화면/허용된 노트/편집기 동작만 전달합니다. CodeMirror 선택 수정은 원래 노트·본문·선택·조합 상태를 다시 확인한 일반 transaction이므로 undo/자동저장을 유지합니다.
 
 활성화는 설치와 분리됩니다. `extension.enable`은 사용자가 확인한 digest가 현재 manifest와 같은지 확인하고, 기기의 앱 데이터 폴더 `app.foltra.desktop/plugin-grants/<vault-path-hash>/<id>.json`에 승인을 저장합니다. Vault 안에 승인 정보를 두지 않으며 코드/권한 변경과 복원한 다른 경로의 vault는 다시 활성화해야 합니다. `plugin-data`는 백업에 포함하지만 실행 승인은 포함하지 않습니다. Core의 `Store` 복제는 동일한 잠금 파일의 `Arc`를 공유해 JS callback의 소유 수명 동안에도 vault 잠금을 유지합니다. 플러그인 API도 공통 `dispatch`의 명령/인자/revision 검사를 거칩니다. 개별 데이터 명령은 원자적이지만 여러 호출을 하나의 transaction으로 묶지는 않습니다.
 
-이 API는 임의 DOM/CSS·CodeMirror 내부 확장이나 새 DB property type을 허용하지 않습니다. 네트워크·외부 파일 API, OS 프로세스 격리, 공개 marketplace/업데이트, 기존 Obsidian 플러그인 호환은 미구현입니다. 테마는 계속 지정된 색상 token을 사용합니다. 자세한 계약과 제한은 [PLUGIN_SDK.md](PLUGIN_SDK.md)에 있습니다.
+이 API는 임의 DOM/CSS·CodeMirror 내부 확장이나 새 DB property type을 허용하지 않습니다. 네트워크·외부 파일 API, OS 프로세스 격리, 공개 marketplace/자동 업데이트, 기존 Obsidian 플러그인 호환은 미구현입니다. 테마는 계속 지정된 색상 token을 사용합니다. 자세한 계약과 제한은 [PLUGIN_SDK.md](PLUGIN_SDK.md)에 있습니다.
 
 ## 새 기능을 추가할 때
 
@@ -189,6 +194,10 @@ Markdown의 raw HTML과 원격 이미지 자동 로딩을 사용하지 않습니
 
 새 vault는 `vim: false`, `editorMode: live`로 시작합니다. 기존의 명시적 Vim 설정은 유지합니다. live/source 전환은 CodeMirror compartment를 재설정하며 같은 문서와 undo history를 사용합니다. 읽기 모드는 별도 renderer입니다. Live Preview의 decoration은 편집기 focus effect와 선택 범위를 따라 활성 줄/블록만 원문으로 드러내고, 본문을 떠나면 미리보기로 복귀합니다. 선택 끝이 다음 줄 시작과 일치하면 선택되지 않은 다음 줄은 제외합니다. 보기 모드 버튼/명령은 편집기 mount 완료 시 대기 중인 focus를 적용합니다. 표·쿼리는 기존 NotePreview를 재사용합니다. 위키링크와 웹 링크는 편집 중 Ctrl/Cmd+클릭으로 열 수 있습니다.
 
+수평 구분선(`HorizontalRule`)은 block replacement 대신 실제 CodeMirror 줄을 유지합니다. 비활성 줄은 원문 텍스트의 크기를 유지한 채 숨기고 테마의 선 색으로 표시하며, 커서/선택이 닿으면 원문을 드러냅니다. 방향키·Vim 이동·마우스 위치 지정은 기본 편집기 경로를 사용합니다. 구문 트리를 기준으로 처리하므로 YAML 경계나 Setext 헤딩 밑줄을 수평 구분선으로 오인하지 않습니다.
+
+Setext 제목은 구문 트리가 포함한 모든 내용 줄에 동일한 제목 스타일을 적용합니다. 마지막 밑줄 문법 줄은 제목 서체 적용에서 제외하고 기존 원문 표시/접기 규칙을 따릅니다. gutter 높이도 각 내용 줄의 제목 클래스로부터 계산해 여러 줄 제목과 번호의 정렬을 유지합니다.
+
 `[[` 자동완성은 CodeMirror autocomplete의 로컬 keymap과 IME 처리를 사용합니다. 후보 선택은 본문만 변경하며, 실제 생성은 [LINKS.md](LINKS.md)의 `note.open-link` 경로에서만 실행합니다. core는 같은 vault 잠금 안에서 먼저 UUID/제목을 해석하고 생성 여부를 결정합니다. `Link.name`은 alias와 분리한 파생 대상 필드입니다. `showUnresolvedLinks`는 기존 설정에도 기본 true를 병합하고, `graphDocuments`는 표시용 가상 노드를 만들며 원본 노트를 쓰지 않습니다.
 
 Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출한 편집기 handler에 연결합니다. 현재 단일 활성 편집기의 매핑만 유지하며 설정 변경·편집기 해제 시 자신이 등록한 매핑을 제거해 기존 Vim 동작을 복원합니다. 키 조합은 `gd` 같은 연속 입력 또는 `Mod+Enter` 같은 수정 키 조합입니다. 연속 입력은 영문·숫자 최대 12개이며 공백은 구분자이고 대소문자를 구분합니다. Leader 없이 입력하는 연속 조합은 영문으로 시작하며 Vim Normal 본문에 등록됩니다. UI는 명령 간 중복·접두어 충돌과 Leader 첫 키 충돌을 검사하고, core는 저장 형식을 검증합니다. 명령의 배열을 비우면 모든 조합이 해제되며 키 자체를 제거하면 기본 바인딩으로 돌아갑니다. UI는 빈 입력을 저장 목록에서 제외합니다. 설정 UI는 키 조합과 일반 단축키 입력란을 분리합니다. 키 조합의 `<leader>f` 표기를 기존 `{ keys: "f", leader: true }`로 파싱하며, 체크박스는 사용하지 않습니다. 이 표기 변환은 저장 포맷과 기존 라우팅을 바꾸지 않습니다. 기본 `gd`는 `note.follow-existing-link`, Mod+Enter는 `note.follow-link` 명령으로 편집기 handle의 현재 커서 위치를 해석합니다. 둘 다 `useOpenWikiLink`의 저장·열기 흐름을 사용하며, `gd`는 기존 노트만 열고 없는 대상에서는 저장·생성·이동 기록을 변경하지 않습니다. Mod+Enter는 기존 atomic `note.open-link`로 열기/생성을 유지합니다. 별도 전역 키 리스너나 원본 쓰기 경로를 만들지 않습니다. `:w`는 저장, `:q`는 현재 노트 닫기, `:wq`/`:x`는 저장 후 닫기입니다. 저장 실패/충돌은 강제 저장으로 우회하지 않습니다. `:q!`는 진행 중 저장이 끝나기를 기다린 뒤 미저장 초안만 버리며, 이미 자동 저장한 내용을 되돌리지는 않습니다. 현재 노트 외 파일 경로와 범위 저장은 거절합니다.
@@ -201,11 +210,13 @@ Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출�
 
 ## 데이터베이스 컬럼 변경
 
-`database.property.preview`는 원본 스키마와 DB 전체 행을 읽어 변환 계획을 만듭니다. 반환값은 `revision`, `property`, `rowCount`, `changedRows`, `errorCount`, `errors`, `canApply`입니다. revision은 스키마 원문과 행 ID/revision 목록을 묶은 SHA-256이며, 일반 행의 revision과는 다른 변경 범위를 가집니다. 조회는 파일을 변경하지 않습니다.
+`database.property.preview`는 원본 스키마와 DB 전체 행을 읽어 변경 계획을 만듭니다. 반환값은 `revision`, `property`, `rowCount`, `changedRows`, `errorCount`, `errors`, `changedNotes`, `changedQueries`, `queryErrors`, `canApply`입니다. revision은 스키마 원문과 행 ID/revision 목록을 묶은 SHA-256이며, 컬럼 이름 변경 때에는 SQL 참조 분석에 사용한 catalog와 노트 revision도 포함합니다. 일반 행의 revision과는 다른 변경 범위를 가집니다. 조회는 파일을 변경하지 않습니다.
 
-`database.property.update`에는 같은 `databaseId`/`property`와 미리보기의 `expectedRevision`을 보냅니다. 코어가 잠금 안에서 다시 계산한 revision이 다르면 충돌을 반환합니다. 변환 불가 값이 하나라도 있으면 전체 적용을 거절합니다. 성공 시 스키마와 값이 실제로 달라진 행을 하나의 journal로 commit하며, 본문 링크와 Markdown 파일은 유지합니다. persisted Database/Record 포맷은 바꾸지 않습니다. 코어는 GUI와 CLI에서 같은 경로를 사용합니다.
+`database.property.update`에는 같은 `databaseId`/`property`와 미리보기의 `expectedRevision`을 보냅니다. 코어가 잠금 안에서 다시 계산한 revision이 다르면 충돌을 반환합니다. 변환 불가 값 또는 안전하게 갱신할 수 없는 쿼리가 있으면 전체 적용을 거절합니다. 성공 시 스키마·실제로 값이 달라진 행·SQL 참조를 바꾼 노트를 하나의 journal로 commit합니다. 컬럼과 행 ID, 본문 연결을 유지하므로 ID 기반 JSON 쿼리·정렬·너비·Anki 매핑은 변경할 필요가 없습니다. persisted Database/Record 포맷은 바꾸지 않습니다. 코어는 GUI와 CLI에서 같은 경로를 사용합니다.
 
-`PropertyEditor`는 검사 결과와 실패 예시를 표시합니다. 검사 이후 충돌은 자동 재시도로 우회하지 않습니다. `ColumnHeader`가 크기 조절 입력을 받고 `DatabaseView`는 property ID로 너비를 저장합니다. 이름 셀의 본문 버튼은 기존 `openBody` 경로를 호출하므로, 본문을 열기 전까지 새 노트가 필요 없는 모델을 유지합니다.
+`PropertyEditor`는 제목을 포함한 컬럼 이름을 수정하고, 변경할 쿼리 수와 검사 실패 예시를 표시합니다. 검사 이후 충돌은 자동 재시도로 우회하지 않습니다. 열기 전에 현재 노트의 미저장 초안을 저장합니다. `ColumnHeader`가 크기 조절 입력을 받고 `DatabaseView`는 property ID로 너비를 저장합니다. 본문 컬럼의 헤더 오른쪽 끝에는 문서 아이콘과 `노트` 배지를 표시하고, 호버·접근성 설명으로 각 행의 노트를 만들거나 여는 역할을 안내합니다. 실제 PK는 자동 생성되는 행 ID(`__id`)이며 제목 값은 중복될 수 있지만, 일반 DB 화면에 별도 PK 안내는 표시하지 않습니다. 이름 셀의 본문 버튼은 기존 `openBody` 경로를 호출하므로, 본문을 열기 전까지 새 노트가 필요 없는 모델을 유지합니다.
+
+컬럼 헤더 드래그 또는 우클릭 메뉴의 좌우 이동은 표의 표시 순서만 바꿉니다. `useColumnOrder`는 property ID 배열을 `foltra:column-order:<vaultId>:<databaseId>` localStorage에 저장하며 기기별 배치로 취급합니다. 헤더·셀·너비를 함께 재배치하지만 canonical `database.properties`, SQL/JSON 쿼리, 제목/본문 역할과 상태 필터 기준은 바꾸지 않습니다. 삭제된 ID는 무시하고 새 컬럼은 뒤에 추가하며 이름·타입 변경에는 현재 속성 객체를 사용합니다. DB/vault 전환 시 대상 배치를 먼저 읽고 명시적인 이동에만 저장합니다. 드래그의 출처와 현재 DB/schema 범위를 검사해 다른 창이나 오래된 드래그로 순서가 변경되지 않게 합니다.
 
 ## 폴더와 휴지통 갱신
 

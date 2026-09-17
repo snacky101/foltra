@@ -9,12 +9,14 @@ export function PluginSettingsView({
   revision,
   invoke,
   error,
+  title = '확장 설정',
 }: {
   pluginId: string;
   viewId: string;
   revision: string;
   invoke: PluginSettingsInvoke;
   error?: string;
+  title?: string;
 }) {
   const [tree, setTree] = useState<PluginNode | null>(null);
   const [busy, setBusy] = useState(true);
@@ -61,7 +63,7 @@ export function PluginSettingsView({
   return (
     <PluginView
       embedded
-      title="확장 설정"
+      title={title}
       tree={tree}
       busy={busy}
       error={error}

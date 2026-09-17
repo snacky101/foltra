@@ -145,3 +145,67 @@ test('losing window focus flushes edits and concurrent save callers share one wr
   expect(await saving).toBe(true);
   expect(note.isDirty()).toBe(false);
 });
+
+test('saving a conflict copy preserves edits typed while the copy request is pending', async () => {
+  await edit('Draft to copy');
+  let finish!: (value: Note) => void;
+  vi.mocked(call).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = resolve;
+      }),
+  );
+  let copying!: Promise<Note>;
+  await act(async () => {
+    copying = note.saveCopy();
+  });
+  const outcome = copying.then(
+    () => 'navigated',
+    () => 'retained',
+  );
+  await edit('New input while copying');
+  await act(async () => finish({ ...original, id: 'copy', body: 'Draft to copy' }));
+  expect(await outcome).toBe('retained');
+  expect(note.draft.body).toBe('New input while copying');
+  expect(note.isDirty()).toBe(true);
+  expect(note.currentNote()?.id).toBe('one');
+});
+
+test('saving an unchanged conflict draft as a copy still allows opening the saved copy', async () => {
+  await edit('Copied body');
+  const copied = { ...original, id: 'copy', title: 'Title (사본)', body: 'Copied body' };
+  vi.mocked(call).mockResolvedValueOnce(copied);
+  let saved!: Note;
+  await act(async () => {
+    saved = await note.saveCopy();
+  });
+  expect(saved).toEqual(copied);
+  expect(note.isDirty()).toBe(false);
+  expect(refresh).toHaveBeenCalledOnce();
+});
+
+test('copy refresh cannot discard input typed after creation but before navigation', async () => {
+  await edit('Copied body');
+  vi.mocked(call).mockResolvedValueOnce({ ...original, id: 'copy', body: 'Copied body' });
+  let finish!: () => void;
+  refresh = vi.fn(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await act(async () => root.render(<Harness />));
+  let copying!: Promise<Note>;
+  await act(async () => {
+    copying = note.saveCopy();
+  });
+  const outcome = copying.then(
+    () => 'navigated',
+    () => 'retained',
+  );
+  await edit('Typed during refresh');
+  await act(async () => finish());
+  expect(await outcome).toBe('retained');
+  expect(note.draft.body).toBe('Typed during refresh');
+  expect(note.isDirty()).toBe(true);
+});

@@ -12,8 +12,19 @@ export type TopicOptions = typeof defaultTopicOptions;
 
 export function useTopics(workspace: Workspace, options: TopicOptions) {
   const [retry, setRetry] = useState(0);
-  const sourceKey = JSON.stringify([
+  const folders = workspace.settings.topicFolders ?? { include: [], exclude: [] };
+  const scopeKey = JSON.stringify([
     workspace.path,
+    folders,
+    workspace.notes
+      .map((note) => [note.id, note.folderId ?? ''] as const)
+      .sort(([a], [b]) => a.localeCompare(b)),
+    workspace.folders
+      .map((folder) => [folder.id, folder.parentId] as const)
+      .sort(([a], [b]) => a.localeCompare(b)),
+  ]);
+  const sourceKey = JSON.stringify([
+    scopeKey,
     workspace.notes.map((note) => [note.id, note.revision]),
     workspace.topicOrderRevision,
     retry,
@@ -21,7 +32,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const [catalog, setCatalog] = useState<{ key: string; topics?: Topic[]; error?: string } | null>(null);
   useEffect(() => {
     let active = true;
-    void call<Topic[]>(workspace.path, 'topics.list').then(
+    void call<Topic[]>(workspace.path, 'topics.list', { folders }).then(
       (topics) => {
         if (active) setCatalog({ key: sourceKey, topics });
       },
@@ -37,7 +48,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const topic = topics?.find((topic) => topic.id === options.topicId) ?? topics?.[0];
   const offset = topic?.id === options.topicId ? options.offset : 0;
   const requestKey = JSON.stringify([sourceKey, topic?.id, offset, options.sort]);
-  const context = JSON.stringify([workspace.path, topic?.id]);
+  const context = JSON.stringify([scopeKey, topic?.id]);
   const currentContext = useRef(context);
   currentContext.current = context;
   const pending = useRef(false);
@@ -51,6 +62,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       topic: topic.id,
       offset,
       limit: 50,
+      folders,
       ...(options.sort ? { sort: options.sort } : {}),
     }).then(
       (data) => {
@@ -93,6 +105,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
         placement,
         expectedRevision,
         sort,
+        folders,
       });
       if (currentContext.current !== context) return false;
       reload();
@@ -107,6 +120,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   };
   return {
     topics,
+    scopeKey,
     topic,
     data: page?.key === requestKey ? page.data : undefined,
     error:

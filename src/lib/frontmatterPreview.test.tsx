@@ -20,8 +20,9 @@ function state(doc: string, anchor = doc.length) {
     selection: { anchor },
     extensions: [yamlFrontmatter({ content: markdown({ extensions: [GFM] }) })],
   });
-  ensureSyntaxTree(state, doc.length, 100);
-  return state;
+  expect(ensureSyntaxTree(state, doc.length, 100)).not.toBeNull();
+  // Publish completed parsing to the immutable state before reading syntaxTree().
+  return state.update({}).state;
 }
 const header = '---\ntags: [study, 한글]\nstatus: draft\nitems:\n  - "#fake [[Missing]]"\n---';
 

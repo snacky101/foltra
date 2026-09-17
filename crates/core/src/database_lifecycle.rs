@@ -93,6 +93,49 @@ pub fn rename(store: &Store, args: &Value) -> Result<Value> {
     Ok(serde_json::to_value(snapshot.database)?)
 }
 
+pub fn delete_property(store: &Store, args: &Value) -> Result<Value> {
+    let mut snapshot = snapshot(store, text(args, "databaseId")?)?;
+    check_revision(text(args, "expectedRevision")?, &snapshot.revision)?;
+    let property_id = text(args, "propertyId")?;
+    let index = snapshot
+        .database
+        .properties
+        .iter()
+        .position(|property| property.id == property_id)
+        .ok_or_else(|| Error::new("invalid_property", "Column does not exist"))?;
+    if property_id == "title" || snapshot.database.properties.len() == 1 {
+        return Err(Error::new(
+            "invalid_schema",
+            "The name column and last remaining column cannot be deleted",
+        ));
+    }
+    snapshot.database.properties.remove(index);
+    // Patch original JSON so unrelated schema/row metadata survives column removal.
+    let mut schema: Value = serde_json::from_str(&snapshot.schema)?;
+    schema["properties"].as_array_mut().unwrap().remove(index);
+    let mut writes = vec![(
+        database_path(&snapshot.database.id)?,
+        Some(pretty(&schema)?),
+    )];
+    let time = now();
+    let mut changed_rows = 0;
+    for (path, raw) in snapshot.records {
+        let mut row: Value = serde_json::from_str(&raw)?;
+        if row["values"]
+            .as_object_mut()
+            .unwrap()
+            .remove(property_id)
+            .is_some()
+        {
+            row["updatedAt"] = json!(time);
+            writes.push((path, Some(pretty(&row)?)));
+            changed_rows += 1;
+        }
+    }
+    store.commit(writes)?;
+    Ok(json!({"database":snapshot.database,"changedRows":changed_rows}))
+}
+
 pub fn delete(store: &Store, args: &Value) -> Result<Value> {
     let snapshot = snapshot(store, text(args, "id")?)?;
     check_revision(text(args, "expectedRevision")?, &snapshot.revision)?;

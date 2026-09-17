@@ -1,19 +1,41 @@
-import type { EditorState, Range } from '@codemirror/state';
+import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import { createRoot, type Root } from 'react-dom/client';
 import { FrontmatterPanel } from '../components/FrontmatterPanel';
 import { frontmatterBlock, frontmatterRange } from './frontmatter';
+
+export const requestFrontmatterProperty = StateEffect.define<'add' | 'handled'>();
+export const frontmatterPanelState = StateField.define({
+  create: () => ({ show: false, add: false }),
+  update(value, transaction) {
+    let next = transaction.selection ? { show: false, add: false } : value;
+    for (const effect of transaction.effects)
+      if (effect.is(requestFrontmatterProperty))
+        next = effect.value === 'add' ? { show: true, add: true } : { ...next, add: false };
+    return next;
+  },
+});
+
+export function addFrontmatterProperty(view: EditorView) {
+  if (view.composing) return;
+  view.dispatch({
+    changes: frontmatterRange(view.state.doc.toString()) ? undefined : { from: 0, insert: '---\n---\n\n' },
+    effects: [requestFrontmatterProperty.of('add'), EditorView.scrollIntoView(0, { y: 'start' })],
+    userEvent: 'input',
+  });
+}
 
 class FrontmatterPreview extends WidgetType {
   private static mounted = new WeakMap<HTMLElement, { root: Root; observer: ResizeObserver }>();
   constructor(
     readonly source: string,
     readonly to: number,
+    readonly addProperty: boolean,
   ) {
     super();
   }
   eq(other: FrontmatterPreview) {
-    return this.source === other.source && this.to === other.to;
+    return this.source === other.source && this.to === other.to && this.addProperty === other.addProperty;
   }
   toDOM(view: EditorView) {
     const dom = document.createElement('div');
@@ -30,6 +52,8 @@ class FrontmatterPreview extends WidgetType {
     mounted.root.render(
       <FrontmatterPanel
         source={this.source}
+        addPropertyRequested={this.addProperty}
+        onAddPropertyHandled={() => view.dispatch({ effects: requestFrontmatterProperty.of('handled') })}
         onEditSource={() => {
           view.dispatch({
             selection: { anchor: view.state.doc.line(2).from },
@@ -68,12 +92,13 @@ export function frontmatterDecorations(state: EditorState): Range<Decoration>[] 
   if (!frontmatter) return [];
   // Source visibility follows the document selection. Moving focus from a widget
   // button to the editor must not collapse the source again during blur events.
-  const editing = state.selection.ranges.some((range) => range.from <= frontmatter.to);
+  const panel = state.field(frontmatterPanelState, false);
+  const editing = !panel?.show && state.selection.ranges.some((range) => range.from <= frontmatter.to);
   if (!editing)
     return [
       Decoration.replace({
         block: true,
-        widget: new FrontmatterPreview(frontmatter.yaml, frontmatter.to),
+        widget: new FrontmatterPreview(frontmatter.yaml, frontmatter.to, panel?.add ?? false),
       }).range(0, frontmatter.to),
     ];
   const result: Range<Decoration>[] = [];

@@ -12,6 +12,94 @@
   color: var(--accent);
   font-size: 11px;
 }
+.topic-folder-filter {
+  margin: -12px 0 26px;
+}
+.topic-filter-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 11px;
+  color: var(--muted);
+}
+.topic-filter-summary .secondary-button {
+  padding: 7px 10px;
+}
+.topic-filter-summary [aria-expanded='true'] > svg:last-child {
+  transform: rotate(180deg);
+}
+.topic-filter-count {
+  min-width: 18px;
+  padding: 2px 5px;
+  border-radius: 9px;
+  background: var(--selection);
+  color: var(--accent);
+  font: 10px var(--mono-font);
+}
+.topic-filter-panel {
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.topic-filter-panel > p {
+  margin: 0 0 14px;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--muted);
+}
+.topic-filter-panel fieldset {
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+.topic-filter-columns,
+.topic-filter-folder {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px 44px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 6px;
+}
+.topic-filter-columns {
+  font-size: 10px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+}
+.topic-filter-columns > span:not(:first-child) {
+  text-align: center;
+}
+.topic-filter-folders {
+  max-height: 280px;
+  overflow-y: auto;
+}
+.topic-filter-folder {
+  min-height: 40px;
+  font-size: 12px;
+  border-radius: 4px;
+}
+.topic-filter-folder:hover {
+  background: var(--selection);
+}
+.topic-filter-folder > span {
+  overflow-wrap: anywhere;
+}
+.topic-filter-folder small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.topic-filter-folder input {
+  justify-self: center;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
 .topics-layout {
   display: grid;
   grid-template-columns: 180px minmax(0, 1fr);

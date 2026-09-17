@@ -1,4 +1,6 @@
 import { HighlightedCode } from './HighlightedCode';
+import { fontFamilyStack } from '../lib/fontFamily';
+import type { CSSProperties } from 'react';
 import { FrontmatterPanel } from './FrontmatterPanel';
 import { frontmatterRange } from '../lib/frontmatter';
 import { SqlQuery } from './SqlQuery';
@@ -16,6 +18,9 @@ import { call } from '../lib/api';
 import { canCreateWikiNote, resolveWikiNote } from '../lib/wikiLinks';
 import { remarkWikiLinks, wikiTarget } from '../lib/remarkWikiLinks';
 import { remarkListSpacing } from '../lib/remarkListSpacing';
+import { remarkTasks } from '../lib/remarkTasks';
+import { taskStatus } from '../lib/markdownTasks';
+import { TaskIcon } from './TaskIcon';
 import { separateListParagraphs } from '../lib/markdownListLayout';
 import type { QueryResult, Workspace } from '../lib/types';
 
@@ -111,6 +116,23 @@ interface NotePreviewProps {
 const PreviewContext = createContext<Omit<NotePreviewProps, 'body'> | null>(null);
 // Stable component identities preserve query state when a block moves or its context updates.
 const markdownComponents: Components = {
+  li: function PreviewListItem({ node, children, ...props }) {
+    const marker = node?.properties['data-task-marker'];
+    const status = typeof marker === 'string' ? taskStatus(marker) : null;
+    return (
+      <li
+        {...props}
+        className={[props.className, status ? 'task-list-item' : ''].filter(Boolean).join(' ') || undefined}
+      >
+        {status && (
+          <span className="task-list-marker">
+            <TaskIcon status={status} />
+          </span>
+        )}
+        {children}
+      </li>
+    );
+  },
   a: function PreviewLink({ href, children }) {
     const { workspace, openLink, openTag } = useContext(PreviewContext)!;
     const [error, setError] = useState('');
@@ -214,13 +236,25 @@ export function NotePreview({
     [body, frontmatter],
   );
   return (
-    <div className="markdown-preview">
+    <div
+      className="markdown-preview"
+      style={
+        { '--editor-font-family': fontFamilyStack(workspace.settings?.editorFontFamily) } as CSSProperties
+      }
+    >
       {frontmatter && <FrontmatterPanel source={frontmatter.yaml} />}
       <PreviewContext
         value={{ workspace, openNote, openLink, executeQueries, openTag: openTag ?? navigateTag }}
       >
         <ReactMarkdown
-          remarkPlugins={[remarkGfm, remarkTags, remarkWikiLinks, remarkBreaks, remarkListSpacing]}
+          remarkPlugins={[
+            remarkGfm,
+            remarkTasks,
+            remarkTags,
+            remarkWikiLinks,
+            remarkBreaks,
+            remarkListSpacing,
+          ]}
           components={markdownComponents}
         >
           {previewBody || '*아직 작성한 내용이 없습니다.*'}

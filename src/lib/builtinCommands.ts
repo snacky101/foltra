@@ -67,6 +67,18 @@ const definitions = [
   { id: 'note.link', title: '노트 연결 삽입', group: '노트', bindings: [{ keys: 'll', leader: true }] },
   { id: 'note.frontmatter.edit', title: '노트 속성 · frontmatter 편집', group: '노트' },
   {
+    id: 'note.task.cycle',
+    title: '작업 상태 순환',
+    group: '노트',
+    bindings: [{ keys: 'Mod+l', leader: false }],
+  },
+  {
+    id: 'note.frontmatter.add',
+    title: '노트 속성 추가',
+    group: '노트',
+    bindings: [{ keys: 'Mod+;', leader: false }],
+  },
+  {
     id: 'note.back',
     title: '이전 노트 위치로 돌아가기',
     group: '탐색',
@@ -136,10 +148,11 @@ const definitions = [
   { id: 'database.delete', title: '데이터베이스를 휴지통으로 이동', group: '데이터베이스' },
   {
     id: 'database.property.edit',
-    title: '컬럼 타입 변경',
+    title: '컬럼 속성 편집',
     group: '데이터베이스',
     bindings: [{ keys: 'dt', leader: true }],
   },
+  { id: 'database.property.delete', title: '컬럼 삭제', group: '데이터베이스' },
   {
     id: 'record.create',
     title: 'DB에 새 항목',

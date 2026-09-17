@@ -258,16 +258,36 @@
 .table-scroll {
   overflow-x: auto;
 }
+.database-title {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  font-size: 31px;
+  font-weight: 600;
+  letter-spacing: -1.2px;
+  line-height: 1.3;
+  box-shadow: none;
+}
+.database-title:hover,
+.database-title:focus {
+  box-shadow: 0 1px var(--line);
+}
 .data-table {
   width: 100%;
   border-collapse: collapse;
   border: 1px solid var(--line);
   table-layout: fixed;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--database-font-size, 14px);
+  font-family: var(--database-font-family, var(--body-font));
+  line-height: 1.5;
 }
 .data-table th {
-  font-size: 10px;
+  font-size: calc(var(--database-font-size, 14px) - 2px);
   color: var(--muted);
   font-weight: 400;
   background: color-mix(in srgb, var(--panel) 60%, transparent);
@@ -288,7 +308,7 @@
 .data-table th:first-child {
   min-width: 34px;
   width: 34px;
-  font: 9px var(--mono-font);
+  font: clamp(10px, calc(var(--database-font-size, 14px) - 3px), 12px) var(--mono-font);
   color: var(--muted);
   text-align: center;
 }
@@ -328,7 +348,7 @@
   width: 100%;
   min-width: 110px;
   background: transparent;
-  font-size: 11px;
+  font-size: inherit;
 }
 .data-table td input[type='checkbox'] {
   width: 15px;
@@ -414,12 +434,13 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 11px;
+  font-size: calc(var(--database-font-size, 14px) - 1px);
+  font-family: var(--database-font-family, var(--body-font));
   font-weight: 500;
   padding: 8px 0 13px;
 }
 .board-column h3 small {
-  font: 10px var(--mono-font);
+  font: calc(var(--database-font-size, 14px) - 3px) var(--mono-font);
   margin-left: auto;
   color: var(--muted);
 }
@@ -430,6 +451,7 @@
   background: var(--muted);
 }
 .board-card {
+  font-family: var(--database-font-family, var(--body-font));
   background: color-mix(in srgb, var(--paper) 80%, white);
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -445,13 +467,13 @@
 }
 .board-card > strong {
   display: block;
-  font-size: 12px;
+  font-size: var(--database-font-size, 14px);
   line-height: 1.7;
   margin-bottom: 15px;
   font-weight: 500;
 }
 .board-card > small {
-  font: 10px var(--mono-font);
+  font: calc(var(--database-font-size, 14px) - 2px) var(--database-font-family, var(--mono-font));
   color: var(--muted);
 }
 .board-card > svg:last-child {
@@ -526,6 +548,20 @@
 }
 .timeline-entry > svg {
   color: var(--muted);
+}
+.database-view .timeline-entry time {
+  flex-basis: 9em;
+  font-size: calc(var(--database-font-size, 14px) - 2px);
+  font-family: var(--database-font-family, var(--mono-font));
+}
+.database-view .timeline-entry {
+  font-family: var(--database-font-family, var(--body-font));
+}
+.database-view .timeline-entry strong {
+  font-size: var(--database-font-size, 14px);
+}
+.database-view .timeline-entry > span small {
+  font-size: calc(var(--database-font-size, 14px) - 2px);
 }
 .note-context-menu {
   position: fixed;
@@ -743,6 +779,75 @@
   font-size: 14px;
   font-weight: 600;
   margin-bottom: 21px;
+}
+.task-marker-help p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+.task-marker-legend {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 14px 24px;
+  margin: 22px 0;
+  padding: 0;
+  list-style: none;
+}
+.task-marker-legend li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+}
+.task-marker-legend code {
+  min-width: 3ch;
+  white-space: pre;
+  color: var(--muted);
+}
+.task-marker-legend .task-icon {
+  display: block;
+}
+.font-family-setting {
+  margin-bottom: 18px;
+}
+.font-family-custom {
+  display: flex;
+  align-items: end;
+  gap: 10px;
+  margin: 4px 0 12px;
+}
+.font-family-custom label {
+  flex: 1;
+  min-width: 0;
+}
+.font-family-custom label > span {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.font-family-custom input {
+  width: 100%;
+  font-size: 12px;
+}
+.font-family-preview {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  font-size: 16px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+}
+.font-family-hint,
+.font-family-error {
+  margin: 8px 0 0;
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--muted);
+}
+.font-family-error {
+  color: var(--danger);
 }
 .setting-row {
   display: flex;
@@ -1834,6 +1939,8 @@
   text-align: left;
 }
 .column-heading > span:nth-child(2) {
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1842,8 +1949,49 @@
   margin-left: auto;
   opacity: 0.4;
 }
+.column-heading > .column-sort-arrow {
+  flex-shrink: 0;
+  color: var(--accent);
+  opacity: 1;
+}
+.column-role {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--muted);
+  white-space: nowrap;
+}
 .column-heading:hover {
   background: var(--selection);
+}
+.column-heading[draggable='true'] {
+  cursor: grab;
+}
+.column-dragging .column-heading {
+  cursor: grabbing;
+  opacity: 0.5;
+}
+.data-table th[data-drop-placement]::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: var(--accent);
+  z-index: 4;
+  pointer-events: none;
+}
+.data-table th[data-drop-placement='before']::after {
+  left: -1px;
+}
+.data-table th[data-drop-placement='after']::after {
+  right: -1px;
 }
 .column-resize-handle {
   position: absolute;
@@ -1886,7 +2034,7 @@
   flex-shrink: 0;
   white-space: nowrap;
   padding: 4px 5px;
-  font-size: 10px;
+  font-size: calc(var(--database-font-size, 14px) - 2px);
   opacity: 0.55;
   border-radius: 4px;
 }
@@ -1904,6 +2052,11 @@
 }
 .data-table .select-control {
   max-width: 100%;
+  font-size: inherit;
+}
+.data-table .select-options {
+  font-size: var(--database-font-size, 14px);
+  font-family: var(--database-font-family, var(--body-font));
 }
 .data-table .date-field {
   min-width: 0;
@@ -1932,6 +2085,11 @@
 .property-editor .form-field textarea {
   resize: vertical;
   line-height: 1.7;
+}
+.property-role-description {
+  font-size: 12px;
+  line-height: 1.7;
+  margin-bottom: 14px;
 }
 .property-conversion-summary {
   background: var(--panel);

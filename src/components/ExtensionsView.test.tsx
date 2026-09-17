@@ -16,6 +16,7 @@ let kind: Extension['kind'];
 const refresh = vi.fn<() => Promise<void>>();
 const onError = vi.fn();
 const invokeSettings = vi.fn();
+const beforeDisable = vi.fn<() => Promise<void>>();
 let enabled = false;
 const render = () =>
   root.render(
@@ -30,6 +31,7 @@ const render = () =>
         } as Workspace
       }
       invokeSettings={invokeSettings}
+      beforeDisable={beforeDisable}
       refresh={refresh}
       onError={onError}
     />,
@@ -66,6 +68,7 @@ beforeEach(async () => {
   document.body.append(host);
   root = createRoot(host);
   refresh.mockImplementation(async () => render());
+  beforeDisable.mockResolvedValue(undefined);
   vi.mocked(call).mockImplementation(async (_path, command, args) => {
     if (command === 'extension.install') {
       const { manifest } = args as { manifest: Extension };
@@ -73,6 +76,12 @@ beforeEach(async () => {
       return manifest;
     }
     if (command === 'extension.settings.get') return { values: {}, revision: 'test-revision' };
+    if (command === 'extension.update') {
+      const { manifest } = args as { manifest: Extension };
+      installed = installed.map((extension) => (extension.id === manifest.id ? manifest : extension));
+      enabled = false;
+      return manifest;
+    }
     if (command === 'extension.remove')
       installed = installed.filter((e) => e.id !== (args as { id: string }).id);
   });
@@ -83,8 +92,11 @@ afterEach(async () => {
   host.remove();
 });
 
-test('only Anki is offered in the catalog, while local plugins remain available', async () => {
-  expect(extensionCatalog.filter((e) => e.kind === 'plugin').map((e) => e.id)).toEqual(['anki']);
+test('Anki and the daily calendar are offered in the catalog, while local plugins remain available', async () => {
+  expect(extensionCatalog.filter((e) => e.kind === 'plugin').map((e) => e.id)).toEqual([
+    'anki',
+    'daily-calendar',
+  ]);
   expect(extensionCatalog.filter((e) => e.kind === 'theme').map((e) => e.id)).toEqual([
     'catppuccin-mocha',
     'rose-pine',
@@ -93,6 +105,7 @@ test('only Anki is offered in the catalog, while local plugins remain available'
   ]);
   expect([...host.querySelectorAll('.extension-card')].map((e) => e.getAttribute('aria-label'))).toEqual([
     'Anki 연결',
+    '일지 캘린더',
   ]);
   const custom = { ...calendarFixture, id: 'local-calendar', name: 'My calendar' };
   await upload(JSON.stringify(custom));
@@ -317,4 +330,79 @@ test('already installed Anki 1.0.0 exposes settings without replacing the packag
   expect(call).not.toHaveBeenCalled();
   expect(installed[0]).toEqual(legacy);
   expect(host.querySelector('.version')?.textContent).toBe('v1.0.0');
+});
+
+test('an installed older package can update in place and requires activation again', async () => {
+  const latest = extensionCatalog.find((e) => e.id === 'anki')!;
+  installed = [{ ...latest, version: '1.1.0' }];
+  enabled = true;
+  await act(async () => render());
+  await toggleInstalled();
+  await search('Anki');
+  expect(button('Anki 연결 업데이트').textContent).toContain(`v${latest.version} 업데이트`);
+  await click('Anki 연결 업데이트');
+  expect(call).toHaveBeenCalledExactlyOnceWith('/temporary-catalog', 'extension.update', {
+    manifest: latest,
+    expectedDigest: 'test-digest',
+  });
+  expect(beforeDisable).toHaveBeenCalledExactlyOnceWith('anki');
+  expect(vi.mocked(call).mock.invocationCallOrder[0]).toBeLessThan(beforeDisable.mock.invocationCallOrder[0]);
+  expect(beforeDisable.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]);
+  expect(installed[0]).toEqual(latest);
+  expect(button('Anki 연결 업데이트')).toBeUndefined();
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')?.checked).toBe(false);
+  expect(host.querySelector('[role=status]')?.textContent).toBe('업데이트 완료 · 권한 확인 후 활성화하세요');
+  expect(installedFilter().checked).toBe(true);
+  expect(host.querySelector<HTMLInputElement>('input[type=search]')?.value).toBe('Anki');
+});
+
+test.each([extensionCatalog.find((e) => e.id === 'anki')!.version, '1.10.0', '2.0.0', 'custom-version'])(
+  '%s is not replaced by a lower, equal or uncomparable catalog version',
+  async (version) => {
+    installed = [{ ...extensionCatalog.find((e) => e.id === 'anki')!, version }];
+    await act(async () => render());
+    expect(button('Anki 연결 업데이트')).toBeUndefined();
+    expect(call).not.toHaveBeenCalled();
+  },
+);
+
+test('a failed stale update preserves the existing package and active session', async () => {
+  const current = { ...extensionCatalog.find((e) => e.id === 'anki')!, version: '1.1.0' };
+  installed = [current];
+  enabled = true;
+  await act(async () => render());
+  const error = new Error('Installed extension changed');
+  vi.mocked(call).mockRejectedValueOnce(error);
+  await click('Anki 연결 업데이트');
+  expect(onError).toHaveBeenCalledWith(error);
+  expect(beforeDisable).not.toHaveBeenCalled();
+  expect(refresh).not.toHaveBeenCalled();
+  expect(installed[0]).toBe(current);
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')?.checked).toBe(true);
+  expect(button('Anki 연결 업데이트').disabled).toBe(false);
+  expect(host.querySelector('[role=status]')?.textContent).toBe('');
+});
+
+test('pending updates suppress duplicate clicks and cannot stop a different vault after unmount', async () => {
+  installed = [{ ...extensionCatalog.find((e) => e.id === 'anki')!, version: '1.1.0' }];
+  await act(async () => render());
+  let finish!: () => void;
+  vi.mocked(call).mockImplementationOnce(
+    () =>
+      new Promise((resolve) => {
+        finish = () => resolve(installed[0]);
+      }),
+  );
+  await act(async () => {
+    button('Anki 연결 업데이트').click();
+    button('Anki 연결 업데이트').click();
+  });
+  expect(call).toHaveBeenCalledOnce();
+  expect(button('Anki 연결 업데이트').disabled).toBe(true);
+  expect(button('Anki 연결 제거').textContent).toBe('제거');
+  expect(button('Anki 연결 제거').disabled).toBe(true);
+  await act(async () => root.render(null));
+  await act(async () => finish());
+  expect(beforeDisable).not.toHaveBeenCalled();
+  expect(refresh).not.toHaveBeenCalled();
 });

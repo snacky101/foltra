@@ -353,7 +353,7 @@
   },
   {
     "id": "database.property.preview",
-    "title": "Preview column type conversion",
+    "title": "Preview column changes and SQL reference updates",
     "readOnly": true,
     "headless": true,
     "argsSchema": {
@@ -375,7 +375,7 @@
   },
   {
     "id": "database.property.update",
-    "title": "Apply checked column type conversion",
+    "title": "Apply checked column changes and SQL reference updates",
     "readOnly": false,
     "headless": true,
     "argsSchema": {
@@ -389,12 +389,39 @@
         },
         "expectedRevision": {
           "type": "string",
-          "description": "Schema and records revision returned by database.property.preview"
+          "description": "Schema, records, and query references revision returned by database.property.preview"
         }
       },
       "required": [
         "databaseId",
         "property",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "database.property.delete",
+    "title": "Delete a column and its values from all records",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "databaseId": {
+          "type": "string"
+        },
+        "propertyId": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string",
+          "description": "Schema and all records revision returned by database.inspect"
+        }
+      },
+      "required": [
+        "databaseId",
+        "propertyId",
         "expectedRevision"
       ],
       "additionalProperties": false
@@ -572,7 +599,18 @@
     "headless": true,
     "argsSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "folders": {
+          "type": "object",
+          "properties": {
+            "include": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 },
+            "exclude": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 }
+          },
+          "required": ["include", "exclude"],
+          "additionalProperties": false,
+          "description": "Folder IDs include descendants; empty ID selects root notes only. Empty include means all. Exclude wins."
+        }
+      },
       "required": [],
       "additionalProperties": false
     }
@@ -585,6 +623,16 @@
     "argsSchema": {
       "type": "object",
       "properties": {
+        "folders": {
+          "type": "object",
+          "properties": {
+            "include": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 },
+            "exclude": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 }
+          },
+          "required": ["include", "exclude"],
+          "additionalProperties": false,
+          "description": "Folder IDs include descendants; empty ID selects root notes only. Empty include means all. Exclude wins."
+        },
         "topic": {
           "type": "string",
           "description": "Opaque topic ID from topics.list"
@@ -624,6 +672,16 @@
     "argsSchema": {
       "type": "object",
       "properties": {
+        "folders": {
+          "type": "object",
+          "properties": {
+            "include": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 },
+            "exclude": { "type": "array", "items": { "type": "string" }, "maxItems": 1000 }
+          },
+          "required": ["include", "exclude"],
+          "additionalProperties": false,
+          "description": "Same folder filter used by topics.blocks; only visible source and target cards can move."
+        },
         "topic": {
           "type": "string"
         },
@@ -731,6 +789,22 @@
         "lineNumbers": {
           "type": "string"
         },
+        "editorFontFamily": {
+          "type": "string",
+          "description": "Editor font family; empty restores the default. Trimmed, no control characters, at most 100 Unicode characters."
+        },
+        "databaseFontFamily": {
+          "type": "string",
+          "description": "Independent database font family; empty restores the default. Trimmed, no control characters, at most 100 Unicode characters."
+        },
+        "databaseFontSize": {
+          "type": "integer",
+          "description": "Database text size in pixels, 12–20 (default 14)"
+        },
+        "topicFolders": {
+          "type": "object",
+          "description": "Topic source folders: include/exclude UUID arrays. Empty include means all; exclusions win; descendants included; empty ID means root-level notes."
+        },
         "cursorShape": {
           "type": "string"
         },
@@ -780,6 +854,28 @@
       },
       "required": [
         "manifest"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.update",
+    "title": "Update extension package",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "manifest": {
+          "type": "object"
+        },
+        "expectedDigest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "manifest",
+        "expectedDigest"
       ],
       "additionalProperties": false
     }

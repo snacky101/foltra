@@ -1,4 +1,6 @@
 .cm-frontmatter-panel {
+  /* Keep panel margins inside the height CodeMirror measures for cursor movement. */
+  display: flow-root;
   width: 100%;
   min-width: 0;
   box-sizing: border-box;

@@ -5,23 +5,54 @@ import { indentMore, indentLess, insertNewlineAndIndent } from '@codemirror/comm
 import { deleteMarkupBackward, insertNewlineContinueMarkupCommand } from '@codemirror/lang-markdown';
 import { getCM } from '@replit/codemirror-vim';
 import { completionStatus } from '@codemirror/autocomplete';
+import { syntaxTree } from '@codemirror/language';
 import { indentMarkdownList } from './markdownIndentation';
+import { taskPrefix } from './markdownTasks';
 import type { ChangeSpec, StateCommand } from '@codemirror/state';
 
 const continueMarkup = insertNewlineContinueMarkupCommand({ nonTightLists: false });
 
 // Enter continues one item, even when earlier items have blank separators.
 // Keep CodeMirror's nesting, task markers and numbering. Exiting only removes markup.
-export const continueMarkdownList: StateCommand = ({ state, dispatch }) =>
-  continueMarkup({
-    state,
+export const continueMarkdownList: StateCommand = ({ state, dispatch }) => {
+  // The upstream command only knows [ ]/[x]. Normalize current task ancestors
+  // in a temporary, same-length document and apply only its result to the original.
+  const tasks = new Map<number, { from: number; to: number; insert: string }>();
+  for (const range of state.selection.ranges) {
+    if (!range.empty) continue;
+    for (let node = syntaxTree(state).resolveInner(range.head, -1); node; node = node.parent!) {
+      if (['Frontmatter', 'FencedCode', 'CodeBlock', 'HTMLBlock', 'Table'].includes(node.name)) break;
+      if (node.name !== 'ListItem' || node.parent?.name !== 'BulletList') continue;
+      const mark = node.getChild('ListMark');
+      if (!mark) continue;
+      const line = state.doc.lineAt(mark.to);
+      const rest = state.doc.sliceString(mark.to, line.to);
+      const space = rest.match(/^[ \t]+/)?.[0].length ?? 0;
+      const task = space && taskPrefix(rest.slice(space));
+      if (!task) continue;
+      const from = mark.to + space;
+      if (range.head < from + task.length) continue;
+      const empty =
+        range.head >= from + task.length &&
+        range.head <= line.to &&
+        !state.doc.sliceString(from + task.length, line.to).trim();
+      if (empty) tasks.set(from, { from, to: from + task.length, insert: '   ' });
+      else if (!tasks.has(from) && ![' ', 'x', 'X'].includes(task.marker))
+        tasks.set(from, { from: from + 1, to: from + 2, insert: ' ' });
+    }
+  }
+  const prepared = tasks.size
+    ? state.update({ changes: [...tasks.values()].sort((a, b) => a.from - b.from) }).state
+    : state;
+  return continueMarkup({
+    state: prepared,
     dispatch(transaction) {
       const adjustments: ChangeSpec[] = [];
       transaction.changes.iterChanges((_oldFrom, _oldTo, from, _end, inserted) => {
         const extra = /^\n[ \t>]*\n(?=[ \t>]*(?:[-+*]|\d+[.)])(?:[ \t]|$))/.exec(inserted.toString());
         if (extra) adjustments.push({ from, to: from + extra[0].length - 1 });
       });
-      if (!adjustments.length) return dispatch(transaction);
+      if (!adjustments.length && prepared === state) return dispatch(transaction);
       const cleanup = transaction.state.changes(adjustments);
       dispatch(
         state.update({
@@ -33,14 +64,19 @@ export const continueMarkdownList: StateCommand = ({ state, dispatch }) =>
       );
     },
   });
+};
 
 export const deleteMarkdownMarkupBackward: StateCommand = (target) => {
   const emptyItems = target.state.selection.ranges.every((range) => {
+    for (let node = syntaxTree(target.state).resolveInner(range.head, -1); node; node = node.parent!)
+      if (['Frontmatter', 'FencedCode', 'CodeBlock', 'HTMLBlock', 'Table'].includes(node.name)) return false;
     const line = target.state.doc.lineAt(range.head);
+    const task = /^[\t >]*[-+*][ \t]+(\[[^\]\r\n]\])[ \t]*$/.exec(line.text);
     return (
       range.empty &&
       range.head === line.to &&
-      /^[\t >]*(?:[-+*]|\d+[.)])(?:[ \t]+\[[ xX]\])?[ \t]+$/.test(line.text)
+      (/^[\t >]*(?:[-+*]|\d+[.)])(?:[ \t]+\[[ xX]\])?[ \t]+$/.test(line.text) ||
+        (task !== null && taskPrefix(task[1]) !== null))
     );
   });
   // CodeMirror replaces a later item's marker with spaces. On an empty item,

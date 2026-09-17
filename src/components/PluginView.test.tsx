@@ -141,3 +141,34 @@ test('input blur does not disable the next select or checkbox while its action i
     ['auto', true],
   ]);
 });
+
+test.each([{ isComposing: true }, { keyCode: 229 }])(
+  'IME confirmation does not submit a plugin input draft (%j)',
+  async (init) => {
+    const action = vi.fn().mockResolvedValue(undefined);
+    await act(async () =>
+      root.render(<PluginView title="Test" tree={tree} busy={false} action={action} refresh={() => {}} />),
+    );
+    const input = host.querySelector('input')!;
+    await act(async () => {
+      input.focus();
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(input, '한글');
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    const composing = new KeyboardEvent('keydown', {
+      key: 'Enter',
+      bubbles: true,
+      cancelable: true,
+      ...init,
+    });
+    await act(async () => input.dispatchEvent(composing));
+    expect(composing.defaultPrevented).toBe(false);
+    expect(action).not.toHaveBeenCalled();
+    await act(async () =>
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })),
+    );
+    expect(action).toHaveBeenCalledWith('draft', '한글', undefined);
+    await act(async () => input.blur());
+    expect(action).toHaveBeenCalledOnce();
+  },
+);

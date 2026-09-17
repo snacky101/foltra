@@ -1,5 +1,5 @@
 import type { Api } from '../../../packages/plugin-sdk';
-import { identify, sources, type Config } from './sources';
+import { identify, sources, withNoteBody, type Config } from './sources';
 import { hasImages, prepareCard } from './media';
 export interface Sent {
   id: number;
@@ -18,6 +18,7 @@ export const defaults: Config = {
   database: '',
   front: '',
   back: '',
+  backSource: 'column',
   deck: 'Foltra',
   tag: 'anki',
   blocks: true,
@@ -26,10 +27,19 @@ export const defaults: Config = {
 };
 export function read(api: Api) {
   const saved = api.storage.read<Data>();
+  const { includeNoteBody, ...config } = (saved.value?.config ?? {}) as Partial<Config> & {
+    includeNoteBody?: boolean;
+  };
+  const backSource =
+    config.backSource === 'column' || config.backSource === 'note'
+      ? config.backSource
+      : includeNoteBody
+        ? 'note'
+        : 'column';
   return {
     revision: saved.revision,
     data: {
-      config: { ...defaults, ...saved.value?.config },
+      config: { ...defaults, ...config, backSource },
       sent: saved.value?.sent ?? {},
       errors: saved.value?.errors ?? {},
       message: saved.value?.message ?? '',
@@ -107,7 +117,7 @@ export function sync(api: Api, automatic = false) {
     const force = api.state.force as Record<string, string> | undefined;
     candidates.sort((a, b) => Number(Boolean(force?.[b.key])) - Number(Boolean(force?.[a.key])));
     // Media I/O also shares the host invocation budget; process image cards individually.
-    const work = candidates.slice(0, candidates.some(hasImages) ? 1 : 4);
+    const work = candidates.slice(0, candidates.some((s) => s.bodyNoteId || hasImages(s)) ? 1 : 4);
     if (work.length) {
       ensureModel(api);
       api.anki('createDeck', { deck: data.config.deck });
@@ -117,10 +127,12 @@ export function sync(api: Api, automatic = false) {
         if (duplicates.has(item.key))
           throw new Error('중복된 블록 ID입니다. 복사된 블록의 foltra-anki 주석을 제거하세요.');
         if (item.key.startsWith('pending-')) continue;
-        if (!item.front.trim() || !item.back.trim()) throw new Error('앞면과 뒷면을 모두 입력하세요.');
-        if (item.front.length + item.back.length > 20_000)
+        const card = withNoteBody(api, item);
+        if (card.problem) throw new Error(card.problem);
+        if (!card.front.trim() || !card.back.trim()) throw new Error('앞면과 뒷면을 모두 입력하세요.');
+        if (card.front.length + card.back.length > 20_000)
           throw new Error('카드 내용은 20,000자 이하로 작성하세요.');
-        const prepared = prepareCard(item),
+        const prepared = prepareCard(card),
           content = prepared.fields,
           digest = api.hash(JSON.stringify(content)),
           previous = data.sent[item.key];

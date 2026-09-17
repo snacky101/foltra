@@ -93,7 +93,7 @@ function parseShortcut(shortcut: string, mod: 'meta' | 'ctrl') {
   const letter = tokens.pop() ?? '';
   const key = letter.toLowerCase();
   const parts = tokens.map((part) => part.toLowerCase());
-  if (!/^(?:[a-z0-9,./]|enter|f(?:[1-9]|1[0-2])|arrow(?:left|right|up|down))$/.test(key)) return null;
+  if (!/^(?:[a-z0-9,.;/]|enter|f(?:[1-9]|1[0-2])|arrow(?:left|right|up|down))$/.test(key)) return null;
   if (
     parts.some((part) => !['mod', 'ctrl', 'meta', 'shift', 'alt'].includes(part)) ||
     new Set(parts).size !== parts.length
@@ -116,8 +116,9 @@ export function shortcutMatches(
 ): boolean {
   const binding = parseShortcut(shortcut, mod);
   if (!binding) return false;
+  const key = commandKey(event).toLowerCase();
   return (
-    commandKey(event).toLowerCase() === binding.key &&
+    (key === binding.key || (binding.key === ';' && event.shiftKey && key === ':')) &&
     event.metaKey === (binding.primary === 'meta') &&
     event.ctrlKey === (binding.primary === 'ctrl') &&
     event.shiftKey === binding.shift &&

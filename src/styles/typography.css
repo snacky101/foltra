@@ -31,11 +31,12 @@
   --md-code-before: 20px;
   --md-code-after: 20px;
   font-size: var(--md-body-size);
+  font-family: var(--editor-font-family, var(--body-font));
   line-height: 1.95;
 }
 .markdown-preview h1,
 .editor .cm-live-h1 {
-  font-family: var(--display-font);
+  font-family: var(--editor-font-family, var(--display-font));
   font-size: var(--md-h1-size);
   line-height: 1.5;
   font-weight: 400;
@@ -144,6 +145,51 @@
   width: var(--md-list-indent);
   text-indent: 0;
   text-align: center;
+}
+.task-icon {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--accent);
+  vertical-align: -3px;
+}
+.task-icon[data-task-status='todo'],
+.task-icon[data-task-status='cancelled'],
+.task-icon[data-task-status='deferred'] {
+  color: var(--muted);
+}
+.task-icon[data-task-status='important'],
+.task-icon[data-task-status='question'],
+.task-icon[data-task-status='star'] {
+  color: var(--warning);
+}
+.markdown-preview li.task-list-item {
+  position: relative;
+  list-style: none;
+}
+.markdown-preview li.task-list-item::before {
+  content: none;
+}
+.markdown-preview .task-list-marker {
+  position: absolute;
+  left: calc(-1 * var(--md-list-indent));
+  top: 0;
+  width: var(--md-list-indent);
+  text-align: center;
+}
+.editor .cm-live-task {
+  position: relative;
+}
+.editor .cm-live-task .task-icon {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
 }
 .markdown-preview strong,
 .editor .cm-live-strong {

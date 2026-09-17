@@ -13,7 +13,7 @@ export interface PluginRuntime {
   backgroundCommand?: string;
   source: string;
   permissions: PluginPermission[];
-  views?: { id: string; title: string }[];
+  views?: { id: string; title: string; placement?: 'main' | 'right-sidebar' }[];
   settingsView?: string;
   events?: ('workspace.changed' | 'note.opened')[];
   settings?: {
@@ -38,7 +38,18 @@ export interface PluginEditorSnapshot {
   selection: string;
 }
 export interface PluginNode {
-  type: 'stack' | 'row' | 'grid' | 'card' | 'text' | 'heading' | 'button' | 'input' | 'select' | 'checkbox';
+  type:
+    | 'stack'
+    | 'row'
+    | 'grid'
+    | 'card'
+    | 'text'
+    | 'heading'
+    | 'button'
+    | 'input'
+    | 'select'
+    | 'checkbox'
+    | 'calendar';
   text?: string;
   label?: string;
   value?: string;
@@ -52,6 +63,12 @@ export interface PluginNode {
   checked?: boolean;
   disabled?: boolean;
   options?: string[];
+  month?: string;
+  today?: string;
+  markedDates?: string[];
+  previousAction?: string;
+  nextAction?: string;
+  todayAction?: string;
 }
 export interface PluginEvent {
   type: 'load' | 'unload' | 'command' | 'render' | 'action' | 'event';

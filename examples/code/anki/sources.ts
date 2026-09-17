@@ -3,6 +3,7 @@ export interface Config {
   database: string;
   front: string;
   back: string;
+  backSource: 'column' | 'note';
   deck: string;
   tag: string;
   blocks: boolean;
@@ -16,6 +17,8 @@ export interface Source {
   back: string;
   revision: string;
   noteId?: string;
+  bodyNoteId?: string;
+  problem?: string;
   line?: number;
   block?: boolean;
 }
@@ -71,18 +74,43 @@ export function sources(api: Api, config: Config): Source[] {
   const result: Source[] = [];
   if (config.database) {
     const db = api.call<Database[]>('database.list').find((d) => d.id === config.database);
-    if (!db || ![config.front, config.back].every((id) => db.properties.some((p) => p.id === id)))
+    if (
+      !db ||
+      ![config.front, ...(config.backSource === 'column' ? [config.back] : [])].every((id) =>
+        db.properties.some((p) => p.id === id),
+      )
+    )
       throw new Error('데이터베이스와 앞면·뒷면 컬럼을 다시 선택하세요.');
+    const notes =
+      config.backSource === 'note'
+        ? new Map(api.call<Pick<Note, 'id' | 'revision'>[]>('note.list').map((note) => [note.id, note]))
+        : undefined;
     for (let offset = 0; ; offset += 100) {
       const page = api.call<QueryResult>('query.run', { databaseId: db.id, limit: 100, offset });
-      for (const row of page.rows)
+      for (const row of page.rows) {
+        const note = row.bodyNoteId ? notes?.get(row.bodyNoteId) : undefined;
         result.push({
           key: `row-${row.id}`,
           label: db.name,
           front: String(row.values[config.front] ?? ''),
-          back: String(row.values[config.back] ?? ''),
-          revision: row.revision,
+          back: config.backSource === 'column' ? String(row.values[config.back] ?? '') : '',
+          revision: JSON.stringify([
+            'db-v2',
+            row.revision,
+            config.front,
+            config.backSource,
+            config.backSource === 'note' ? [row.bodyNoteId, note?.revision ?? null] : config.back,
+          ]),
+          ...(note ? { noteId: note.id, bodyNoteId: note.id } : {}),
+          ...(config.backSource === 'note' && !note
+            ? {
+                problem: row.bodyNoteId
+                  ? '연결된 노트를 찾을 수 없습니다. DB 행에 다른 노트를 연결하거나 뒷면에서 컬럼을 선택하세요.'
+                  : '이 행에 연결된 노트가 없습니다. DB 행에 노트를 연결하거나 뒷면에서 컬럼을 선택하세요.',
+              }
+            : {}),
         });
+      }
       if (offset + page.rows.length >= page.total) break;
     }
   }
@@ -107,6 +135,27 @@ export function sources(api: Api, config: Config): Source[] {
     });
   }
   return result;
+}
+
+// Read only the cards being displayed or sent, within the SDK's host-call budget.
+export function withNoteBody(api: Api, source: Source): Source {
+  if (!source.bodyNoteId) return source;
+  let body = api.call<Note>('note.read', { id: source.bodyNoteId }).body;
+  const opening = /^(?:\uFEFF)?---[ \t]*\r?\n/.exec(body);
+  if (opening) {
+    const closing = /\n---[ \t]*(?:\r?\n|(?![\s\S]))/g;
+    closing.lastIndex = opening[0].length - 1;
+    const match = closing.exec(body);
+    if (match) body = body.slice(match.index + match[0].length);
+  }
+  const back = clean(body);
+  return {
+    ...source,
+    back,
+    ...(!back
+      ? { problem: '연결된 노트 본문이 비어 있습니다. 본문을 입력하거나 뒷면에서 컬럼을 선택하세요.' }
+      : {}),
+  };
 }
 export const html = (text: string) =>
   text

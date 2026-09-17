@@ -33,18 +33,18 @@ fn quote(name: &str) -> String {
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Column {
-    name: String,
-    property_id: Option<String>,
+pub(crate) struct Column {
+    pub name: String,
+    pub property_id: Option<String>,
     #[serde(rename = "type")]
     kind: String,
 }
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Table {
-    database_id: String,
-    name: String,
-    columns: Vec<Column>,
+pub(crate) struct Table {
+    pub database_id: String,
+    pub name: String,
+    pub columns: Vec<Column>,
     sql: String,
 }
 
@@ -86,7 +86,7 @@ fn names(items: &[(&str, &str)], reserved: &[&str]) -> Vec<String> {
         .collect()
 }
 
-fn tables(databases: &[Database]) -> Vec<Table> {
+pub(crate) fn tables(databases: &[Database]) -> Vec<Table> {
     let labels: Vec<_> = databases
         .iter()
         .map(|db| (db.name.as_str(), db.id.as_str()))

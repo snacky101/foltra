@@ -2,6 +2,7 @@ import { EditorSelection, EditorState } from '@codemirror/state';
 import { markdown, insertNewlineContinueMarkup } from '@codemirror/lang-markdown';
 import { GFM } from '@lezer/markdown';
 import { syntaxTree } from '@codemirror/language';
+import { history, undo } from '@codemirror/commands';
 import { expect, test } from 'vitest';
 import { continueMarkdownList, deleteMarkdownMarkupBackward } from './markdownEditing';
 import { markdownListLayout, separateListParagraphs } from './markdownListLayout';
@@ -125,6 +126,9 @@ test('Backspace preserves text in a nonempty item and leaves code and selections
   expect(s.doc.toString()).toBe('- First\n  Second');
   for (const s of [
     state('```\n- '),
+    state('-     [b]'),
+    state('-     [/] '),
+    state('-     [x] '),
     state('Plain text'),
     state('- ').update({ selection: EditorSelection.range(0, 2) }).state,
   ]) {
@@ -163,4 +167,88 @@ test('splitting a loose item preserves its trailing text and positions the curso
   });
   expect(s.doc.toString()).toBe('- First\n\n- English\n- bullet');
   expect(s.selection.main.head).toBe(s.doc.toString().indexOf('bullet'));
+});
+
+test.each([
+  ['- [x] First\n- [/] Working', '- [x] First\n- [/] Working\n- [ ] '],
+  ['- Parent\n  - [b] Child', '- Parent\n  - [b] Child\n  - [ ] '],
+  ['> - [!] Important', '> - [!] Important\n> - [ ] '],
+  ['- [b] Parent\n  - [/] Child', '- [b] Parent\n  - [/] Child\n  - [ ] '],
+  ['- [/] ', ''],
+  ['- [b]', ''],
+  ['- [ ]', ''],
+  ['- [x]', ''],
+  ['- [x] First\n- [/] ', '- [x] First\n'],
+  ['- Parent\n  - Child\n  - [/] ', '- Parent\n  - Child\n- '],
+  ['> - First\n> - [?]', '> - First\n> '],
+])('Enter preserves custom task states and exits empty tasks on the same line: %s', (before, after) => {
+  let s = state(before);
+  let dispatched = 0;
+  expect(
+    continueMarkdownList({
+      state: s,
+      dispatch: (tr) => {
+        s = tr.state;
+        dispatched++;
+      },
+    }),
+  ).toBe(true);
+  expect(s.doc.toString()).toBe(after);
+  expect(s.selection.main.head).toBe(after.length);
+  expect(dispatched).toBe(1);
+});
+
+test.each(['- [/] ', '- [b]', '- [ ]', '- [x]', '> - [!]'])(
+  'Backspace exits an empty task without inserting a new row: %s',
+  (before) => {
+    let s = state(before);
+    expect(
+      deleteMarkdownMarkupBackward({
+        state: s,
+        dispatch: (tr) => {
+          s = tr.state;
+        },
+      }),
+    ).toBe(true);
+    expect(s.doc.toString()).toBe(before.startsWith('>') ? '> ' : '');
+  },
+);
+
+test('custom-task continuation is a single undoable edit and preserves text after the caret', () => {
+  const before = '- [x] First\n- [/] Working tail';
+  const target = {
+    state: EditorState.create({
+      doc: before,
+      selection: { anchor: before.indexOf('tail') },
+      extensions: [markdown({ extensions: [GFM] }), history()],
+    }),
+    dispatch(tr: { state: EditorState }) {
+      target.state = tr.state;
+    },
+  };
+  expect(continueMarkdownList(target)).toBe(true);
+  expect(target.state.doc.toString()).toBe('- [x] First\n- [/] Working\n- [ ] tail');
+  expect(target.state.selection.main.head).toBe(target.state.doc.toString().indexOf('tail'));
+  expect(undo(target)).toBe(true);
+  expect(target.state.doc.toString()).toBe(before);
+  expect(target.state.selection.main.head).toBe(before.indexOf('tail'));
+});
+
+test('custom tasks continue together for multiple cursors without exposing normalized markers', () => {
+  const before = '- [/] one\n- [b] two';
+  let s = EditorState.create({
+    doc: before,
+    selection: EditorSelection.create([EditorSelection.cursor(9), EditorSelection.cursor(before.length)]),
+    extensions: [markdown({ extensions: [GFM] }), EditorState.allowMultipleSelections.of(true)],
+  });
+  expect(
+    continueMarkdownList({
+      state: s,
+      dispatch: (tr) => {
+        s = tr.state;
+      },
+    }),
+  ).toBe(true);
+  expect(s.doc.toString()).toBe('- [/] one\n- [ ] \n- [b] two\n- [ ] ');
+  expect(s.selection.ranges).toHaveLength(2);
 });

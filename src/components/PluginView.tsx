@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Puzzle, RefreshCw } from 'lucide-react';
 import { Select } from './Select';
+import { PluginCalendar } from './PluginCalendar';
 import type { PluginNode } from '../lib/pluginTypes';
 type Action = (id: string, value?: string | boolean, payload?: unknown) => Promise<void>;
 function PluginInput({ node, action }: { node: PluginNode; action: Action }) {
@@ -31,7 +32,7 @@ function PluginInput({ node, action }: { node: PluginNode; action: Action }) {
         onChange={(e) => setValue(e.target.value)}
         onBlur={commit}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+          if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229) {
             e.preventDefault();
             commit();
           }
@@ -109,6 +110,7 @@ function PluginChoice({ node, action }: { node: PluginNode; action: Action }) {
   );
 }
 function Node({ node, action }: { node: PluginNode; action: Action }) {
+  if (node.type === 'calendar') return <PluginCalendar node={node} action={action} />;
   if (node.type === 'text') return <p className={`plugin-text ${node.tone ?? ''}`}>{node.text}</p>;
   if (node.type === 'heading') return <h2 className="plugin-heading">{node.text}</h2>;
   if (node.type === 'button') return <PluginButton node={node} action={action} />;

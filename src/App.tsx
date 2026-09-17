@@ -1,6 +1,7 @@
 import { TagNavigation } from './lib/tagNavigation';
 import { usePlugins } from './lib/usePlugins';
 import { PluginView } from './components/PluginView';
+import { PluginSidebarViews } from './components/PluginSidebarViews';
 import { useSettingsNavigation, settingsGroups, type SettingsGroup } from './lib/settingsNavigation';
 import { leaderLabel } from './lib/leaderKey';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,7 +31,7 @@ import { applyTheme } from './lib/theme';
 import { defaultNoteListOptions } from './lib/noteList';
 import { defaultTopicOptions } from './lib/useTopics';
 import { runNoteCommand, type NoteCommand } from './lib/noteCommands';
-import type { Note, Row, Settings, View, Query, Folder } from './lib/types';
+import type { Note, Row, Settings, View, Query, Folder, Database, Property } from './lib/types';
 import { Welcome } from './components/Welcome';
 import { VaultPicker } from './components/VaultPicker';
 import { Sidebar } from './components/Sidebar';
@@ -103,7 +104,7 @@ export default function App() {
   const commandLineHost = useRef<HTMLDivElement>(null);
   const selectedVault = useRef('');
   const pendingInsert = useRef<string | null>(null);
-  const pendingFrontmatter = useRef(false);
+  const pendingFrontmatter = useRef<{ action: 'edit' | 'add'; noteId: string; vault: string } | null>(null);
   const pendingLine = useRef<number | null>(null);
   const pendingLocation = useRef<EditorLocation | null>(null);
   const pendingEditorFocus = useRef(true);
@@ -169,8 +170,12 @@ export default function App() {
       pendingLocation.current = null;
     }
     if (pendingFrontmatter.current && editor.current) {
-      pendingFrontmatter.current = false;
-      editor.current.editFrontmatter();
+      const pending = pendingFrontmatter.current;
+      pendingFrontmatter.current = null;
+      if (pending.noteId === noteId && pending.vault === vault.path) {
+        if (pending.action === 'add') editor.current.addFrontmatterProperty();
+        else editor.current.editFrontmatter();
+      }
     }
   };
   useEffect(() => {
@@ -189,7 +194,7 @@ export default function App() {
   }, [preview, settingsNavigation.opened, note.status, note.note?.id, noteId, view]);
   const openNote = async (id: string, line?: number) => {
     if (returning.current) return;
-    pendingFrontmatter.current = false;
+    pendingFrontmatter.current = null;
     if (!(await note.save())) return;
     pendingEditorFocus.current = !preview || !!line;
     if (noteId && (id !== noteId || line)) {
@@ -244,6 +249,10 @@ export default function App() {
     }
   };
   const openLink = useOpenWikiLink(vault.path, workspace, note.save, vault.refresh, openNote, onError);
+  const editProperty = async (database: Database, property: Property) => {
+    if (!(await note.save()) || selectedVault.current !== vault.path) return;
+    setDialog({ kind: 'property-edit', database, property });
+  };
   const openBody = (row: Row) => {
     if (row.bodyNoteId && workspace?.notes.some((n) => n.id === row.bodyNoteId))
       void openNote(row.bodyNoteId);
@@ -347,6 +356,14 @@ export default function App() {
       if (mode !== 'read') requestAnimationFrame(editorReady);
     } else pendingEditorFocus.current = false;
   };
+  const openFrontmatter = async (action: 'edit' | 'add') => {
+    if (!noteId) return;
+    if (workspace?.settings.editorMode !== 'live' && !(await updateSettings({ editorMode: 'live' }))) return;
+    if (selectedVault.current !== vault.path || note.currentNote()?.id !== noteId) return;
+    pendingFrontmatter.current = { action, noteId, vault: vault.path };
+    setView('notes');
+    requestAnimationFrame(editorReady);
+  };
   const plugins = usePlugins({
     visible: workView === 'plugin' && !settingsNavigation.opened,
     workspace,
@@ -356,6 +373,10 @@ export default function App() {
     refresh: vault.refresh,
     openNote,
     openView: () => setView('plugin'),
+    openSidebar: () => {
+      setBacklinks(true);
+      setView('notes');
+    },
     onError,
     notify: setToast,
   });
@@ -375,16 +396,12 @@ export default function App() {
     'note.mode.source': () => changeEditorMode('source'),
     'note.mode.read': () => changeEditorMode('read'),
     'note.link': () => setDialog({ kind: 'link' }),
-    'note.frontmatter.edit': async () => {
-      if (!noteId) return;
-      if (
-        (await updateSettings({ editorMode: 'live' })) &&
-        selectedVault.current === vault.path &&
-        note.currentNote()?.id === noteId
-      ) {
-        pendingFrontmatter.current = true;
-        setView('notes');
-        requestAnimationFrame(editorReady);
+    'note.frontmatter.edit': () => openFrontmatter('edit'),
+    'note.frontmatter.add': () => openFrontmatter('add'),
+    'note.task.cycle': () => {
+      if (view === 'notes' && !preview && noteId) {
+        if (palette) editor.current?.focus();
+        editor.current?.cycleTask();
       }
     },
     'note.follow-link': () => editor.current?.followLink(),
@@ -440,8 +457,19 @@ export default function App() {
       const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-property-id]')
         ?.dataset.propertyId;
       const property =
+        database?.properties.find((p) => p.id === id) ??
+        database?.properties.find((p) => p.id === 'title') ??
+        database?.properties[0];
+      if (database && property) return editProperty(database, property);
+    },
+    'database.property.delete': () => {
+      const database = workspace?.databases.find((db) => db.id === databaseId);
+      const id = (document.activeElement as HTMLElement | null)?.closest<HTMLElement>('[data-property-id]')
+        ?.dataset.propertyId;
+      const property =
         database?.properties.find((p) => p.id === id) ?? database?.properties.find((p) => p.id !== 'title');
-      if (database && property) setDialog({ kind: 'property-edit', database, property });
+      if (database && property && property.id !== 'title' && database.properties.length > 1)
+        setDialog({ kind: 'property-delete', database, property });
     },
     'record.create': newRow,
     'view.notes': () => navigate('all-notes'),
@@ -519,7 +547,7 @@ export default function App() {
     setDatabaseId(null);
     setHistory({ back: [], forward: [] });
     pendingLocation.current = null;
-    pendingFrontmatter.current = false;
+    pendingFrontmatter.current = null;
     setNoteListOptions(defaultNoteListOptions);
     setTopicOptions((current) => ({ ...defaultTopicOptions, showSources: current.showSources }));
     setQuery(undefined);
@@ -685,6 +713,19 @@ export default function App() {
                   </button>
                 </>
               )}
+              {!settingsNavigation.opened &&
+                view === 'notes' &&
+                !noteId &&
+                plugins.sidebarViews.length > 0 && (
+                  <button
+                    className="icon-button"
+                    aria-label="백링크 패널"
+                    aria-expanded={backlinks}
+                    onClick={() => dispatch('backlinks.open')}
+                  >
+                    <PanelRight size={17} />
+                  </button>
+                )}
             </div>
           </header>
           {vault.error && (
@@ -719,6 +760,16 @@ export default function App() {
                   note={note}
                   preview={preview}
                   backlinks={backlinks}
+                  sidebar={
+                    plugins.sidebarViews.length ? (
+                      <PluginSidebarViews
+                        views={plugins.sidebarViews}
+                        revision={plugins.sidebarRevision}
+                        invoke={plugins.invokeSidebar}
+                        errors={plugins.errors}
+                      />
+                    ) : undefined
+                  }
                   editor={editor}
                   dispatch={dispatch}
                   openNote={openNote}
@@ -742,8 +793,9 @@ export default function App() {
                     refresh={vault.refresh}
                     openBody={openBody}
                     addProperty={() => setDialog({ kind: 'property', database: activeDatabase })}
-                    editProperty={(property) =>
-                      setDialog({ kind: 'property-edit', database: activeDatabase, property })
+                    editProperty={(property) => void editProperty(activeDatabase, property).catch(onError)}
+                    deleteProperty={(property) =>
+                      setDialog({ kind: 'property-delete', database: activeDatabase, property })
                     }
                     onError={onError}
                     initialQuery={query}
@@ -773,6 +825,7 @@ export default function App() {
                   key={workspace.vault.id}
                   workspace={workspace}
                   options={topicOptions}
+                  updateSettings={updateSettings}
                   toggleSources={() => dispatch('topics.sources.toggle')}
                   onChange={setTopicOptions}
                   openNote={(id, line) => void openNote(id, line)}

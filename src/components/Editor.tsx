@@ -1,4 +1,6 @@
 import { editorHighlightStyle } from '../lib/codeHighlighting';
+import { fontFamilyStack } from '../lib/fontFamily';
+import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { TagNavigation } from '../lib/tagNavigation';
 import { pluginEditorSnapshot, applyPluginEditorEdit } from '../lib/pluginEditor';
@@ -11,6 +13,7 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { yamlFrontmatter } from '@codemirror/lang-yaml';
 import { frontmatterRange } from '../lib/frontmatter';
+import { addFrontmatterProperty, frontmatterPanelState } from '../lib/livePreviewFrontmatter';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { vim, getCM } from '@replit/codemirror-vim';
 import { codeLanguage } from '../lib/codeLanguages';
@@ -25,6 +28,7 @@ import { openExternalLink } from '../lib/openExternalLink';
 import { editorCursorExtension, refreshEditorCursor } from '../lib/editorCursor';
 import { editorLineNumbers } from '../lib/lineNumbers';
 import { markdownEditing } from '../lib/markdownEditing';
+import { cycleMarkdownTask } from '../lib/markdownTasks';
 import { imagePasteExtension } from '../lib/imagePaste';
 import {
   captureEditorLocation,
@@ -53,6 +57,8 @@ export interface EditorHandle {
   focus: () => void;
   insert: (text: string) => void;
   editFrontmatter: () => void;
+  addFrontmatterProperty: () => void;
+  cycleTask: () => void;
   jump: (line: number) => void;
   followLink: (createIfMissing?: boolean) => void;
   getLocation: () => EditorLocation | null;
@@ -128,6 +134,14 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       editor.dispatch({ selection: { anchor: editor.state.doc.line(2).from }, scrollIntoView: true });
       editor.focus();
     },
+    addFrontmatterProperty: () => {
+      if (view.current) addFrontmatterProperty(view.current);
+    },
+    cycleTask: () => {
+      const editor = view.current;
+      if (!editor || !editor.hasFocus || latest.current.hidden || editor.compositionStarted) return;
+      if (cycleMarkdownTask(editor)) editor.focus();
+    },
     jump: (number) => {
       const editor = view.current;
       if (!editor) return;
@@ -147,6 +161,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           vimConfig.current.of(latest.current.vimEnabled ? vim() : []),
           panels({ bottomContainer: latest.current.commandLineHost.current ?? undefined }),
           history(),
+          frontmatterPanelState,
           drawSelection(),
           cursorConfig.current.of(editorCursorExtension(latest.current.workspace.settings)),
           lineNumberConfig.current.of(editorLineNumbers(latest.current.workspace.settings.lineNumbers)),
@@ -212,7 +227,11 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           }),
           EditorView.theme({
             '&': { background: 'transparent', fontSize: '16px' },
-            '.cm-content': { fontFamily: 'var(--body-font)', lineHeight: '1.95', padding: '16px 0 160px' },
+            '.cm-content': {
+              fontFamily: 'var(--editor-font-family, var(--body-font))',
+              lineHeight: '1.95',
+              padding: '16px 0 160px',
+            },
             '.cm-line': { padding: '0' },
             '.cm-scroller': { overflow: 'visible' },
             '.cm-focused': { outline: 'none' },
@@ -297,6 +316,9 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       effects: lineNumberConfig.current.reconfigure(editorLineNumbers(props.workspace.settings.lineNumbers)),
     });
   }, [props.workspace.settings.lineNumbers]);
+  useLayoutEffect(() => {
+    view.current?.requestMeasure();
+  }, [props.workspace.settings.editorFontFamily]);
   useEffect(() => {
     view.current?.dispatch({
       effects: cursorConfig.current.reconfigure(editorCursorExtension(props.workspace.settings)),
@@ -339,5 +361,15 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
     if (!cm || !props.vimEnabled) return;
     return bindVimKeybindings(cm, latest.current.vimBindings, (id) => latest.current.onCommand(id));
   }, [props.vimEnabled, vimBindingKey]);
-  return <div className="editor" ref={parent} />;
+  return (
+    <div
+      className="editor"
+      ref={parent}
+      style={
+        {
+          '--editor-font-family': fontFamilyStack(props.workspace.settings.editorFontFamily),
+        } as CSSProperties
+      }
+    />
+  );
 });

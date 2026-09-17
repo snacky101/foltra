@@ -1,5 +1,6 @@
 import { EditorSelection, EditorState } from '@codemirror/state';
 import { markdown } from '@codemirror/lang-markdown';
+import { yamlFrontmatter } from '@codemirror/lang-yaml';
 import { GFM } from '@lezer/markdown';
 import { gutterLineClass } from '@codemirror/view';
 import { expect, test } from 'vitest';
@@ -162,6 +163,105 @@ test('setext underline remains editable with the heading and collapses when inac
   const editing = s.update({ selection: { anchor: 2 } }).state;
   expect(collapsedLines(editing)).toEqual([]);
   expect(editing.doc.toString()).toBe(s.doc.toString());
+});
+
+function headingLines(s: EditorState, focused = true) {
+  const result: { line: number; level: string }[] = [];
+  livePreviewDecorations(s, { workspace, openNote() {}, openLink() {} }, focused).between(
+    0,
+    s.doc.length,
+    (from, _to, decoration) => {
+      const level = decoration.spec.class?.match(/\bcm-live-h([1-6])\b/)?.[1];
+      if (level) result.push({ line: s.doc.lineAt(from).number, level });
+    },
+  );
+  return result;
+}
+
+test.each([
+  ['===', '1'],
+  ['---', '2'],
+])(
+  'multiline Setext %s styles all heading text but excludes its underline and following paragraph',
+  (marker, level) => {
+    const doc = `First line\nSecond line\nThird line\n${marker}\n\nOrdinary paragraph`;
+    const s = state(doc);
+    expect(headingLines(s)).toEqual([
+      { line: 1, level },
+      { line: 2, level },
+      { line: 3, level },
+    ]);
+    expect(collapsedLines(s)).toEqual([4]);
+    expect(s.doc.toString()).toBe(doc);
+  },
+);
+
+test('multiline heading typography is stable for active lines, underline editing and multiline selection', () => {
+  const original = state('First line\nSecond line\n---\n\nAfter');
+  const expected = [
+    { line: 1, level: '2' },
+    { line: 2, level: '2' },
+  ];
+  for (const selection of [
+    EditorSelection.cursor(2),
+    EditorSelection.cursor(original.doc.line(2).from + 2),
+    EditorSelection.cursor(original.doc.line(3).from + 1),
+    EditorSelection.range(0, original.doc.line(3).to),
+  ]) {
+    const selected = original.update({ selection }).state;
+    expect(headingLines(selected)).toEqual(expected);
+    expect(headingLines(selected, false)).toEqual(expected);
+    expect(collapsedLines(selected)).toEqual([]);
+    expect(selected.doc.toString()).toBe(original.doc.toString());
+  }
+});
+
+test('multiline Setext headings assign matching gutter height to every text line', () => {
+  for (const [marker, level] of [
+    ['===', '1'],
+    ['---', '2'],
+  ]) {
+    const doc = `First\nSecond\n${marker}\n\nAfter`;
+    const s = EditorState.create({
+      doc,
+      selection: { anchor: doc.length },
+      extensions: [
+        markdown(),
+        livePreviewExtension(() => ({ workspace, openNote() {}, openLink() {} }), true),
+      ],
+    });
+    const headings: { line: number; className: string }[] = [];
+    for (const set of s.facet(gutterLineClass))
+      set.between(0, s.doc.length, (from, _to, gutter) => {
+        if (/^cm-live-gutter-h[1-6]$/.test(gutter.elementClass))
+          headings.push({ line: s.doc.lineAt(from).number, className: gutter.elementClass });
+      });
+    expect(headings).toEqual([
+      { line: 1, className: `cm-live-gutter-h${level}` },
+      { line: 2, className: `cm-live-gutter-h${level}` },
+    ]);
+  }
+});
+
+test('multiline heading styles respect YAML boundaries and nested blockquote contents', () => {
+  const doc = '---\ntitle: Name\n---\n\nFirst\nSecond\n===\n\nAfter';
+  const s = EditorState.create({
+    doc,
+    selection: { anchor: doc.length },
+    extensions: [yamlFrontmatter({ content: markdown({ extensions: [GFM] }) })],
+  });
+  expect(headingLines(s)).toEqual([
+    { line: 5, level: '1' },
+    { line: 6, level: '1' },
+  ]);
+  const quote = state('> First\n> Second\n> ---\n\nAfter');
+  expect(headingLines(quote)).toEqual([
+    { line: 1, level: '2' },
+    { line: 2, level: '2' },
+  ]);
+  const atx = state('## First\nSecond\n\nAfter');
+  expect(headingLines(atx)).toEqual([{ line: 1, level: '2' }]);
+  expect(s.doc.toString()).toBe(doc);
 });
 
 test('selected blank lines are exposed across multiline selections', () => {

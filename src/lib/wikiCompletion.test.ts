@@ -130,3 +130,47 @@ test('duplicate and reserved titles insert unambiguous IDs while preserving user
     '[[one|Same]]',
   );
 });
+
+test('large-vault completion bounds title resolution work to the visible result limit', () => {
+  let titleReads = 0;
+  const notes = Array.from({ length: 1000 }, (_, index) => ({
+    id: `note-${index}`,
+    get title() {
+      titleReads++;
+      return `Note ${String(index).padStart(4, '0')}`;
+    },
+  }));
+  const result = completions('[[', { ...workspace, notes, links: [] } as unknown as Workspace)!;
+  expect(result.options).toHaveLength(100);
+  // Avoid a flaky wall-clock threshold while catching whole-vault quadratic scans.
+  expect(titleReads).toBeLessThan(300_000);
+});
+
+test('a duplicate outside the visible result limit still requires an unambiguous ID', () => {
+  const notes = [
+    ...Array.from({ length: 99 }, (_, index) => ({
+      id: `note-${index}`,
+      title: `A ${String(index).padStart(2, '0')}`,
+    })),
+    { id: 'duplicate-first', title: 'Z duplicate' },
+    { id: 'duplicate-last', title: 'Z duplicate' },
+  ];
+  const result = completions('[[', { ...workspace, notes, links: [] } as unknown as Workspace)!;
+  expect(result.options).toHaveLength(100);
+  const last = result.options[99];
+  expect(last.detail).toBe('Vault · duplicat');
+  let inserted = '';
+  const before = state('[[');
+  (last.apply as Function)(
+    {
+      state: before,
+      dispatch: (transaction: any) => {
+        inserted = before.update(transaction).state.doc.toString();
+      },
+    },
+    last,
+    2,
+    2,
+  );
+  expect(inserted).toBe('[[duplicate-first|Z duplicate]]');
+});

@@ -49,6 +49,10 @@ export interface Settings {
   vim: boolean;
   editorMode: 'live' | 'source' | 'read';
   lineNumbers: 'none' | 'absolute' | 'relative';
+  databaseFontSize: number;
+  editorFontFamily: string;
+  databaseFontFamily: string;
+  topicFolders: { include: string[]; exclude: string[] };
   cursorShape: 'bar' | 'block' | 'underline';
   cursorFollowVim: boolean;
   cursorBlink: 'steady' | 'blink' | 'breath';

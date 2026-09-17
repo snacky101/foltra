@@ -39,3 +39,30 @@ fn legacy_shortcut_labels_keep_their_behavior_and_new_settings_preserve_case() {
         );
     }
 }
+
+#[test]
+fn semicolon_shortcuts_preserve_shift_and_existing_bindings_when_saved() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    execute(path, "vault.init", json!({"name":"Semicolon shortcuts"})).unwrap();
+    let bindings = json!({
+        "note.properties": [
+            {"keys":"Mod+;","leader":false},
+            {"keys":"Mod+Shift+;","leader":false}
+        ],
+        "focus.left": [{"keys":"Ctrl+h","leader":false}],
+        "focus.right": [{"keys":"Ctrl+H","leader":false}],
+        "note.rename": [{"keys":"F2","leader":false},{"keys":"rn","leader":true}]
+    });
+    let saved = execute(path, "settings.update", json!({"keybindings":bindings})).unwrap();
+    assert_eq!(saved["keybindings"], bindings);
+    assert_eq!(
+        execute(path, "settings.get", json!({})).unwrap()["keybindings"],
+        bindings
+    );
+    let stored: serde_json::Value = serde_json::from_str(
+        &std::fs::read_to_string(dir.path().join(".foltra/settings.json")).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(stored["keybindings"], bindings);
+}

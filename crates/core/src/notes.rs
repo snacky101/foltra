@@ -6,6 +6,32 @@ pub(crate) fn note_path(note_id: &str) -> Result<String> {
     Ok(format!("notes/{}.md", id(note_id)?))
 }
 
+// For structural edits that only change body source (for example SQL identifiers), preserve
+// the managed metadata and do not run title/wiki-link normalization as a side effect.
+pub(crate) fn plan_body_replacement(
+    store: &Store,
+    note: &Note,
+) -> Result<(String, Option<String>)> {
+    let path = note_path(&note.meta.id)?;
+    let raw = store.read(&path)?;
+    check_revision(&note.revision, &crate::storage::revision(&raw))?;
+    let (header, _) = raw
+        .strip_prefix("---\n")
+        .and_then(|rest| rest.split_once("\n---\n"))
+        .ok_or_else(|| Error::new("invalid_note", "Invalid note metadata"))?;
+    let mut metadata: Value = serde_json::from_str(header)?;
+    metadata["updatedAt"] = json!(note.meta.updated_at);
+    let content = format!(
+        "---\n{}\n---\n\n{}",
+        serde_json::to_string(&metadata)?,
+        note.body
+    );
+    if content.len() > 16 * 1024 * 1024 {
+        return Err(Error::new("file_too_large", "Note exceeds 16 MiB"));
+    }
+    Ok((path, Some(content)))
+}
+
 pub fn read_note(store: &Store, note_id: &str) -> Result<Note> {
     let note = Note::parse(&store.read(&note_path(note_id)?)?)?;
     if note.meta.id != note_id {

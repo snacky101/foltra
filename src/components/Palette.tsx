@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Search, ArrowUpRight } from 'lucide-react';
 import { leaderLabel } from '../lib/leaderKey';
 import { Modal } from './Modal';
@@ -22,6 +22,7 @@ export function Palette({
 }) {
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState(0);
+  const list = useRef<HTMLDivElement>(null);
   const filtered = commands.filter((c) => `${c.title} ${c.id}`.toLowerCase().includes(query.toLowerCase()));
   const matchingNotes = notes.filter((n) => n.title.toLowerCase().includes(query.toLowerCase())).slice(0, 8);
   const results = [
@@ -40,6 +41,9 @@ export function Palette({
       action: () => openNote(note.id),
     })),
   ].slice(0, 30);
+  useEffect(() => {
+    list.current?.querySelector('.selected')?.scrollIntoView({ block: 'nearest' });
+  }, [selected, query]);
   return (
     <Modal title="어디로 이어갈까요?" close={close} className="palette">
       <div className="palette-search">
@@ -53,10 +57,10 @@ export function Palette({
             setSelected(0);
           }}
           onKeyDown={(e) => {
-            if (e.nativeEvent.isComposing) return;
+            if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
             if (e.key === 'ArrowDown') {
               e.preventDefault();
-              setSelected((s) => Math.min(s + 1, results.length - 1));
+              setSelected((s) => Math.max(0, Math.min(s + 1, results.length - 1)));
             }
             if (e.key === 'ArrowUp') {
               e.preventDefault();
@@ -70,12 +74,12 @@ export function Palette({
         />
         <kbd>esc</kbd>
       </div>
-      <div className="palette-results">
+      <div ref={list} className="palette-results">
         {results.map((result, index) => (
           <button
             key={result.id}
             className={index === selected ? 'selected' : ''}
-            onMouseEnter={() => setSelected(index)}
+            onMouseMove={() => setSelected(index)}
             onClick={result.action}
           >
             <ArrowUpRight size={16} />

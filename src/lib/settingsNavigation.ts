@@ -2,6 +2,7 @@ import { useLayoutEffect, useRef, useState } from 'react';
 
 export const settingsGroups = [
   { id: 'editor', title: '편집기', description: '노트를 읽고 쓰는 방식을 설정합니다.' },
+  { id: 'database', title: '데이터베이스', description: '데이터를 편안하게 읽을 수 있도록 설정합니다.' },
   { id: 'cursor', title: '커서', description: '커서의 모양과 움직임을 설정합니다.' },
   { id: 'keyboard', title: 'Vim 및 단축키', description: '익숙한 키로 나만의 작업 흐름을 만드세요.' },
   { id: 'theme', title: '테마', description: '오래 머물기 편안한 색을 선택하세요.' },

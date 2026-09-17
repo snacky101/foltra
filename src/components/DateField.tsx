@@ -64,6 +64,7 @@ export function DateField({
         if (!root.current?.contains(e.relatedTarget)) setOpen(false);
       }}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
         if (e.key === 'Escape' && open) {
           e.preventDefault();
           e.stopPropagation();
@@ -84,7 +85,8 @@ export function DateField({
         onFocus={onFocus}
         onBlur={() => onCommit(value)}
         onKeyDown={(e) => {
-          if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+          if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
+          if (e.key === 'Enter') {
             e.preventDefault();
             e.currentTarget.blur();
           }

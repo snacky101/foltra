@@ -1,6 +1,6 @@
 use crate::{notes, storage::Store, text, wiki::resolve_note, Error, Note, Result};
 use pulldown_cmark::{Event, LinkType, Tag, TagEnd};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::{
     collections::{BTreeMap, BTreeSet},
@@ -32,6 +32,42 @@ struct Index {
     notes: Vec<Note>,
     topics: BTreeMap<String, Topic>,
     blocks: Vec<Block>,
+    visible_notes: Vec<bool>,
+    filter_revision: String,
+}
+
+#[derive(Default, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+struct FolderFilter {
+    include: Vec<String>,
+    exclude: Vec<String>,
+}
+
+fn parse_folder_filter(value: &Value) -> Result<FolderFilter> {
+    let mut filter: FolderFilter = serde_json::from_value(value.clone()).map_err(|_| {
+        Error::new(
+            "invalid_arguments",
+            "Folder filters require include and exclude arrays",
+        )
+    })?;
+    for ids in [&mut filter.include, &mut filter.exclude] {
+        if ids.len() > 1000 {
+            return Err(Error::new(
+                "query_limit",
+                "At most 1000 folder IDs per filter",
+            ));
+        }
+        for id in ids.iter().filter(|id| !id.is_empty()) {
+            crate::id(id)?;
+        }
+        ids.sort();
+        ids.dedup();
+    }
+    Ok(filter)
+}
+
+pub(crate) fn validate_folder_filter(value: &Value) -> Result<()> {
+    parse_folder_filter(value).map(|_| ())
 }
 
 fn columns(text: &str) -> usize {
@@ -39,8 +75,46 @@ fn columns(text: &str) -> usize {
         .fold(0, |col, ch| col + if ch == '\t' { 4 - col % 4 } else { 1 })
 }
 
-fn index(store: &Store) -> Result<Index> {
+fn index(store: &Store, args: &Value) -> Result<Index> {
     let notes = notes::notes(store)?;
+    let filter = args
+        .get("folders")
+        .map(parse_folder_filter)
+        .transpose()?
+        .unwrap_or_default();
+    let folders = if filter.include.is_empty() && filter.exclude.is_empty() {
+        vec![]
+    } else {
+        crate::folders::folders(store)?
+    };
+    let parents: BTreeMap<_, _> = folders
+        .iter()
+        .map(|folder| (folder.id.as_str(), folder.parent_id.as_deref()))
+        .collect();
+    let selected = |ids: &[String], note: &Note| {
+        let Some(mut id) = note.meta.folder_id.as_deref() else {
+            return ids.iter().any(String::is_empty);
+        };
+        while let Some(parent) = parents.get(id) {
+            if ids
+                .binary_search_by(|candidate| candidate.as_str().cmp(id))
+                .is_ok()
+            {
+                return true;
+            }
+            let Some(parent) = parent else { break };
+            id = parent;
+        }
+        false
+    };
+    let visible_notes: Vec<_> = notes
+        .iter()
+        .map(|note| {
+            (filter.include.is_empty() || selected(&filter.include, note))
+                && !selected(&filter.exclude, note)
+        })
+        .collect();
+    let filter_revision = crate::storage::revision(&serde_json::to_string(&(&filter, &parents))?);
     let mut topics = BTreeMap::new();
     let mut sources: BTreeMap<String, BTreeSet<usize>> = BTreeMap::new();
     let mut blocks = Vec::new();
@@ -166,15 +240,17 @@ fn index(store: &Store) -> Result<Index> {
                         .and_then(|s| s.split_once('|'))
                         .map(|(_, label)| label)
                         .filter(|s| !s.is_empty());
-                    topics.entry(id.clone()).or_insert_with(|| Topic {
-                        id: id.clone(),
-                        title: resolved.map(|n| n.meta.title.clone()).unwrap_or_else(|| {
-                            if is_id { label.unwrap_or(name) } else { name }.into()
-                        }),
-                        note_id: resolved.map(|n| n.meta.id.clone()),
-                        block_count: 0,
-                        note_count: 0,
-                    });
+                    if visible_notes[note_index] {
+                        topics.entry(id.clone()).or_insert_with(|| Topic {
+                            id: id.clone(),
+                            title: resolved.map(|n| n.meta.title.clone()).unwrap_or_else(|| {
+                                if is_id { label.unwrap_or(name) } else { name }.into()
+                            }),
+                            note_id: resolved.map(|n| n.meta.id.clone()),
+                            block_count: 0,
+                            note_count: 0,
+                        });
+                    }
                     source.topics.insert(id);
                 }
                 Event::End(end @ (TagEnd::Item | TagEnd::Paragraph | TagEnd::Heading(_))) => {
@@ -191,9 +267,11 @@ fn index(store: &Store) -> Result<Index> {
                     {
                         let line = line_number(source.range.start);
                         let end = note.body[..source.range.end].trim_end().len();
-                        for id in &source.topics {
-                            topics.get_mut(id).unwrap().block_count += 1;
-                            sources.entry(id.clone()).or_default().insert(note_index);
+                        if visible_notes[note_index] {
+                            for id in &source.topics {
+                                topics.get_mut(id).unwrap().block_count += 1;
+                                sources.entry(id.clone()).or_default().insert(note_index);
+                            }
                         }
                         blocks.push(Block {
                             note: note_index,
@@ -215,6 +293,8 @@ fn index(store: &Store) -> Result<Index> {
         notes,
         topics,
         blocks,
+        visible_notes,
+        filter_revision,
     })
 }
 
@@ -249,8 +329,8 @@ fn excerpt(source: &str) -> String {
         .join("\n")
 }
 
-pub fn list(store: &Store) -> Result<Value> {
-    let mut topics: Vec<_> = index(store)?.topics.into_values().collect();
+pub fn list(store: &Store, args: &Value) -> Result<Value> {
+    let mut topics: Vec<_> = index(store, args)?.topics.into_values().collect();
     topics.sort_by(|a, b| a.title.cmp(&b.title).then(a.id.cmp(&b.id)));
     Ok(serde_json::to_value(topics)?)
 }
@@ -283,7 +363,7 @@ fn collection(store: &Store, args: &Value) -> Result<Collection> {
     if !["newest", "oldest", "custom"].contains(&sort) {
         return Err(Error::new("invalid_arguments", "Unknown topic sort"));
     }
-    let index = index(store)?;
+    let index = index(store, args)?;
     let mut matching: Vec<_> = index
         .blocks
         .iter()
@@ -316,8 +396,12 @@ fn collection(store: &Store, args: &Value) -> Result<Collection> {
         })
         .collect();
     revision_sources.sort();
-    let revision =
-        crate::storage::revision(&serde_json::to_string(&(topic, revision_sources, saved))?);
+    let revision = crate::storage::revision(&serde_json::to_string(&(
+        topic,
+        revision_sources,
+        saved,
+        &index.filter_revision,
+    ))?);
     let anchors: Vec<_> = matching
         .iter()
         .map(|&i| {
@@ -352,8 +436,16 @@ pub fn blocks(store: &Store, args: &Value) -> Result<Value> {
     }
     let offset = args.get("offset").and_then(Value::as_u64).unwrap_or(0);
     let result = collection(store, args)?;
-    let total = result.matching.len();
-    let page: Vec<_> = result.positions.iter().skip(usize::try_from(offset).unwrap_or(usize::MAX))
+    let positions: Vec<_> = result
+        .positions
+        .iter()
+        .copied()
+        .filter(|&position| {
+            result.index.visible_notes[result.index.blocks[result.matching[position]].note]
+        })
+        .collect();
+    let total = positions.len();
+    let page: Vec<_> = positions.iter().skip(usize::try_from(offset).unwrap_or(usize::MAX))
         .take(limit as usize).map(|&position| {
             let block=&result.index.blocks[result.matching[position]];
             let note = &result.index.notes[block.note];
@@ -379,14 +471,14 @@ pub fn reorder(store: &Store, args: &Value) -> Result<Value> {
             "Use before or after placement",
         ));
     }
-    let source = result
-        .positions
-        .iter()
-        .position(|&i| result.anchors[i].id() == source);
-    let target = result
-        .positions
-        .iter()
-        .position(|&i| result.anchors[i].id() == target);
+    let source = result.positions.iter().position(|&i| {
+        result.index.visible_notes[result.index.blocks[result.matching[i]].note]
+            && result.anchors[i].id() == source
+    });
+    let target = result.positions.iter().position(|&i| {
+        result.index.visible_notes[result.index.blocks[result.matching[i]].note]
+            && result.anchors[i].id() == target
+    });
     let (Some(source), Some(target)) = (source, target) else {
         return Err(Error::new(
             "not_found",

@@ -7,6 +7,7 @@ import { markdown } from '@codemirror/lang-markdown';
 import { yamlFrontmatter } from '@codemirror/lang-yaml';
 import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { focusLivePreview, livePreviewExtension } from './livePreview';
+import { addFrontmatterProperty, frontmatterPanelState } from './livePreviewFrontmatter';
 import type { Workspace } from './types';
 
 const body = '---\nstatus: draft\ncount: 3\n---\n\nPreserve body';
@@ -37,6 +38,7 @@ beforeEach(async () => {
         extensions: [
           yamlFrontmatter({ content: markdown() }),
           history(),
+          frontmatterPanelState,
           livePreviewExtension(() => context, true),
         ],
       }),
@@ -98,4 +100,96 @@ test('typing in the body retains the property widget DOM and its field focus sta
   await act(async () => view.dispatch({ changes: { from: body.length, insert: ' extra' } }));
   expect(document.querySelector('.frontmatter-panel')).toBe(panel);
   expect(view.state.doc.toString()).toBe(body + ' extra');
+});
+
+test('property addition opens the name field from YAML source without changing existing values or body', async () => {
+  await act(async () => view.dispatch({ selection: { anchor: 4 } }));
+  expect(document.querySelector('.frontmatter-panel')).toBeNull();
+  await act(async () => addFrontmatterProperty(view));
+  const name = document.querySelector<HTMLInputElement>('[aria-label="새 속성 이름"]');
+  expect(name).not.toBeNull();
+  expect(document.activeElement).toBe(name);
+  expect(view.state.doc.toString()).toBe(body);
+  expect(view.state.field(frontmatterPanelState).add).toBe(false);
+  await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="YAML 원문 편집"]')!.click());
+  expect(view.state.selection.main.head).toBe(4);
+  expect(document.querySelector('.frontmatter-panel')).toBeNull();
+});
+
+test('repeating the property command focuses the existing name input and preserves the unfinished draft', async () => {
+  await act(async () => addFrontmatterProperty(view));
+  const name = document.querySelector<HTMLInputElement>('[aria-label="새 속성 이름"]')!;
+  const value = document.querySelector<HTMLInputElement>('[aria-label="새 속성 값"]')!;
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(name, '새 속성');
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    value.focus();
+    Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!.call(
+      value,
+      'unfinished draft',
+    );
+    value.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await act(async () => addFrontmatterProperty(view));
+  expect(document.activeElement).toBe(name);
+  expect(name.value).toBe('새 속성');
+  expect(value.value).toBe('unfinished draft');
+  expect(document.querySelectorAll('[aria-label="새 속성 이름"]')).toHaveLength(1);
+  expect(view.state.doc.toString()).toBe(body);
+});
+
+test.each(['Original body\n  Keep whitespace\n', ''])(
+  'creates an empty header without replacing the original body: %j',
+  async (original) => {
+    await act(async () =>
+      view.dispatch({
+        changes: { from: 0, to: view.state.doc.length, insert: original },
+        selection: { anchor: original.length },
+      }),
+    );
+    await act(async () => addFrontmatterProperty(view));
+    expect(view.state.doc.toString()).toBe('---\n---\n\n' + original);
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('새 속성 이름');
+    await act(async () => {
+      undo(view);
+    });
+    expect(view.state.doc.toString()).toBe(original);
+  },
+);
+
+test('frontmatter-only notes need no extra newline or placeholder value to open the property form', async () => {
+  const original = '---\n# Preserve\nstatus: draft\n---';
+  await act(async () =>
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: original },
+      selection: { anchor: original.length },
+    }),
+  );
+  await act(async () => addFrontmatterProperty(view));
+  expect(document.activeElement?.getAttribute('aria-label')).toBe('새 속성 이름');
+  expect(view.state.doc.toString()).toBe(original);
+});
+
+test('handled requests do not reopen the add form after leaving and revisiting source', async () => {
+  await act(async () => addFrontmatterProperty(view));
+  await act(async () => document.querySelector<HTMLButtonElement>('[aria-label="속성 추가 취소"]')!.click());
+  await act(async () => view.dispatch({ selection: { anchor: 4 } }));
+  await act(async () => view.dispatch({ selection: { anchor: body.length } }));
+  expect(document.querySelector('.frontmatter-panel')).not.toBeNull();
+  expect(document.querySelector('[aria-label="새 속성 이름"]')).toBeNull();
+});
+
+test('malformed YAML keeps its source and error instead of inserting or resetting properties', async () => {
+  const original = '---\nstatus: [unfinished\n---\n\nBody';
+  await act(async () =>
+    view.dispatch({
+      changes: { from: 0, to: view.state.doc.length, insert: original },
+      selection: { anchor: 4 },
+    }),
+  );
+  await act(async () => addFrontmatterProperty(view));
+  expect(view.state.doc.toString()).toBe(original);
+  expect(document.querySelector('[role="alert"]')).not.toBeNull();
+  expect(document.querySelector('[aria-label="새 속성 이름"]')).toBeNull();
+  expect(document.querySelector('[aria-label="YAML 원문 편집"]')).not.toBeNull();
 });

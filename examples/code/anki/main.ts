@@ -1,5 +1,5 @@
 import type { Api, Database, Plugin, ViewNode } from '../../../packages/plugin-sdk';
-import { sources, type Config } from './sources';
+import { sources, withNoteBody, type Config } from './sources';
 import { read, sync, connection, needsSync } from './sync';
 const text = (value: string, tone?: 'muted' | 'danger'): ViewNode => ({ type: 'text', text: value, tone });
 const button = (label: string, action: string, payload?: unknown): ViewNode => ({
@@ -52,11 +52,17 @@ const plugin = {
         const data = read(api).data,
           config = draft(api),
           all = databases(api),
-          db = all.find((d) => d.id === config.database);
+          db = all.find((d) => d.id === config.database),
+          backColumn = db?.properties.find((p) => p.id === config.back);
         let cards: ReturnType<typeof sources> = [],
           problem = '';
         try {
-          if (!settingsOnly) cards = sources(api, data.config);
+          if (!settingsOnly)
+            cards = sources(api, data.config).map((card, index) =>
+              index < 40 || (api.state.review as { key?: string } | undefined)?.key === card.key
+                ? withNoteBody(api, card)
+                : card,
+            );
         } catch (e) {
           problem = String(e);
         }
@@ -109,15 +115,22 @@ const plugin = {
                       db.properties.map((p) => column(p, db)),
                     ),
                     choice(
-                      '뒷면 컬럼',
+                      '뒷면',
                       'back',
-                      column(
-                        db.properties.find((p) => p.id === config.back) ??
-                          db.properties[1] ??
-                          db.properties[0],
-                        db,
-                      ),
-                      db.properties.map((p) => column(p, db)),
+                      config.backSource === 'note'
+                        ? '연결된 노트 본문'
+                        : backColumn
+                          ? `컬럼 · ${column(backColumn, db)}`
+                          : '컬럼 선택',
+                      [
+                        ...(!backColumn && config.backSource === 'column' ? ['컬럼 선택'] : []),
+                        ...db.properties.map((p) => `컬럼 · ${column(p, db)}`),
+                        '연결된 노트 본문',
+                      ],
+                    ),
+                    text(
+                      '뒷면은 선택한 컬럼 또는 연결된 노트 본문 중 하나만 사용합니다. 본문의 첨부 이미지도 전송합니다.',
+                      'muted',
                     ),
                   ]
                 : []),
@@ -172,12 +185,15 @@ const plugin = {
             type: 'card',
             children: [
               text(card.front || '(앞면이 비어 있습니다)'),
-              text(card.back.slice(0, 220) || '(뒷면이 비어 있습니다)', 'muted'),
               text(
-                `${card.label} · ${error ? '확인 필요' : !needsSync(data, card) ? '동기화됨' : '동기화 대기'}`,
+                card.problem || card.back.slice(0, 220) || '(뒷면이 비어 있습니다)',
+                card.problem ? 'danger' : 'muted',
+              ),
+              text(
+                `${card.label} · ${error || card.problem ? '확인 필요' : !needsSync(data, card) ? '동기화됨' : '동기화 대기'}`,
                 'muted',
               ),
-              ...(error ? [text(error.message, 'danger')] : []),
+              ...(error && error.message !== card.problem ? [text(error.message, 'danger')] : []),
               {
                 type: 'row',
                 children: [
@@ -251,9 +267,18 @@ const plugin = {
               config.database = selected?.id ?? '';
               config.front = selected?.properties[0]?.id ?? '';
               config.back = selected?.properties[1]?.id ?? selected?.properties[0]?.id ?? '';
-            } else if ((action.id === 'front' || action.id === 'back') && db)
-              config[action.id] = db.properties.find((p) => column(p, db) === action.value)?.id ?? '';
-            else if (action.id === 'blocks' || action.id === 'auto')
+            } else if (action.id === 'front' && db)
+              config.front = db.properties.find((p) => column(p, db) === action.value)?.id ?? '';
+            else if (action.id === 'back' && db) {
+              if (action.value === '연결된 노트 본문') config.backSource = 'note';
+              else {
+                const selected = db.properties.find((p) => `컬럼 · ${column(p, db)}` === action.value);
+                if (selected) {
+                  config.backSource = 'column';
+                  config.back = selected.id;
+                }
+              }
+            } else if (action.id === 'blocks' || action.id === 'auto')
               config[action.id] = action.value === true;
             else if (action.id === 'deck-choice') {
               if (action.value !== '직접 입력') config.deck = String(action.value);

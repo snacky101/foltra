@@ -167,15 +167,21 @@ export function useNote(
   }, []);
 
   const saveCopy = useCallback(async () => {
+    const sent = current.current;
+    const turn = epoch.current;
     const result = await call<Note>(vault, 'note.create', {
-      title: `${current.current.title} (사본)`,
-      body: current.current.body,
+      title: `${sent.title} (사본)`,
+      body: sent.body,
     });
+    if (turn === epoch.current) await onSavedRef.current();
+    if (turn !== epoch.current || current.current !== sent)
+      throw new Error(
+        '사본은 저장했지만 저장 중 내용이나 열린 노트가 바뀌어 이동하지 않았습니다. 현재 초안을 확인해 주세요.',
+      );
     dirty.current = false;
     pendingSince.current = null;
     setError('');
     setStatus('saved');
-    await onSavedRef.current();
     return result;
   }, [vault]);
   const discard = useCallback(async () => {

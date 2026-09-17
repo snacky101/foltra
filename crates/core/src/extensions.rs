@@ -1,4 +1,4 @@
-use crate::storage::Store;
+use crate::storage::{revision, Store};
 use crate::validation::pretty;
 use crate::{Error, Query, Result};
 use serde::Deserialize;
@@ -168,13 +168,38 @@ pub fn install(store: &Store, value: &Value) -> Result<Value> {
     {
         return Err(Error::new(
             "extension_exists",
-            "Remove the installed version before replacing it",
+            "Extension is installed; use extension.update to replace it safely",
         ));
     }
     store.commit(vec![(
         format!("extensions/{}.json", manifest.id),
         Some(pretty(value)?),
     )])?;
+    Ok(value.clone())
+}
+pub fn update(store: &Store, value: &Value, expected_digest: &str) -> Result<Value> {
+    let manifest = validate(value)?;
+    let path = format!("extensions/{}.json", manifest.id);
+    let raw = store
+        .optional(&path)?
+        .ok_or_else(|| Error::new("not_found", "Extension is not installed"))?;
+    let current: Value = serde_json::from_str(&raw)?;
+    let installed = validate(&current)?;
+    if installed.id != manifest.id || installed.kind != manifest.kind {
+        return Err(Error::new(
+            "invalid_extension",
+            "Updated package must have the same ID and kind",
+        ));
+    }
+    // Match the semantic digest displayed by extension.status, not JSON whitespace.
+    if revision(&current.to_string()) != expected_digest {
+        return Err(Error::new(
+            "conflict",
+            "Installed extension changed; review the update again",
+        ));
+    }
+    // Plugin data and device grants stay intact. A different digest requires fresh approval.
+    store.commit(vec![(path, Some(pretty(value)?))])?;
     Ok(value.clone())
 }
 pub(crate) fn validate_manifest(value: &Value) -> Result<()> {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type RefObject } from 'react';
 import { ChevronRight, Plus, Trash2, X } from 'lucide-react';
 import { frontmatterEntries, parseFrontmatter, updateFrontmatter } from '../lib/frontmatter';
 
@@ -10,14 +10,19 @@ export function FrontmatterPanel({
   source,
   onChange,
   onEditSource,
+  addPropertyRequested = false,
+  onAddPropertyHandled,
 }: {
   source: string;
   onChange?: (yaml: string) => void;
   onEditSource?: () => void;
+  addPropertyRequested?: boolean;
+  onAddPropertyHandled?: () => void;
 }) {
   const [expanded, setExpanded] = useState(true);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState('');
+  const nameInput = useRef<HTMLInputElement>(null);
   const parsed = useMemo(() => {
     try {
       return { entries: frontmatterEntries(parseFrontmatter(source)), error: '' };
@@ -26,6 +31,15 @@ export function FrontmatterPanel({
     }
   }, [source]);
   useEffect(() => setError(''), [source]);
+  useEffect(() => {
+    if (!addPropertyRequested) return;
+    setExpanded(true);
+    if (!parsed.error && onChange) {
+      setAdding(true);
+      nameInput.current?.focus();
+    }
+    onAddPropertyHandled?.();
+  }, [addPropertyRequested]);
   const update = (key: string, value: string | null, insert = false) => {
     onChange?.(updateFrontmatter(source, key, value, insert));
   };
@@ -112,6 +126,7 @@ export function FrontmatterPanel({
             {onChange &&
               (adding ? (
                 <NewProperty
+                  nameInput={nameInput}
                   add={(key, value) => {
                     update(key, value, true);
                     setAdding(false);
@@ -199,11 +214,18 @@ function PropertyValue({
   );
 }
 
-function NewProperty({ add, cancel }: { add: (key: string, value: string) => void; cancel: () => void }) {
+function NewProperty({
+  add,
+  cancel,
+  nameInput,
+}: {
+  add: (key: string, value: string) => void;
+  cancel: () => void;
+  nameInput: RefObject<HTMLInputElement | null>;
+}) {
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
   const [error, setError] = useState('');
-  const nameInput = useRef<HTMLInputElement>(null);
   const isComposing = useRef(false);
   useEffect(() => nameInput.current?.focus(), []);
   return (

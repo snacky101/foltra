@@ -1,0 +1,17 @@
+{
+  "kind": "plugin",
+  "id": "daily-calendar",
+  "name": "일지 캘린더",
+  "version": "1.0.0",
+  "description": "우측 사이드바에서 오늘과 날짜별 노트를 확인합니다. YYYY-MM-DD 제목의 노트가 있는 날짜에 점을 표시합니다.",
+  "commands": [
+    { "id": "today", "title": "캘린더 오늘로 이동", "action": { "type": "script" } },
+    { "id": "previous-month", "title": "캘린더 이전 달", "action": { "type": "script" } },
+    { "id": "next-month", "title": "캘린더 다음 달", "action": { "type": "script" } }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": ["notes.read", "ui"],
+    "views": [{ "id": "calendar", "title": "일지 캘린더", "placement": "right-sidebar" }]
+  }
+}

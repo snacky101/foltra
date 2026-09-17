@@ -21,6 +21,17 @@ import { call } from '../lib/api';
 import { extensionCatalog } from '../lib/extensionCatalog';
 import type { Extension, Workspace } from '../lib/types';
 
+function isNewerVersion(candidate: string, current: string) {
+  if (![candidate, current].every((version) => /^\d+\.\d+\.\d+$/.test(version))) return false;
+  const next = candidate.split('.').map(Number),
+    previous = current.split('.').map(Number);
+  if (![...next, ...previous].every(Number.isSafeInteger)) return false;
+  return next.some(
+    (value, index) =>
+      value > previous[index] && next.slice(0, index).every((part, at) => part === previous[at]),
+  );
+}
+
 export function ExtensionsView({
   kind,
   workspace,
@@ -82,6 +93,12 @@ export function ExtensionsView({
     run(extension.id, async () => {
       await call(workspace.path, 'extension.install', { manifest: extension });
       return `${extension.name} 설치 완료`;
+    });
+  const update = (extension: Extension, digest: string) =>
+    run(`update:${extension.id}`, async () => {
+      await call(workspace.path, 'extension.update', { manifest: extension, expectedDigest: digest });
+      if (mounted.current) await beforeDisable?.(extension.id);
+      return '업데이트 완료 · 권한 확인 후 활성화하세요';
     });
   const installFile = (file: File) =>
     run('file:', async () => {
@@ -253,6 +270,18 @@ export function ExtensionsView({
         {extensions.map((extension) => {
           const installed = installedById.has(extension.id);
           const working = busy === extension.id;
+          const status = workspace.pluginStates?.find((s) => s.id === extension.id);
+          const upgrade =
+            installed && extension.kind === 'plugin' && extension.runtime
+              ? extensionCatalog.find(
+                  (candidate) =>
+                    candidate.id === extension.id &&
+                    candidate.kind === extension.kind &&
+                    candidate.runtime &&
+                    isNewerVersion(candidate.version, extension.version),
+                )
+              : undefined;
+          const updating = busy === `update:${extension.id}`;
           return (
             <article className="extension-card" key={extension.id} aria-label={extension.name}>
               <div className="extension-card-top">
@@ -291,7 +320,7 @@ export function ExtensionsView({
                 <PluginControls
                   beforeDisable={beforeDisable}
                   extension={extension}
-                  status={workspace.pluginStates?.find((s) => s.id === extension.id)}
+                  status={status}
                   vault={workspace.path}
                   refresh={refresh}
                   error={pluginErrors[extension.id]}
@@ -322,6 +351,17 @@ export function ExtensionsView({
                       설정
                     </button>
                   ) : null}
+                  {upgrade && (
+                    <button
+                      className="text-button"
+                      disabled={busy !== null || !status?.digest}
+                      aria-label={`${extension.name} 업데이트`}
+                      onClick={() => status && void update(upgrade, status.digest)}
+                    >
+                      {updating ? <Loader2 size={13} /> : <Download size={13} />}
+                      {updating ? '업데이트 중…' : `v${upgrade.version} 업데이트`}
+                    </button>
+                  )}
                   {installed ? (
                     <button
                       className="text-button"

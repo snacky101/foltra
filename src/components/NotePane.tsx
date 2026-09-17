@@ -1,4 +1,4 @@
-import { lazy, Suspense, type RefObject, type Dispatch, type SetStateAction } from 'react';
+import { lazy, Suspense, type RefObject, type Dispatch, type SetStateAction, type ReactNode } from 'react';
 import { FileText, Link2, Loader2, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Backlinks } from './Backlinks';
 import type { EditorHandle } from './Editor';
@@ -7,6 +7,7 @@ import type { useNote } from '../lib/useNote';
 import type { Dialog } from './AppDialogs';
 import type { NoteCommand } from '../lib/noteCommands';
 import { noteLinks } from '../lib/noteLinks';
+import { fontFamilyStack } from '../lib/fontFamily';
 import { vimNormalBindings, type Command } from '../lib/commands';
 const Editor = lazy(() => import('./Editor').then((module) => ({ default: module.Editor })));
 const NotePreview = lazy(() => import('./NotePreview').then((module) => ({ default: module.NotePreview })));
@@ -16,6 +17,7 @@ interface Props {
   note: ReturnType<typeof useNote>;
   preview: boolean;
   backlinks: boolean;
+  sidebar?: ReactNode;
   editor: RefObject<EditorHandle | null>;
   dispatch: (id: string) => void;
   commands: Command[];
@@ -35,6 +37,7 @@ export function NotePane({
   note,
   preview,
   backlinks,
+  sidebar,
   editor,
   dispatch,
   commands,
@@ -68,6 +71,7 @@ export function NotePane({
             </div>
             <input
               className="note-title"
+              style={{ fontFamily: fontFamilyStack(workspace.settings.editorFontFamily) }}
               aria-label="노트 제목"
               value={note.draft.title}
               disabled={note.status === 'loading'}
@@ -81,21 +85,23 @@ export function NotePane({
                 connections
               </span>
               <span>Personal knowledge</span>
-              <button
-                className="icon-button"
-                aria-label="노트 속성 편집"
-                title="노트 속성 · frontmatter 편집"
-                onClick={() => dispatch('note.frontmatter.edit')}
-              >
-                <SlidersHorizontal size={13} />
-              </button>
-              <button
-                className="icon-button"
-                aria-label="현재 노트 삭제"
-                onClick={() => dispatch('note.delete')}
-              >
-                <Trash2 size={13} />
-              </button>
+              <div className="note-actions" role="group" aria-label="노트 작업">
+                <button
+                  className="icon-button"
+                  aria-label="노트 속성 편집"
+                  title="노트 속성 · frontmatter 편집"
+                  onClick={() => dispatch('note.frontmatter.edit')}
+                >
+                  <SlidersHorizontal size={13} />
+                </button>
+                <button
+                  className="icon-button"
+                  aria-label="현재 노트 삭제"
+                  onClick={() => dispatch('note.delete')}
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
             </div>
             <div className="document-divider" />
             {note.error && (
@@ -180,12 +186,13 @@ export function NotePane({
           </div>
         )}
       </div>
-      {backlinks && noteId && (
+      {backlinks && (noteId || sidebar) && (
         <Backlinks
           workspace={workspace}
           noteId={noteId}
           openNote={(id, line) => void openNote(id, line)}
           openLink={openLink}
+          sidebar={sidebar}
         />
       )}
     </>

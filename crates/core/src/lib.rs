@@ -14,6 +14,7 @@ mod plugin_manifest;
 mod plugin_runtime;
 mod query;
 mod sql_query;
+mod sql_rename;
 mod storage;
 mod tags;
 mod topic_order;
@@ -141,12 +142,15 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
             store,
             serde_json::from_str(&store.read(".foltra/vault.json")?)?,
         ),
-        "note.list" => Ok(serde_json::to_value(
-            notes::notes(store)?
-                .into_iter()
-                .map(|n| n.meta)
-                .collect::<Vec<_>>(),
-        )?),
+        "note.list" => {
+            let mut summaries = Vec::new();
+            for note in notes::notes(store)? {
+                let mut summary = serde_json::to_value(note.meta)?;
+                summary["revision"] = Value::String(note.revision);
+                summaries.push(summary);
+            }
+            Ok(Value::Array(summaries))
+        }
         "note.read" => Ok(serde_json::to_value(notes::read_note(
             store,
             text(&args, "id")?,
@@ -178,6 +182,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "database.property.add" => databases::add_property(store, &args),
         "database.property.preview" => database_schema::preview(store, &args),
         "database.property.update" => database_schema::update(store, &args),
+        "database.property.delete" => database_lifecycle::delete_property(store, &args),
         "record.create" => databases::create_record(store, &args),
         "record.update" => databases::update_record(store, &args),
         "record.delete" => databases::delete_record(store, &args),
@@ -201,7 +206,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "search" => query::search(store, text(&args, "query")?),
         "tags.list" => tags::list(store),
         "tags.blocks" => tags::blocks(store, &args),
-        "topics.list" => topics::list(store),
+        "topics.list" => topics::list(store, &args),
         "topics.blocks" => topics::blocks(store, &args),
         "topics.reorder" => topics::reorder(store, &args),
         "settings.get" => vault::settings(store),
@@ -210,6 +215,12 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
             store,
             args.get("manifest")
                 .ok_or_else(|| Error::new("invalid_arguments", "manifest is required"))?,
+        ),
+        "extension.update" => extensions::update(
+            store,
+            args.get("manifest")
+                .ok_or_else(|| Error::new("invalid_arguments", "manifest is required"))?,
+            text(&args, "expectedDigest")?,
         ),
         "extension.remove" => extensions::remove(store, text(&args, "id")?),
         "extension.list" => extensions::list(store),

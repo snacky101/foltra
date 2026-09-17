@@ -268,6 +268,22 @@ test('dd deletes one selected data row and shares isolated undo/redo history', a
   expect(view.state.doc.toString()).toBe(deleted);
 });
 
+test.each([{ metaKey: true }, { altKey: true }, { ctrlKey: true }])(
+  'modified Vim u does not undo a table edit: %j',
+  async (modifiers) => {
+    await setup(true);
+    await select(1, 0);
+    await key('Enter');
+    await type('Keep this edit');
+    await key('Enter');
+    const changed = view.state.doc.toString();
+    expect((await key('u', modifiers)).defaultPrevented).toBe(false);
+    expect(view.state.doc.toString()).toBe(changed);
+    await key('u');
+    expect(view.state.doc.toString()).toBe(body);
+  },
+);
+
 test('deleting the last data rows retains the header and a usable selection', async () => {
   await setup(true);
   await select(2, 0);

@@ -1,6 +1,7 @@
 import { FolderSelect } from './FolderSelect';
 import { Select } from './Select';
 import { PropertyEditor } from './PropertyEditor';
+import { DeletePropertyDialog } from './DeletePropertyDialog';
 import { useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { SearchDialog } from './SearchDialog';
@@ -15,7 +16,7 @@ export type Dialog =
   | { kind: 'search'; query?: string }
   | { kind: 'body'; row: Row }
   | { kind: 'property'; database: Database }
-  | { kind: 'property-edit'; database: Database; property: Property };
+  | { kind: 'property-edit' | 'property-delete'; database: Database; property: Property };
 interface Props {
   dialog: Dialog;
   workspace: Workspace;
@@ -62,9 +63,21 @@ export function AppDialogs({
   if (dialog.kind === 'property-edit')
     return (
       <PropertyEditor
+        key={`${workspace.path}:${dialog.database.id}:${dialog.property.id}`}
         vault={workspace.path}
         database={dialog.database}
         property={dialog.property}
+        close={close}
+        refresh={refresh}
+      />
+    );
+  if (dialog.kind === 'property-delete')
+    return (
+      <DeletePropertyDialog
+        key={`${workspace.path}:${dialog.database.id}:${dialog.property.id}`}
+        vault={workspace.path}
+        databaseId={dialog.database.id}
+        propertyId={dialog.property.id}
         close={close}
         refresh={refresh}
       />

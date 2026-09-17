@@ -115,7 +115,7 @@ pub fn restore(store: &Store, args: &Value) -> Result<Value> {
 }
 
 pub fn settings(store: &Store) -> Result<Value> {
-    let mut defaults = json!({"vim":false,"editorMode":"live","lineNumbers":"none","cursorShape":"bar","cursorFollowVim":true,"cursorBlink":"blink","cursorBlinkRate":600,"cursorAnimation":"none","slash":false,"showUnresolvedLinks":true,"leader":" ","theme":"paper","keybindings":{},"shortcutVersion":4});
+    let mut defaults = json!({"vim":false,"editorMode":"live","lineNumbers":"none","editorFontFamily":"","databaseFontFamily":"","databaseFontSize":14,"topicFolders":{"include":[],"exclude":[]},"cursorShape":"bar","cursorFollowVim":true,"cursorBlink":"blink","cursorBlinkRate":600,"cursorAnimation":"none","slash":false,"showUnresolvedLinks":true,"leader":" ","theme":"paper","keybindings":{},"shortcutVersion":4});
     if let Some(raw) = store.optional(".foltra/settings.json")? {
         let mut saved: Map<String, Value> = serde_json::from_str(&raw)?;
         validate_settings(&saved)?;
@@ -158,6 +158,14 @@ pub(crate) fn validate_settings(values: &Map<String, Value>) -> Result<()> {
                     .as_str()
                     .is_some_and(|s| ["steady", "blink", "breath"].contains(&s)) => {}
             "cursorBlinkRate" if value.as_u64().is_some_and(|n| (200..=2000).contains(&n)) => {}
+            "databaseFontSize" if value.as_u64().is_some_and(|n| (12..=20).contains(&n)) => {}
+            "editorFontFamily" | "databaseFontFamily"
+                if value.as_str().is_some_and(|name| {
+                    name == name.trim()
+                        && name.chars().count() <= 100
+                        && !name.chars().any(char::is_control)
+                }) => {}
+            "topicFolders" if crate::topics::validate_folder_filter(value).is_ok() => {}
             "theme"
                 if value.as_str().is_some_and(|s| {
                     s.len() <= 80 && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')
@@ -259,7 +267,7 @@ fn valid_shortcut(value: &str) -> bool {
         .is_some_and(|n| (1..=12).contains(&n));
     let key_valid = function
         || ["enter", "arrowleft", "arrowright", "arrowup", "arrowdown"].contains(&key)
-        || (key.len() == 1 && (key.as_bytes()[0].is_ascii_alphanumeric() || ",./".contains(key)));
+        || (key.len() == 1 && (key.as_bytes()[0].is_ascii_alphanumeric() || ",./;".contains(key)));
     let primary = parts
         .iter()
         .filter(|p| ["mod", "ctrl", "meta"].contains(p))

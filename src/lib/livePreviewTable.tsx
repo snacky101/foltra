@@ -316,7 +316,13 @@ class TableEditor {
       // Cancel the pending operator without leaving the selected cell.
     } else if ((event.metaKey || event.ctrlKey) && key.toLowerCase() === 'z')
       (event.shiftKey ? redo : undo)(this.view);
-    else if (vim && !this.editing && (key === 'u' || (event.ctrlKey && key === 'r')))
+    else if (
+      vim &&
+      !this.editing &&
+      !event.metaKey &&
+      !event.altKey &&
+      ((key === 'u' && !event.ctrlKey) || (event.ctrlKey && key === 'r'))
+    )
       (key === 'u' ? undo : redo)(this.view);
     else if (key === 'Enter' && event.altKey && !event.metaKey && !event.ctrlKey) this.insertRow();
     else if (event.metaKey || event.ctrlKey || event.altKey) return;

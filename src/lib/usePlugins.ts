@@ -15,8 +15,15 @@ interface Options {
   refresh: () => Promise<void>;
   openNote: (id: string) => Promise<void>;
   openView: () => void;
+  openSidebar?: () => void;
   onError: (error: unknown) => void;
   notify: (message: string) => void;
+}
+export interface PluginSidebarView {
+  pluginId: string;
+  id: string;
+  title: string;
+  key: string;
 }
 export function usePlugins(options: Options) {
   const latest = useRef(options);
@@ -28,6 +35,7 @@ export function usePlugins(options: Options) {
   activeRef.current = active;
   const [tree, setTree] = useState<PluginNode | null>(null);
   const [busy, setBusy] = useState(false);
+  const [sidebarVersion, setSidebarVersion] = useState(0);
   const viewRequest = useRef(0);
   const enabled = (options.workspace?.pluginStates ?? []).filter((s) => s.enabled);
   const signature = JSON.stringify(enabled);
@@ -51,7 +59,8 @@ export function usePlugins(options: Options) {
           const view = latest.current.workspace?.extensions
             .find((e) => e.id === id)
             ?.runtime?.views?.find((v) => v.id === effect.args.id);
-          if (view) {
+          if (view?.placement === 'right-sidebar') latest.current.openSidebar?.();
+          else if (view) {
             setTree(null);
             setActive({ pluginId: id, ...view });
             latest.current.openView();
@@ -65,6 +74,7 @@ export function usePlugins(options: Options) {
           }
         }
       }
+      if (event.type !== 'render' && alive(id, session)) setSidebarVersion((value) => value + 1);
       return response;
     } catch (error) {
       if (alive(id, session)) {
@@ -82,6 +92,23 @@ export function usePlugins(options: Options) {
     const extension = latest.current.workspace?.extensions.find((e) => e.id === id);
     const declared = extension && pluginSettingsView(extension);
     if (!declared || event.id !== declared) return Promise.resolve(null);
+    return invokeRef.current(id, event);
+  }, []);
+  const invokeSidebar = useCallback<PluginSettingsInvoke>((id, event) => {
+    const workspace = latest.current.workspace;
+    const extension = workspace?.extensions.find((item) => item.id === id);
+    const status = workspace?.pluginStates?.find((item) => item.id === id && item.enabled);
+    const session = sessions.current.get(id);
+    if (
+      !status ||
+      !session ||
+      session.error ||
+      session.path !== workspace?.path ||
+      session.status.digest !== status.digest ||
+      !extension?.runtime?.permissions.includes('ui') ||
+      !extension.runtime.views?.some((view) => view.id === event.id && view.placement === 'right-sidebar')
+    )
+      return Promise.resolve(null);
     return invokeRef.current(id, event);
   }, []);
   // Establish sessions before embedded settings views issue their first passive render.
@@ -120,6 +147,36 @@ export function usePlugins(options: Options) {
     options.workspace?.databases,
     options.workspace?.records,
     options.workspace?.links,
+  ]);
+  const sidebarViews: PluginSidebarView[] = [];
+  for (const extension of options.workspace?.extensions ?? []) {
+    const status = enabled.find((item) => item.id === extension.id);
+    const session = sessions.current.get(extension.id);
+    if (
+      !status ||
+      !session ||
+      session.path !== path ||
+      session.status.digest !== status.digest ||
+      !extension.runtime?.permissions.includes('ui')
+    )
+      continue;
+    for (const view of extension.runtime.views ?? []) {
+      if (view.placement !== 'right-sidebar') continue;
+      sidebarViews.push({
+        pluginId: extension.id,
+        id: view.id,
+        title: view.title,
+        key: JSON.stringify([path, extension.id, status.digest, view.id]),
+      });
+    }
+  }
+  const sidebarRevision = JSON.stringify([
+    path,
+    signature,
+    dataSignature,
+    options.workspace?.settings,
+    options.noteId,
+    sidebarVersion,
   ]);
   const renderView = async () => {
     const view = activeRef.current;
@@ -238,6 +295,7 @@ export function usePlugins(options: Options) {
     const session = sessions.current.get(id);
     if (!session) return;
     sessions.current.delete(id);
+    setSidebarVersion((value) => value + 1);
     if (activeRef.current?.pluginId === id) {
       ++viewRequest.current;
       setActive(null);
@@ -246,5 +304,18 @@ export function usePlugins(options: Options) {
     }
     await session.dispose();
   };
-  return { commands, active, tree, busy, action, errors, renderView, stop, invokeSettings };
+  return {
+    commands,
+    active,
+    tree,
+    busy,
+    action,
+    errors,
+    renderView,
+    stop,
+    invokeSettings,
+    sidebarViews,
+    sidebarRevision,
+    invokeSidebar,
+  };
 }

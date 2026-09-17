@@ -45,7 +45,11 @@ test.each([
         {
           id: extension.id,
           version: extension.version,
-          runtime: { settingsView: extension.settingsView, views: [{ id: extension.view, title: '설정' }] },
+          runtime: {
+            permissions: ['ui'],
+            settingsView: extension.settingsView,
+            views: [{ id: extension.view, title: '설정' }],
+          },
         },
       ],
       pluginStates: [{ id: extension.id, enabled, digest: 'digest' }],

@@ -49,13 +49,16 @@ export function wikiCompletions(
   if (slashes % 2) return null;
   const from = line.from + match.index + 2;
   const search = searchKey(match[1]);
-  const candidates = workspace.notes.map((note) => ({
+  const candidates: {
+    label: string;
+    detail: string;
+    target?: string;
+    alias?: string;
+    note?: Workspace['notes'][number];
+  }[] = workspace.notes.map((note) => ({
     label: note.title,
-    ...wikiNoteReference(workspace.notes, note),
-    detail:
-      workspace.notes.filter((n) => n.title === note.title).length > 1
-        ? `${workspace.folders.find((folder) => folder.id === note.folderId)?.name ?? 'Vault'} · ${note.id.slice(0, 8)}`
-        : '노트',
+    detail: '노트',
+    note,
   }));
   if (workspace.settings.showUnresolvedLinks) {
     candidates.push(
@@ -93,14 +96,22 @@ export function wikiCompletions(
           a.label.localeCompare(b.label),
       )
       .slice(0, 100)
-      .map(({ label, target, alias, detail }) => ({
-        label,
-        detail,
-        apply: (view, completion, start, end) =>
-          view.dispatch({
-            ...wikiCompletionEdit(view.state, start, end, target, alias),
-            annotations: pickedCompletion.of(completion),
-          }),
-      })),
+      .map(({ label, note, target, alias, detail }) => {
+        // Only displayed candidates need whole-vault ambiguity checks. Keep the
+        // complete note list so duplicates outside the result limit remain safe.
+        const reference = note ? wikiNoteReference(workspace.notes, note) : { target: target!, alias };
+        return {
+          label,
+          detail:
+            note && workspace.notes.filter((n) => n.title === label).length > 1
+              ? `${workspace.folders.find((folder) => folder.id === note.folderId)?.name ?? 'Vault'} · ${note.id.slice(0, 8)}`
+              : detail,
+          apply: (view, completion, start, end) =>
+            view.dispatch({
+              ...wikiCompletionEdit(view.state, start, end, reference.target, reference.alias),
+              annotations: pickedCompletion.of(completion),
+            }),
+        };
+      }),
   };
 }

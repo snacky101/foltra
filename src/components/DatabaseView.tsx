@@ -2,8 +2,12 @@ import { ContextMenu } from './ContextMenu';
 import { Select } from './Select';
 import { DateField } from './DateField';
 import { ColumnHeader } from './ColumnHeader';
+import { DatabaseTitle } from './DatabaseTitle';
 import { clampColumnWidth, defaultColumnWidth, readColumnWidths } from '../lib/columnWidths';
-import { useCallback, useEffect, useState, useRef } from 'react';
+import { useColumnOrder } from '../lib/useColumnOrder';
+import { commandKey } from '../lib/commandKey';
+import { fontFamilyStack } from '../lib/fontFamily';
+import { useCallback, useEffect, useState, useRef, type CSSProperties } from 'react';
 import {
   Plus,
   Table2,
@@ -14,6 +18,8 @@ import {
   Filter,
   Trash2,
   MoreHorizontal,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { call } from '../lib/api';
 import type { Database, Row, Property, QueryResult, Workspace, Query } from '../lib/types';
@@ -116,6 +122,7 @@ function Cell({
         void commit(property.type === 'number' ? (draft === '' ? null : Number(draft)) : draft);
       }}
       onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing || e.nativeEvent.keyCode === 229) return;
         if (e.key === 'Enter') e.currentTarget.blur();
         if (e.key === 'Escape') {
           setDraft(String(value));
@@ -135,6 +142,7 @@ interface Props {
   openBody: (row: Row) => void;
   addProperty: () => void;
   editProperty: (property: Property) => void;
+  deleteProperty: (property: Property) => void;
   onError: (e: unknown) => void;
   initialQuery?: Query;
 }
@@ -146,18 +154,25 @@ export function DatabaseView({
   openBody,
   addProperty,
   editProperty,
+  deleteProperty,
   onError,
   initialQuery,
 }: Props) {
   const [layout, setLayout] = useState<'table' | 'board' | 'timeline'>('table');
   const [filter, setFilter] = useState('');
   const [sort, setSort] = useState('');
+  const [descending, setDescending] = useState(false);
   const [search, setSearch] = useState('');
   const [result, setResult] = useState<QueryResult | null>(null);
   const [page, setPage] = useState(0);
   const [rowMenu, setRowMenu] = useState<{ row: Row; x: number; y: number } | null>(null);
   const closeRowMenu = useCallback(() => setRowMenu(null), []);
   const widthKey = `foltra:column-widths:${workspace.vault.id}:${database.id}`;
+  const columnOrder = useColumnOrder(
+    `foltra:column-order:${workspace.vault.id}:${database.id}`,
+    database.properties,
+    onError,
+  );
   const [widths, setWidths] = useState(() => readColumnWidths(localStorage.getItem(widthKey)));
   useEffect(() => {
     localStorage.setItem(widthKey, JSON.stringify(widths));
@@ -169,9 +184,24 @@ export function DatabaseView({
     );
   const tableWidth = 34 + database.properties.reduce((sum, property) => sum + columnWidth(property), 0);
   const schema = JSON.stringify(database.properties);
+  const sortProperty = database.properties.find((property) => property.id === sort);
+  const changeSort = (property: string, descending = false) => {
+    setSort(property);
+    setDescending(descending);
+    setPage(0);
+  };
+  const cycleSort = (property: string) => {
+    if (sort !== property) changeSort(property);
+    else if (!descending) changeSort(property, true);
+    else changeSort('');
+  };
   useEffect(() => {
     setFilter('');
     setPage(0);
+    if (!database.properties.some((property) => property.id === sort)) {
+      setSort('');
+      setDescending(false);
+    }
   }, [schema]);
   const status = database.properties.find((p) => p.type === 'status' || p.type === 'select');
   const title =
@@ -180,6 +210,7 @@ export function DatabaseView({
   useEffect(() => {
     setFilter('');
     setSort('');
+    setDescending(false);
     setSearch('');
     setPage(0);
     setResult(null);
@@ -194,7 +225,7 @@ export function DatabaseView({
         void call<QueryResult>(vault, 'query.run', {
           databaseId: database.id,
           filters,
-          ...(sort ? { sort } : {}),
+          ...(sortProperty ? { sort: sortProperty.id, descending } : {}),
           limit: 100,
           offset: page * 100,
         })
@@ -209,7 +240,7 @@ export function DatabaseView({
       canceled = true;
       clearTimeout(timeout);
     };
-  }, [vault, database.id, schema, workspace.records, filter, sort, search, page, initialQuery]);
+  }, [vault, database.id, schema, workspace.records, filter, sort, descending, search, page, initialQuery]);
   const mutate = async (command: string, args: object) => {
     try {
       await call(vault, command, args);
@@ -229,10 +260,24 @@ export function DatabaseView({
     }).catch(() => {});
   const rows = result?.rows ?? [];
   return (
-    <section className="database-view page-view">
+    <section
+      className="database-view page-view"
+      style={
+        {
+          '--database-font-size': `${workspace.settings.databaseFontSize ?? 14}px`,
+          '--database-font-family': fontFamilyStack(workspace.settings.databaseFontFamily),
+        } as CSSProperties
+      }
+    >
       <div className="eyebrow">STRUCTURE YOUR THOUGHTS</div>
       <div className="page-heading">
-        <h1>{database.name}</h1>
+        <DatabaseTitle
+          key={`${vault}:${database.id}`}
+          vault={vault}
+          database={database}
+          refresh={refresh}
+          onError={onError}
+        />
         <button className="primary-button" onClick={create}>
           <Plus size={16} /> 새 항목
         </button>
@@ -285,7 +330,11 @@ export function DatabaseView({
             </Select>
           </label>
         )}
-        <Select aria-label="정렬 기준" value={sort} onValueChange={(value) => setSort(value)}>
+        <Select
+          aria-label="정렬 기준"
+          value={sortProperty?.id ?? ''}
+          onValueChange={(value) => changeSort(value)}
+        >
           <option value="">생성 순서</option>
           {database.properties.map((p) => (
             <option key={p.id} value={p.id}>
@@ -293,6 +342,17 @@ export function DatabaseView({
             </option>
           ))}
         </Select>
+        {sortProperty && (
+          <button
+            type="button"
+            className="icon-button"
+            aria-label={`정렬 방향: ${descending ? '내림차순' : '오름차순'}`}
+            title={`${descending ? '오름차순' : '내림차순'}으로 전환`}
+            onClick={() => changeSort(sort, !descending)}
+          >
+            {descending ? <ArrowDown size={15} /> : <ArrowUp size={15} />}
+          </button>
+        )}
         <button className="text-button" onClick={addProperty}>
           <Plus size={14} /> 속성
         </button>
@@ -324,19 +384,26 @@ export function DatabaseView({
           <table className="data-table" style={{ width: tableWidth }}>
             <colgroup>
               <col style={{ width: 34 }} />
-              {database.properties.map((property) => (
+              {columnOrder.columns.map((property) => (
                 <col key={property.id} style={{ width: columnWidth(property) }} />
               ))}
             </colgroup>
             <thead>
               <tr>
                 <th className="row-index">#</th>
-                {database.properties.map((p) => (
+                {columnOrder.columns.map((p) => (
                   <ColumnHeader
-                    key={p.id}
+                    key={`${database.id}:${p.id}`}
                     property={p}
+                    bodyColumn={p.id === bodyColumn?.id}
+                    reorder={columnOrder.header(p.id)}
                     width={columnWidth(p)}
                     edit={() => editProperty(p)}
+                    direction={sort === p.id ? (descending ? 'descending' : 'ascending') : null}
+                    sort={() => cycleSort(p.id)}
+                    remove={
+                      p.id !== 'title' && database.properties.length > 1 ? () => deleteProperty(p) : undefined
+                    }
                     resize={(width) => setWidths((current) => ({ ...current, [p.id]: width }))}
                   />
                 ))}
@@ -359,16 +426,20 @@ export function DatabaseView({
                       e.preventDefault();
                       const rect = e.currentTarget.getBoundingClientRect();
                       setRowMenu({ row, x: rect.left + 12, y: rect.bottom });
+                      return;
                     }
-                    if ((workspace.settings.vim && e.key === 'j') || e.key === 'ArrowDown') {
+                    if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
+                    const key = workspace.settings.vim ? commandKey(e.nativeEvent) : e.key;
+                    if ((workspace.settings.vim && key === 'j') || key === 'ArrowDown') {
                       e.preventDefault();
                       (e.currentTarget.nextElementSibling as HTMLElement)?.focus();
                     }
-                    if ((workspace.settings.vim && e.key === 'k') || e.key === 'ArrowUp') {
+                    if ((workspace.settings.vim && key === 'k') || key === 'ArrowUp') {
                       e.preventDefault();
                       (e.currentTarget.previousElementSibling as HTMLElement)?.focus();
                     }
-                    if (e.key === 'Enter') openBody(row);
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing && e.nativeEvent.keyCode !== 229)
+                      openBody(row);
                   }}
                 >
                   <td className="row-index">
@@ -385,7 +456,7 @@ export function DatabaseView({
                       <MoreHorizontal size={14} />
                     </button>
                   </td>
-                  {database.properties.map((property) => (
+                  {columnOrder.columns.map((property) => (
                     <td key={property.id} data-property-id={property.id}>
                       <div className={property.id === bodyColumn?.id ? 'name-cell' : 'property-cell'}>
                         <Cell

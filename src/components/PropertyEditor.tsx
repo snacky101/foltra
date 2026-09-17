@@ -11,6 +11,9 @@ interface Preview {
   changedRows: number;
   errorCount: number;
   errors: { rowId: string; title: string | null; value: string }[];
+  changedNotes: number;
+  changedQueries: number;
+  queryErrors: { noteId: string; title: string; message: string }[];
   canApply: boolean;
 }
 export function PropertyEditor({
@@ -26,6 +29,7 @@ export function PropertyEditor({
   close: () => void;
   refresh: () => Promise<void>;
 }) {
+  const [name, setName] = useState(property.name);
   const [type, setType] = useState(property.type);
   const [options, setOptions] = useState(property.options?.join('\n') ?? '');
   const [preview, setPreview] = useState<Preview | null>(null);
@@ -40,7 +44,7 @@ export function PropertyEditor({
   const proposal = useMemo<Property>(
     () => ({
       id: property.id,
-      name: property.name,
+      name: name.trim(),
       type,
       ...((type === 'select' || type === 'status') && options.trim()
         ? {
@@ -51,14 +55,19 @@ export function PropertyEditor({
           }
         : {}),
     }),
-    [property.id, property.name, type, options],
+    [property.id, name, type, options],
   );
+  const renaming = proposal.name !== property.name;
+  const converting = proposal.type !== property.type;
   useEffect(() => {
-    if (property.id === 'title') return;
     let active = true;
-    setChecking(true);
     setPreview(null);
     setError('');
+    if (!proposal.name) {
+      setChecking(false);
+      return;
+    }
+    setChecking(true);
     const timer = setTimeout(() => {
       void call<Preview>(vault, 'database.property.preview', { databaseId: database.id, property: proposal })
         .then((value) => {
@@ -75,9 +84,9 @@ export function PropertyEditor({
       active = false;
       clearTimeout(timer);
     };
-  }, [vault, database.id, proposal, attempt, property.id]);
+  }, [vault, database.id, proposal, attempt]);
   const apply = async () => {
-    if (!preview?.canApply || busy.current) return;
+    if (!proposal.name || checking || !preview?.canApply || busy.current) return;
     busy.current = true;
     setSaving(true);
     setError('');
@@ -103,66 +112,107 @@ export function PropertyEditor({
   };
   return (
     <Modal title={`${property.name} 컬럼`} close={dismiss} className="property-editor">
-      {property.id === 'title' ? (
-        <p className="muted">
-          행 이름 컬럼은 텍스트로 유지됩니다. 본문은 이름 셀 옆의 열기 버튼으로 열 수 있습니다.
-        </p>
-      ) : (
-        <>
-          <fieldset disabled={saving}>
-            <label className="form-field">
-              컬럼 타입
-              <Select
-                aria-label="컬럼 타입"
-                value={type}
-                onValueChange={(value) => {
-                  setPreview(null);
-                  setType(value as Property['type']);
-                }}
-              >
-                {[
-                  ['text', '텍스트'],
-                  ['number', '숫자'],
-                  ['checkbox', '체크박스'],
-                  ['date', '날짜'],
-                  ['select', '선택'],
-                  ['status', '상태'],
-                  ['url', 'URL'],
-                ].map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </Select>
-            </label>
-            {(type === 'select' || type === 'status') && (
-              <label className="form-field">
-                선택지 · 한 줄에 하나
-                <textarea
-                  aria-label="컬럼 선택지"
-                  rows={4}
-                  value={options}
-                  onChange={(e) => {
-                    setPreview(null);
-                    setOptions(e.target.value);
-                  }}
-                  placeholder="비워 두면 기존 값에서 자동으로 만듭니다."
-                />
-              </label>
-            )}
-          </fieldset>
-          <div className="property-conversion-summary" aria-live="polite">
-            {checking ? (
-              <p className="muted">기존 값을 검사하고 있습니다…</p>
-            ) : (
-              preview && (
+      <fieldset disabled={saving}>
+        <label className="form-field">
+          컬럼 이름
+          <input
+            aria-label="컬럼 이름"
+            value={name}
+            aria-invalid={!proposal.name}
+            onChange={(event) => {
+              setPreview(null);
+              setName(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing || event.nativeEvent.keyCode === 229) return;
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                event.stopPropagation();
+                void apply();
+              }
+            }}
+          />
+        </label>
+        {property.id === 'title' ? (
+          <p className="muted property-role-description">
+            각 행의 노트를 만들거나 여는 컬럼입니다. 이름은 바꿀 수 있으며 타입은 텍스트로 유지됩니다.
+          </p>
+        ) : (
+          <label className="form-field">
+            컬럼 타입
+            <Select
+              aria-label="컬럼 타입"
+              value={type}
+              onValueChange={(value) => {
+                setPreview(null);
+                setType(value as Property['type']);
+              }}
+            >
+              {[
+                ['text', '텍스트'],
+                ['number', '숫자'],
+                ['checkbox', '체크박스'],
+                ['date', '날짜'],
+                ['select', '선택'],
+                ['status', '상태'],
+                ['url', 'URL'],
+              ].map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </label>
+        )}
+        {(type === 'select' || type === 'status') && (
+          <label className="form-field">
+            선택지 · 한 줄에 하나
+            <textarea
+              aria-label="컬럼 선택지"
+              rows={4}
+              value={options}
+              onChange={(e) => {
+                setPreview(null);
+                setOptions(e.target.value);
+              }}
+              placeholder="비워 두면 기존 값에서 자동으로 만듭니다."
+            />
+          </label>
+        )}
+      </fieldset>
+      <div className="property-conversion-summary" aria-live="polite">
+        {checking ? (
+          <p className="muted">컬럼과 연결된 쿼리를 검사하고 있습니다…</p>
+        ) : (
+          preview && (
+            <>
+              {converting ? (
+                <p>
+                  {preview.rowCount}개 행 검사 · {preview.changedRows}개 값 변환
+                </p>
+              ) : renaming ? (
+                <p>
+                  {property.name} → {proposal.name}
+                </p>
+              ) : (
+                <p>컬럼 설정을 확인했습니다.</p>
+              )}
+              {renaming && (
+                <small>
+                  {preview.changedNotes ?? 0}개 노트의 쿼리 {preview.changedQueries ?? 0}개 이름 참조 변경
+                </small>
+              )}
+              {preview.canApply ? (
+                <small>
+                  {converting
+                    ? '컬럼과 변환된 값을 함께 저장합니다.'
+                    : renaming
+                      ? '컬럼 이름과 연결된 쿼리를 함께 저장합니다. 기존 값과 본문 연결은 유지됩니다.'
+                      : '컬럼 설정을 저장합니다.'}
+                </small>
+              ) : (
                 <>
-                  <p>
-                    {preview.rowCount}개 행 검사 · {preview.changedRows}개 값 변환
-                  </p>
-                  {preview.canApply ? (
-                    <small>컬럼과 변환된 값을 함께 저장합니다.</small>
-                  ) : (
+                  {preview.errorCount > 0 && (
                     <>
                       <p className="conversion-warning">
                         {preview.errorCount}개 값을 변환할 수 없습니다. 아래 값을 먼저 수정하세요.
@@ -177,45 +227,62 @@ export function PropertyEditor({
                       </ul>
                     </>
                   )}
-                  {(type === 'select' || type === 'status') && !options.trim() && (
-                    <small>선택지: {preview.property.options?.join(' · ') || '없음'}</small>
+                  {!!preview.queryErrors?.length && (
+                    <>
+                      <p className="conversion-warning">
+                        아래 쿼리를 먼저 확인하세요. 안전하게 이름을 변경할 수 없어 저장하지 않습니다.
+                      </p>
+                      <ul>
+                        {preview.queryErrors.map((item, index) => (
+                          <li key={`${item.noteId}:${index}`}>
+                            <strong>{item.title}</strong>
+                            <span>{item.message}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </>
                   )}
                 </>
-              )
-            )}
-          </div>
-          {error && (
-            <p className="inline-error" role="alert">
-              {error}
-            </p>
-          )}
-          <p className="muted">
-            숫자는 정확한 숫자 표기, 체크박스는 true/false 또는 숫자 0/1로 변환합니다. 변환할 수 없는 값은
-            삭제하지 않습니다.
-          </p>
-          <div className="modal-actions">
-            <button
-              type="button"
-              className="text-button"
-              disabled={saving || checking}
-              onClick={() => setAttempt((v) => v + 1)}
-            >
-              다시 검사
-            </button>
-            <button type="button" className="secondary-button" disabled={saving} onClick={dismiss}>
-              취소
-            </button>
-            <button
-              type="button"
-              className="primary-button"
-              disabled={saving || checking || !preview?.canApply}
-              onClick={() => void apply()}
-            >
-              {saving ? '적용 중…' : '변경 적용'}
-            </button>
-          </div>
-        </>
+              )}
+              {(type === 'select' || type === 'status') && !options.trim() && (
+                <small>선택지: {preview.property.options?.join(' · ') || '없음'}</small>
+              )}
+            </>
+          )
+        )}
+      </div>
+      {(error || !proposal.name) && (
+        <p className="inline-error" role="alert">
+          {error || '컬럼 이름을 입력하세요.'}
+        </p>
       )}
+      {converting && (
+        <p className="muted">
+          숫자는 정확한 숫자 표기, 체크박스는 true/false 또는 숫자 0/1로 변환합니다. 변환할 수 없는 값은
+          삭제하지 않습니다.
+        </p>
+      )}
+      <div className="modal-actions">
+        <button
+          type="button"
+          className="text-button"
+          disabled={saving || checking || !proposal.name}
+          onClick={() => setAttempt((v) => v + 1)}
+        >
+          다시 검사
+        </button>
+        <button type="button" className="secondary-button" disabled={saving} onClick={dismiss}>
+          취소
+        </button>
+        <button
+          type="button"
+          className="primary-button"
+          disabled={saving || checking || !proposal.name || !preview?.canApply}
+          onClick={() => void apply()}
+        >
+          {saving ? '적용 중…' : '변경 적용'}
+        </button>
+      </div>
     </Modal>
   );
 }

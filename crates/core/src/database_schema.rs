@@ -55,6 +55,7 @@ fn plan(store: &Store, args: &Value) -> Result<ChangePlan> {
         .iter()
         .position(|p| p.id == property.id)
         .ok_or_else(|| Error::new("invalid_property", "Column does not exist"))?;
+    let renamed = database.properties[index].name != property.name;
     if property.id == "title" && property.kind != "text" {
         return Err(Error::new(
             "invalid_schema",
@@ -76,7 +77,7 @@ fn plan(store: &Store, args: &Value) -> Result<ChangePlan> {
         })
         .collect::<Result<_>>()?;
     // Covers schema AND row edits/additions/deletions between preview and apply.
-    let token = revision(&format!(
+    let mut token = revision(&format!(
         "{raw_database}\n{}",
         serde_json::to_string(&row_revisions)?
     ));
@@ -118,6 +119,12 @@ fn plan(store: &Store, args: &Value) -> Result<ChangePlan> {
         ));
     }
     database.properties[index] = property.clone();
+    let rename_plan = renamed
+        .then(|| crate::sql_rename::plan(store, &database))
+        .transpose()?;
+    if let Some(rename) = &rename_plan {
+        token = revision(&format!("{token}\n{}", rename.revision));
+    }
     let mut writes = vec![];
     let mut errors = vec![];
     let mut error_count = 0;
@@ -145,8 +152,27 @@ fn plan(store: &Store, args: &Value) -> Result<ChangePlan> {
             writes.push((record_path(&row.id)?, Some(pretty(&row)?)));
         }
     }
-    let preview = json!({"revision":token,"property":property,"rowCount":total,"changedRows":writes.len(),"errorCount":error_count,"errors":errors,"canApply":error_count == 0});
-    writes.push((database_path(database_id)?, Some(pretty(&database)?)));
+    let changed_notes = rename_plan.as_ref().map_or(0, |plan| plan.changed_notes);
+    let changed_queries = rename_plan.as_ref().map_or(0, |plan| plan.changed_queries);
+    let query_errors = rename_plan
+        .as_ref()
+        .map(|plan| plan.errors.clone())
+        .unwrap_or_default();
+    let preview = json!({"revision":token,"property":property,"rowCount":total,"changedRows":writes.len(),"errorCount":error_count,"errors":errors,"changedNotes":changed_notes,"changedQueries":changed_queries,"queryErrors":query_errors,"canApply":error_count == 0 && query_errors.is_empty()});
+    if let Some(rename) = rename_plan {
+        writes.extend(rename.writes);
+    }
+    // Patch only known property fields so rename also preserves extension/future metadata.
+    let mut schema: Value = serde_json::from_str(&raw_database)?;
+    let target = &mut schema["properties"][index];
+    target["name"] = json!(property.name);
+    target["type"] = json!(property.kind);
+    if !property.options.is_empty() {
+        target["options"] = json!(property.options);
+    } else {
+        target.as_object_mut().unwrap().remove("options");
+    }
+    writes.push((database_path(database_id)?, Some(pretty(&schema)?)));
     Ok(ChangePlan {
         database,
         writes,
@@ -165,6 +191,9 @@ pub fn update(store: &Store, args: &Value) -> Result<Value> {
         plan.preview["revision"].as_str().unwrap(),
     )?;
     if plan.preview["canApply"] != true {
+        if !plan.preview["queryErrors"].as_array().unwrap().is_empty() {
+            return Err(Error::new("query_rename_blocked", "연결된 SQL 쿼리를 안전하게 변경할 수 없습니다. 미리보기에 표시된 노트를 수정한 뒤 다시 시도해 주세요. 변경된 데이터는 없습니다."));
+        }
         return Err(Error::new(
             "conversion_failed",
             format!(
@@ -175,5 +204,7 @@ pub fn update(store: &Store, args: &Value) -> Result<Value> {
     }
     // The existing journal commits schema and all converted rows as one recoverable change.
     store.commit(plan.writes)?;
-    Ok(json!({"database":plan.database,"changedRows":plan.preview["changedRows"]}))
+    Ok(
+        json!({"database":plan.database,"changedRows":plan.preview["changedRows"],"changedNotes":plan.preview["changedNotes"],"changedQueries":plan.preview["changedQueries"]}),
+    )
 }
