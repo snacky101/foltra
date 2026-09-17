@@ -4,6 +4,7 @@ import { PropertyEditor } from './PropertyEditor';
 import { useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
 import { SearchDialog } from './SearchDialog';
+import { SqlQueryDialog } from './SqlQueryDialog';
 import { Modal } from './Modal';
 import { call } from '../lib/api';
 import type { Database, Note, Property, Row, Workspace } from '../lib/types';
@@ -55,7 +56,9 @@ export function AppDialogs({
     }
   };
   if (dialog.kind === 'search')
-    return <SearchDialog vault={workspace.path} initialQuery={dialog.query} close={close} openNote={openNote} />;
+    return (
+      <SearchDialog vault={workspace.path} initialQuery={dialog.query} close={close} openNote={openNote} />
+    );
   if (dialog.kind === 'property-edit')
     return (
       <PropertyEditor
@@ -103,31 +106,7 @@ export function AppDialogs({
         )}
       </Modal>
     );
-  if (dialog.kind === 'query')
-    return (
-      <Modal title="노트에 데이터베이스 쿼리 넣기" close={close}>
-        <p className="muted">
-          읽기 화면에 실제 DB 결과를 표시합니다. 삽입한 JSON에 필터와 정렬을 추가할 수 있습니다.
-        </p>
-        <div className="choice-list">
-          {workspace.databases.map((db) => (
-            <button
-              key={db.id}
-              onClick={() => {
-                insert(
-                  `\n\n\`\`\`foltra-query\n${JSON.stringify({ databaseId: db.id, limit: 25 }, null, 2)}\n\`\`\`\n`,
-                );
-                close();
-              }}
-            >
-              {db.name}
-              <ArrowUpRight size={14} />
-            </button>
-          ))}
-        </div>
-        {!workspace.databases.length && <p>먼저 데이터베이스를 만들어 주세요.</p>}
-      </Modal>
-    );
+  if (dialog.kind === 'query') return <SqlQueryDialog workspace={workspace} insert={insert} close={close} />;
   if (dialog.kind === 'slash')
     return (
       <Modal title="삽입 메뉴" close={close}>

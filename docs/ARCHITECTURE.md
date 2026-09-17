@@ -26,7 +26,9 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `database_schema.rs` | 컬럼 변경 검사·변환 계획·snapshot revision·일괄 적용 | GUI 변환 로직, 데이터 삭제에 의한 타입 변경 |
 | `folders.rs` | 가상 폴더 계층, 이름·부모 검증, revision 기반 이름 변경과 빈 폴더 삭제 | 실제 디렉터리 이동/노트 본문 변환 |
 | `notes.rs`, `databases.rs` | 각 객체의 생성/수정/삭제, revision과 값 검증 | UI별 저장 로직 |
-| `query.rs` | 링크 인덱스, 구조화된 쿼리, 재생성 가능한 검색 인덱스 | 임의 SQL/JS 실행 |
+| `query.rs` | 링크 인덱스, 기존 JSON 쿼리, 재생성 가능한 검색 인덱스 | 사용자 SQL 실행·JS 실행 |
+| `sql_query.rs` | 이름 기반 쿼리 catalog, 읽기 전용 SQL 검증, 임시 DuckDB 테이블·결과 제한 | 원본 수정, 외부 DB 연결·파일·네트워크 접근 |
+| `SqlQuery`, `SqlQueryDialog`, `src/lib/sqlQuery.ts` | SQL 삽입·표 표시, 요청 수명과 DB 변경 갱신, 쿼리 fence 구분 | UI별 SQL 평가·저장 규칙 |
 | `wiki.rs` | 제목/UUID 대상 해석, alias 보존, Markdown 소스 범위 기반 참조 갱신 | UI별 링크 저장 규칙 |
 | `topics.rs`, `topic_order.rs` | Markdown 문단·목록 경계·주제 식별·카드 조회·revision 기반 표시 순서와 내용 대응 | 원문 복제·UI 상태·임의 코드 실행 |
 | `extensions.rs`, `plugin_manifest.rs` | 선언형/코드 manifest·SDK 버전·뷰 스키마 검증, 설치·공통 명령 | 앱 DOM에 커뮤니티 코드 주입 |
@@ -56,6 +58,7 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `src/lib/editorCursor.ts`, `cursorAppearance.ts`, `cursorMotion.ts` | 커서 좌표 측정·모드별 모양·점멸·이동 효과와 수명 관리 | 문서·선택 변경, 전역 키 처리, 프레임별 React 상태 갱신 |
 | `src/lib/wikiCompletion.ts`, `wikiLinkNavigation.ts` | 편집기 자동완성·괄호/alias 보존, 클릭·커서 위치의 링크 대상 해석 | 노트 직접 생성, 전역 키 처리 |
 | `src/lib/useOpenWikiLink.ts` | 초안 저장 후 링크 열기, core 생성 결과와 화면 연결 | 도메인 생성 규칙·충돌 우회 |
+| `src/lib/openExternalLink.ts` | HTTP(S)/mailto 검증, Tauri OS opener 또는 개발 브라우저 열기 | 임의 파일·프로토콜 실행, 노트 생성 |
 | `src/lib/vimCommands.ts`, `noteCommands.ts` | 호출한 편집기로 Ex 라우팅, 저장·닫기 계약 | revision 우회 |
 | `SearchDialog`, `Select`, `DateField`, `ResizableSidebar` | 검색 키 탐색, 테마 공통 입력과 패널 너비 | core 데이터 규칙 |
 | `src/components/*` | 노트·DB·뷰·설정 등의 표시와 입력 | 파일시스템 접근 |
@@ -109,6 +112,18 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 4. 성공하면 base revision과 화면 snapshot을 갱신합니다. 저장 중 새 입력이 있었다면 초안은 유지하고 다음 저장 대상으로 남깁니다.
 5. 충돌이면 초안을 유지하며 사본 저장 또는 다시 읽기를 제공합니다. 새 revision을 몰래 가져와 덮어쓰지 않습니다.
 
+### 노트의 SQL 조회
+
+`query.catalog`는 활성 DB와 컬럼의 표시 이름을 SQL 식별자로 제공하고, 이스케이프한 `SELECT` 예제를 함께 반환합니다. ASCII 대소문자를 무시한 중복 이름이나 컬럼의 예약 메타데이터 이름 충돌은 ID 접미사로 구분합니다. `query.sql {sql}`은 GUI와 CLI가 공유하는 읽기 전용 명령입니다. 기존 `query.run`의 JSON 계약은 유지합니다.
+
+`sql_query.rs`는 PostgreSQL 문법 parser로 단일 조회를 검사하고 다시 직렬화한 뒤, 요청마다 새 in-memory DuckDB에 활성 DB/행의 사본을 적재해 평가합니다. 테이블은 엔진 내장 테이블 이름과 충돌하지 않도록 `vault` schema에 만들고 `search_path`를 지정하므로 사용자는 DB 이름만으로 조회할 수 있습니다. 원본 Markdown·JSON과 기존 SQLite 검색 인덱스를 대체하지 않으며 DB/컬럼 이름 변경 시 노트 속 SQL을 자동 수정하지 않습니다. 숫자는 `DOUBLE`, 체크박스는 `BOOLEAN`, 날짜는 `DATE`, 나머지는 `VARCHAR`로 조회하고 빈 날짜는 `NULL`로 투영합니다. `__id`, `__note`, `__created_at`, `__updated_at` 메타데이터도 제공하며 원본 값과 revision은 바꾸지 않습니다.
+
+쓰기·외부 I/O·확장 로딩·재귀 조회를 차단하고 함수를 허용 목록으로 제한합니다. 배열·튜플·맵·구조체 생성, `overlay`와 사용자 지정 연산자는 거절하며 `CAST`와 타입 지정 문자열은 허용된 scalar 타입만 받습니다. 암묵적인 행 표현식 등을 통한 중첩 타입 결과도 결과 스키마 검사에서 거절합니다. SQL 크기/파서 깊이, 원본 DB·행·적재량, 결과 행·열·셀·문자열 크기를 제한합니다. SQL 평가에는 3초 후 interrupt를 요청하며, 적재 시간까지 포함한 전체 요청 시간 제한은 아닙니다. DuckDB의 128 MB 메모리 예산·단일 스레드·디스크 spill 비활성 설정은 별도 OS 프로세스 격리나 앱 전체 메모리 상한을 보장하지 않습니다. 현재 수치와 `CURRENT_DATE`·날짜 간격을 포함한 지원 문법은 [SQL.md](SQL.md)에 기록합니다.
+
+`SqlQueryDialog`는 `query.catalog`의 이름과 예제로 `foltra-sql` Markdown을 삽입합니다. `NotePreview`는 이 fence와 SQL 내용의 `foltra-query`를 `SqlQuery`로 표시합니다. 기존 `foltra-query`에서 공백을 제외한 첫 글자가 `{`이면 JSON 경로를 사용하며 일반 `sql`/`postgresql` fence는 실행하지 않습니다. 주제 카드처럼 쿼리 실행을 끈 문맥은 두 Foltra fence 모두 코드로 남깁니다.
+
+`SqlQuery`는 vault·SQL·DB/행 snapshot 변경에 따라 다시 요청하고 이전 요청의 늦은 응답은 버립니다. `{columns:[{name,type}],rows,truncated,limit}` 결과의 행은 문자열/`null` 배열이며 React 텍스트로 표시합니다. 표는 읽기 전용이고 결과를 노트 원문에 저장하지 않습니다.
+
 ### 확장 명령과 단축키
 
 플러그인 관리 UI는 설정의 `extensions` 그룹에, 테마 설치·제거·선택은 `theme` 그룹에 있습니다. `extensions.open` 명령은 현재 작업을 저장한 뒤 확장 그룹을 직접 열며, 기존 작업 뷰는 유지합니다. 플러그인은 `ExtensionsView`, 테마는 `ThemeSettings`에서 관리합니다. 테마 기본 선택지는 Paper & Pine과 Midnight이고, 카탈로그와 파일로 추가한 테마는 선택 카드에서 바로 삭제합니다. 사용 중인 테마 삭제와 Paper 복귀는 코어의 한 저장 트랜잭션입니다. 파일 종류가 다른 경우 올바른 설정 그룹을 안내합니다.
@@ -147,7 +162,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 그래프는 노트 ID·제목·연결로 구성한 입력이 바뀔 때만 worker에서 d3-force를 실행합니다. 반발력·연결력·충돌 반경과 약한 중심력을 300 tick 적용하고 worker를 종료합니다. 중복·역방향 링크는 한 선으로 합치고 보이지 않는 대상과 자기 연결은 배치에서 제외합니다. 전체 범위를 맞춘 뒤 UI에서 pan/zoom·강조·제목 겹침 회피를 처리합니다. 120개 상한을 유지하며, 입력 변경과 unmount 시 이전 worker를 종료합니다. 모든 교차선을 없애는 알고리즘이나 대형 graph 벤치마크는 아닙니다.
 
-화면은 편집기와 읽기 renderer를 지연 로딩합니다. DB 결과 페이지는 100행, 쿼리 응답 상한은 500행, 그래프는 120개 노트입니다. 그러나 snapshot은 3초마다 원본을 스캔하고 모든 행 요약을 반환하며, DB 쿼리는 메모리에서 필터링합니다. 이것은 대용량 최종 구조가 아닙니다. 증분 인덱스와 구독 API 도입 여부는 규모별 측정 후 결정합니다.
+화면은 편집기와 읽기 renderer를 지연 로딩합니다. DB 결과 페이지는 100행, 쿼리 응답 상한은 500행, 그래프는 120개 노트입니다. 그러나 snapshot은 3초마다 원본을 스캔하고 모든 행 요약을 반환하며, 기존 JSON DB 쿼리는 메모리에서 필터링합니다. SQL은 조회마다 임시 DuckDB 테이블을 다시 구성합니다. 이것은 대용량 최종 구조가 아닙니다. 증분 인덱스와 구독 API 도입 여부는 규모별 측정 후 결정합니다.
 
 Markdown의 raw HTML과 원격 이미지 자동 로딩을 사용하지 않습니다. 테마에 외부 URL·CSS를 허용하지 않고, core의 경로와 인자를 검증합니다. native IPC는 설치된 앱과 같은 사용자 권한을 가진 신뢰 경계입니다. vault 자체 암호화, 공격자에 의한 로컬 파일 변조 방지, 커뮤니티 코드 sandbox는 제공하지 않습니다.
 

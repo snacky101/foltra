@@ -1,4 +1,5 @@
 import { noteTags } from './noteTags';
+import { isQueryLanguage } from './sqlQuery';
 import { StateEffect, StateField, type EditorState, type Range } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, gutterLineClass, type DecorationSet } from '@codemirror/view';
 import { syntaxTree } from '@codemirror/language';
@@ -11,6 +12,8 @@ import { NotePreview } from '../components/NotePreview';
 import { AttachmentImage } from '../components/AttachmentImage';
 import { attachmentPath } from './attachments';
 import { canCreateWikiNote, resolveWikiNote, splitWikiLink } from './wikiLinks';
+import { markdownLink } from './wikiLinkNavigation';
+import { externalLinkUrl } from './openExternalLink';
 import type { Workspace } from './types';
 
 interface Context {
@@ -18,6 +21,7 @@ interface Context {
   openNote: (id: string) => void;
   openTag?: (tag: string) => void;
   openLink: (target: string) => void;
+  openMarkdownLink?: (target: string) => void;
 }
 export const refreshLivePreview = StateEffect.define<null>();
 export const focusLivePreview = StateEffect.define<boolean>();
@@ -116,22 +120,26 @@ class LinkPreview extends WidgetType {
       this.wiki && !resolveWikiNote(this.context.workspace.notes, name) && !name.startsWith('record:');
     if (missing) dom.classList.add('unresolved');
     dom.textContent = this.label;
+    dom.setAttribute('role', 'link');
     dom.title =
       missing && canCreateWikiNote(this.context.workspace.notes, name)
-        ? `클릭: 편집 · Cmd/Ctrl+클릭: “${name}” 노트 만들기`
-        : '클릭: 편집 · Cmd/Ctrl+클릭: 연결 열기';
+        ? `“${name}” 노트 만들기`
+        : '연결 열기';
     dom.addEventListener('mousedown', (event) => {
+      if (event.button !== 0) return;
       event.preventDefault();
-      if (event.metaKey || event.ctrlKey) {
-        if (this.wiki) {
-          this.context.openLink(name);
-        } else if (/^https?:\/\//i.test(this.target)) {
-          window.open(this.target, '_blank', 'noopener,noreferrer');
-        }
-        return;
+      // Keep a plain click from moving the caret into the source and replacing
+      // this widget before the browser delivers its click event.
+      if (event.shiftKey) {
+        view.dispatch({ selection: { anchor: view.state.selection.main.anchor, head: this.from } });
+        view.focus();
       }
-      view.dispatch({ selection: { anchor: this.from } });
-      view.focus();
+    });
+    dom.addEventListener('click', (event) => {
+      if (event.button !== 0 || event.shiftKey) return;
+      event.preventDefault();
+      if (this.wiki) this.context.openLink(name);
+      else this.context.openMarkdownLink?.(this.target);
     });
     return dom;
   }
@@ -216,7 +224,7 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
         // Code remains real editor lines, so arrows, Vim motions, selection and
         // mouse placement can enter it without jumping over a block widget.
         // Executable queries retain their separate result preview below.
-        if (language !== 'foltra-query') {
+        if (!isQueryLanguage(language)) {
           const first = state.doc.lineAt(from).number;
           const last = state.doc.lineAt(to).number;
           for (let number = first; number <= last; number++) {
@@ -288,7 +296,6 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
         } as Record<string, string>
       )[name];
       if (className) ranges.push(Decoration.mark({ class: className }).range(from, to));
-      if (active) return;
       if (name === 'Link') {
         const raw = state.doc.sliceString(from, to);
         // CommonMark parses the inner pair of brackets in [[target]] as a Link.
@@ -297,14 +304,21 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
           state.doc.sliceString(from - 1, from) === '[' &&
           state.doc.sliceString(to, to + 1) === ']';
         const wiki = (wrapped ? state.doc.sliceString(from - 1, to + 1) : raw).match(/^\[\[([^\]\n]+)\]\]$/);
-        const regular = raw.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);
+        const markdown = wiki ? null : markdownLink(state, node.node);
+        const regular = markdown && externalLinkUrl(markdown.target) ? markdown : null;
         if (wiki || regular) {
           const start = wiki && wrapped ? from - 1 : from;
           const end = wiki && wrapped ? to + 1 : to;
+          const editing =
+            focused &&
+            state.selection.ranges.some((range) =>
+              range.empty ? range.head >= start && range.head < end : range.from < end && range.to > start,
+            );
+          if (editing) return false;
           const slashes =
             state.doc.sliceString(state.doc.lineAt(start).from, start).match(/\\+$/)?.[0].length ?? 0;
           if (slashes % 2) return false;
-          const [target, label] = wiki ? splitWikiLink(wiki[1]) : [regular![2], regular![1]];
+          const [target, label] = wiki ? splitWikiLink(wiki[1]) : [regular!.target, regular!.label];
           ranges.push(
             Decoration.replace({ widget: new LinkPreview(label, target, start, !!wiki, context) }).range(
               start,
@@ -314,6 +328,7 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
           return false;
         }
       }
+      if (active) return;
       if (['HeaderMark', 'EmphasisMark', 'StrikethroughMark', 'CodeMark', 'QuoteMark'].includes(name)) {
         let end = to;
         if (name === 'HeaderMark' || name === 'QuoteMark') {

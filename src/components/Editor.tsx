@@ -11,14 +11,15 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
 import { syntaxHighlighting, HighlightStyle } from '@codemirror/language';
 import { vim, getCM } from '@replit/codemirror-vim';
-import { languages } from '@codemirror/language-data';
+import { codeLanguage } from '../lib/codeLanguages';
 import { GFM } from '@lezer/markdown';
 import { livePreviewExtension, refreshLivePreview } from '../lib/livePreview';
 import { bindVimCommands } from '../lib/vimCommands';
 import { bindVimKeybindings, type VimBinding } from '../lib/vimKeybindings';
 import { bindVimInput } from '../lib/vimInput';
 import { noteCompletionExtension } from '../lib/noteCompletion';
-import { followWikiLink, wikiLinkNavigation } from '../lib/wikiLinkNavigation';
+import { followEditorLink, editorLinkNavigation } from '../lib/wikiLinkNavigation';
+import { openExternalLink } from '../lib/openExternalLink';
 import { editorCursorExtension, refreshEditorCursor } from '../lib/editorCursor';
 import { editorLineNumbers } from '../lib/lineNumbers';
 import { markdownEditing } from '../lib/markdownEditing';
@@ -79,8 +80,11 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
   const parent = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const openTag = useContext(TagNavigation);
-  const latest = useRef({ ...props, openTag });
-  latest.current = { ...props, openTag };
+  const latest = useRef({ ...props, openTag, openMarkdownLink });
+  latest.current = { ...props, openTag, openMarkdownLink };
+  function openMarkdownLink(target: string) {
+    void openExternalLink(target).catch((error) => latest.current.onError(error));
+  }
   const vimConfig = useRef(new Compartment());
   const previewConfig = useRef(new Compartment());
   const highlightConfig = useRef(new Compartment());
@@ -102,7 +106,10 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
     followLink: (createIfMissing = true) => {
       const editor = view.current;
       if (editor && !editor.composing)
-        followWikiLink(editor.state, (target) => latest.current.openLink(target, createIfMissing));
+        followEditorLink(editor.state, {
+          openWiki: (target) => latest.current.openLink(target, createIfMissing),
+          openMarkdown: (target) => latest.current.openMarkdownLink(target),
+        });
     },
     insert: (text) => {
       const editor = view.current;
@@ -133,7 +140,11 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           cursorConfig.current.of(editorCursorExtension(latest.current.workspace.settings)),
           lineNumberConfig.current.of(editorLineNumbers(latest.current.workspace.settings.lineNumbers)),
           highlightActiveLine(),
-          markdown({ extensions: [GFM], addKeymap: false, codeLanguages: languages }),
+          markdown({
+            extensions: [GFM],
+            addKeymap: false,
+            codeLanguages: (name) => codeLanguage(name, true),
+          }),
           markdownEditing,
           imagePasteExtension(() => ({
             vault: latest.current.workspace.path,
@@ -143,7 +154,10 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
             () => latest.current.workspace,
             (error) => latest.current.onError(error),
           ),
-          wikiLinkNavigation((target) => latest.current.openLink(target)),
+          editorLinkNavigation({
+            openWiki: (target) => latest.current.openLink(target),
+            openMarkdown: (target) => latest.current.openMarkdownLink(target),
+          }),
           previewConfig.current.of(
             latest.current.livePreview ? livePreviewExtension(() => latest.current) : [],
           ),

@@ -117,7 +117,7 @@
 .editor .cm-live-link {
   color: var(--accent);
   border-bottom: 1px solid color-mix(in srgb, var(--accent) 35%, transparent);
-  cursor: text;
+  cursor: pointer;
 }
 .editor .cm-live-link.unresolved {
   color: var(--muted);

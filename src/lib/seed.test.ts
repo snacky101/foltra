@@ -20,6 +20,7 @@ vi.mock('./api', async () => {
 import { call } from './api';
 import { seedVault } from './seed';
 import type { Note, Workspace } from './types';
+import type { SqlResult } from './sqlQuery';
 
 test('starter database rows open their own body notes and welcome query points to that database', async () => {
   const vault = await mkdtemp(join(tmpdir(), 'foltra-seed-'));
@@ -37,10 +38,15 @@ test('starter database rows open their own body notes and welcome query points t
       expect(body.body.length).toBeGreaterThan(20);
     }
     const welcome = workspace.notes.find((note) => note.title === '폴트라에 오신 것을 환영해요')!;
-    expect((await call<Note>(vault, 'note.read', { id: welcome.id })).body).toContain(
-      workspace.databases[0].id,
-    );
+    const body = (await call<Note>(vault, 'note.read', { id: welcome.id })).body;
+    const sql = body.match(/```foltra-sql\n([\s\S]*?)\n```/)?.[1];
+    expect(sql).toContain('"Reading room"');
+    expect(sql).not.toContain(workspace.databases[0].id);
+    const result = await call<SqlResult>(vault, 'query.sql', { sql });
+    expect(result.rows).toHaveLength(3);
+    expect(result.rows.flat()).toContain('생각을 정리하는 공간');
   } finally {
     await rm(vault, { recursive: true, force: true });
   }
-});
+  // The native integration launches a fresh CLI for every seed operation.
+}, 20_000);

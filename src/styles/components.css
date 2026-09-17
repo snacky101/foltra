@@ -157,6 +157,27 @@
 .embedded-query td {
   font-size: 10.5px;
 }
+.query-status {
+  padding: 12px 14px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.sql-query-choices button > span {
+  min-width: 0;
+}
+.sql-query-choices strong,
+.sql-query-choices small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+.sql-query-choices small {
+  margin-top: 5px;
+  color: var(--muted);
+}
+.sql-query-choices svg {
+  flex-shrink: 0;
+  margin-left: 12px;
+}
 .query-error,
 .inline-error,
 .save-error {

@@ -12,3 +12,4 @@ tauri-plugin-dialog = "2"
 foltra-core.workspace = true
 serde_json.workspace = true
 tauri-plugin-window-state = "2"
+tauri-plugin-opener = "2"

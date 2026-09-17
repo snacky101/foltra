@@ -10,6 +10,7 @@ mod notes;
 mod plugin_manifest;
 mod plugin_runtime;
 mod query;
+mod sql_query;
 mod storage;
 mod tags;
 mod topic_order;
@@ -174,6 +175,8 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "record.delete" => databases::delete_record(store, &args),
         "record.body" => databases::record_body(store, &args),
         "query.run" => query::run(store, serde_json::from_value(args)?),
+        "query.sql" => sql_query::run(store, text(&args, "sql")?),
+        "query.catalog" => sql_query::catalog(store),
         "links.list" => Ok(serde_json::to_value(query::links(
             &notes::notes(store)?,
             &databases::records(store)?,

@@ -1,6 +1,44 @@
-# 개발 현황 · 2026-09-16
+# 개발 현황 · 2026-09-17
 
 현재 결과물은 **Foltra 0.1.0-preview.1**입니다. `snack-note`와 독립된 Git 저장소이며, macOS Apple Silicon용 DMG와 headless CLI 배포 파일을 빌드했습니다. 제품 전체를 완료하거나 버그·보안 문제·지연이 없다고 보증하는 단계는 아닙니다.
+
+## 2026-09-17 프리뷰 교체 빌드
+
+기존 `v0.1.0-preview.1`을 교체할 배포 파일에 노트 내부 SQL 조회·삽입·결과 갱신·CLI와 Markdown 링크의 `gd`/`Cmd+Enter`·Live Preview 일반 클릭을 포함했습니다. 버전과 파일명은 유지합니다. 아래 개별 작업의 미커밋·미배포 문장은 해당 작업 완료 당시의 이력입니다.
+
+전체 **640개(core 113, CLI 4, frontend 523)** 테스트와 `npm run check`가 통과한 소스로 `npm run release:mac`, `cargo build --release --locked -p foltra-cli`를 실행했습니다. npm·Cargo·Tauri·실제 번들의 버전 일치, DMG 무결성·읽기 전용 마운트·Applications 바로가기·앱 복사 후 엄격한 서명 검사와 arm64 아키텍처를 확인했습니다. 앱과 CLI는 시스템 라이브러리만 동적으로 참조하며 SQL 엔진을 별도로 설치할 필요가 없습니다.
+
+배포 압축에서 꺼낸 CLI를 개발 경로·라이브러리 환경변수 없이 실행해 임시 vault의 한글 노트 저장/조회, 주제 정렬 보존·오래된 revision 거절, DB·컬럼 이름 기반 SQL 필터·정렬·집계·형 변환·날짜/NULL을 확인했습니다. 쓰기·외부 파일/URL 접근·확장 로딩 등 9개 SQL을 거절하며 원본 파일·노트·레코드 revision이 보존되었습니다. 이전 릴리스 파일을 백업·체크섬 검증했고 새 DMG와 CLI의 `SHA256SUMS.txt`를 생성했습니다.
+
+자료는 Git에서 제외한 `test-results/preview-refresh-20260917/`에 있습니다. Apple Silicon 전용·ad-hoc 서명이며 Developer ID 공증은 적용하지 않았습니다. 이번 배포 검증은 모든 macOS 버전·전체 native UI/IME·다운로드 후 Gatekeeper 승인 흐름을 보장하지 않습니다.
+
+## 2026-09-17 Markdown 링크 열기와 Live Preview 클릭
+
+`[표시 이름](URL)`도 기존 명령 경로의 `gd`와 `Cmd+Enter`로 엽니다. 이름·URL·괄호 위치에서 해석하며 중첩 괄호·선택적 제목·이스케이프·HTML 엔티티를 처리합니다. 원문 Cmd/Ctrl+클릭, Live Preview 일반 클릭, 읽기 모드 클릭은 같은 HTTP(S)/mailto 열기를 사용합니다. 데스크톱은 Tauri opener로 기본 브라우저/메일 앱을 요청하고 실패를 표시합니다. URL 프로토콜을 프런트엔드와 native 권한에서 제한하며 플러그인의 자동 anchor 열기는 꺼 중복 실행을 방지합니다.
+
+Live Preview는 줄 전체 대신 실제 링크와 커서/선택의 겹침으로 원문 편집 여부를 판단합니다. 같은 줄의 다른 부분을 편집 중에도 링크를 일반 클릭할 수 있고, 방향키나 Vim 이동으로 링크 안에 들어가면 원문이 나타납니다. Shift+클릭은 선택을 확장하며 우클릭은 링크를 열지 않습니다. 위키 링크의 `gd` 기존 대상만 이동 / `Cmd+Enter` 미생성 대상 생성 규칙은 유지합니다. 상대 경로 노트 링크·file/custom 프로토콜·페이지 내부 앵커는 이번 범위에 포함하지 않습니다([링크 규칙](LINKS.md)).
+
+검증: 전체 **640개(core 113, CLI 4, frontend 523)** 테스트, `npm run check`, Prettier와 `git diff --check` 통과. 링크 범위·실제 편집기 명령 경로·수식 키 중복 클릭·Shift 선택·원문 보존·URL 허용/차단·native opener 호출과 오류 표시를 회귀 검사했습니다.
+
+임시 vault의 Chromium에서 실제 `gd`, Cmd+Enter, 같은 줄의 일반 클릭, 커서 진입 시 원문 표시, 읽기 클릭, 괄호 URL, 기존/미생성 위키 링크의 동작을 확인했습니다. 원문이 보존되었고 화면을 직접 검토했습니다. 브라우저 열기는 `window.open` 호출까지 기록했으며 native OS 브라우저 실행을 직접 검증한 것은 아닙니다. 테스트에서 건드린 브라우저 설정을 복구하고 검증 공간을 종료했습니다. 이전 SQL 검증의 임시 경로는 현재 브라우저 저장소에 없어 다른 QA 설정을 덮어쓰지 않았습니다. 자료는 Git에서 제외한 `test-results/link-qa/`와 `test-results/markdown-links-*.log`입니다.
+
+macOS debug `.app`를 재빌드하고 번들 서명 검사를 통과했습니다. 저장 보호를 거쳐 기존 앱을 정상 종료·재실행해 적용했습니다. 적용 기록은 `test-results/markdown-links-applied.json`입니다. GitHub 릴리스는 갱신하지 않았습니다.
+
+## 2026-09-17 노트 내부 SQL
+
+`foltra-sql` 블록에서 UUID 대신 DB·컬럼 이름으로 조회합니다. `WHERE`, 정렬, 집계, 조인, 비재귀 CTE, 윈도 함수와 PostgreSQL식 `ILIKE`·`::` 문법을 지원합니다. `DB SQL 쿼리 삽입` 명령은 DB와 컬럼 이름을 보여주고 편집 가능한 SQL을 넣습니다. 읽기/Live Preview에서 결과 표를 표시하며 원본 DB 변경 시 갱신합니다. 관계없는 노트 수정으로 결과 표를 다시 만들지 않으며, 늦은 이전 vault/SQL 응답은 버립니다.
+
+공유 코어의 `query.sql`·`query.catalog`를 GUI와 CLI가 함께 사용합니다. 실제 엔진은 앱에 포함된 DuckDB이며 PostgreSQL 서버나 완전한 호환 구현은 아닙니다. 조회마다 메모리에 vault DB·행을 구성하고 Markdown/JSON 원본을 보존합니다. 기존 `foltra-query` JSON은 유지하며 일반 `sql`/`postgresql` 코드 예제는 실행하지 않습니다. 새 vault의 예제는 이름 기반 SQL을 사용하고 기존 노트는 자동 변환하지 않습니다.
+
+쓰기·외부 I/O·확장 로딩·재귀 조회·문자열 연결·배열과 복합 타입을 제한합니다. 결과 500행/128열, SQL 평가 3초 interrupt, 적재·표시 크기 제한을 적용합니다. DuckDB 메모리 예산은 128 MB이지만 프로세스 전체 메모리의 엄격한 상한이나 전체 요청의 시간 보장은 아닙니다. DB/컬럼을 이름 변경하면 SQL도 직접 수정해야 하며, 대형 vault 성능·별도 OS 프로세스 격리·외부 PostgreSQL 연결은 남아 있습니다. 사용 예제와 정확한 범위는 [SQL.md](SQL.md)에 있습니다.
+
+검증: 전체 **584개(core 113, CLI 4, frontend 467)**, `npm run check`와 `git diff --check` 통과. SQL 테스트는 한글/따옴표/중복 이름·날짜/NULL·집계/조인·원본 보존·쓰기/외부 접근 차단·구조화된 값 거절·행 제한·시간 초과 후 재실행을 포함합니다. UI 테스트는 결과 DOM 유지, 늦은 응답 무시, 오류/빈 결과/잘린 결과, 기존 JSON 호환과 삽입을 확인합니다. 실제 CLI를 매번 실행하는 예제 생성 통합 테스트만 20초 제한을 사용합니다.
+
+별도 비영구 macOS WKWebView에서 SQL 삽입 메뉴, 실제 키 입력으로 원문 교체, Live Preview/읽기 결과, 오류 수정 후 복구, CLI 행 수정 후 결과 갱신을 확인하고 화면을 검토했습니다. 일반 SQL 코드 예제는 실행되지 않았고 행 갱신은 노트 원문을 바꾸지 않았습니다. 초기 검증 환경의 임시 경로가 사라진 뒤 기존 vault로 잘못 진입해 한 노트에 SQL 블록이 추가된 사고가 있었으며, 추가한 정확한 부분만 revision 확인 후 제거하고 본문 보존을 재확인했습니다. 이후 검증은 임시 vault 외의 모든 요청을 차단하고 화면의 vault/노트까지 확인했습니다. 이 검증은 전체 native 입력기·대형 vault 성능의 검증을 포함하지 않습니다. 자료는 Git에서 제외한 `test-results/sql-*.log`, `test-results/sql-browser/`에 있습니다.
+
+macOS debug `.app` 재빌드·번들 서명 검사·저장 보호를 거친 정상 재시작을 완료했습니다. 당시 브라우저 검증 공간이 도중에 사라져 localhost 테스트 설정을 복원하지 못했습니다. 이후 별도 링크 검증에서 해당 SQL 임시 경로가 현재 저장소에 없는 것을 확인하고 다른 설정은 덮어쓰지 않았습니다. native 검증은 비영구 저장소를 사용하고 클립보드를 복원한 뒤 종료했습니다.
+
+이번 SQL 변경은 아직 커밋·푸시·GitHub 프리릴리스에 반영하지 않았습니다.
 
 ## 2026-09-16 프리뷰 교체 빌드
 
@@ -31,7 +69,7 @@ Apple Developer ID 서명·공증과 자동 업데이트는 여전히 없습니�
 | 독립 DB | schema/row 독립 생성, text/number/checkbox/date/select/status/url, 전체 행 검사 후 컬럼 타입 변경, revision 수정 | relation, multi-select, formula, rollup, 컬럼 삭제·이름 변경 UI, 범용 포맷 migration |
 | DB 본문 | 이름 셀 옆에서 본문 열기/생성/연결, 행과 노트의 독립 저장, 예제 본문 제공 | row page의 고급 편집, DB/노트 통합 탐색·권한 |
 | DB 뷰 | 표·보드·날짜 타임라인, 필터·정렬·페이지 이동, 컬럼 너비 드래그·저장, 헤더/행 세로선 정렬, 별도 삭제 열 없이 행 메뉴, 기본 행 키 이동 | calendar/gallery/list, 저장된 뷰 구성, 그룹화 고도화, 열 순서, 가상화 |
-| 노트 내부 쿼리 | `foltra-query` JSON을 실제 코어가 평가, 결과에서 본문 열기 | query builder, 집계/join, 실행 계획·취소·비용 제한 |
+| 노트 내부 쿼리 | DB·컬럼 이름으로 `foltra-sql` 조회·집계·조인, SQL 삽입 메뉴, Live Preview/읽기 결과 갱신, CLI, 기존 `foltra-query` JSON 유지 | SQL 자동완성·query builder, 외부 PostgreSQL 연결, 증분 적재·대형 vault 검증, OS 프로세스 격리 |
 | 플러그인 | 카탈로그·파일 설치·설치된 것만 필터, 기존 선언형 확장 + JS/TS 코드 SDK v1, QuickJS 제한 실행, 기기별 권한 승인, 사용자 뷰·설정·이벤트·노트/DB API·선택 영역 편집, 팔레트·단축키·headless CLI | 임의 DOM/CodeMirror 확장·새 DB 속성 타입, 네트워크/외부 파일 API, OS 프로세스 격리, 호환성 정책·자동 업데이트·공개 marketplace |
 | 태그 | Markdown #태그·한글·계층 태그 인식, Live Preview/읽기 칩, 태그 자동완성, 정확한 tag: 검색, CLI 목록·블록 조회 | 일괄 이름 변경·태그 관리 패널 |
 | Anki | 코드 플러그인의 DB 행/태그 블록 → AnkiConnect v6 동기화, vault 이미지 전송, 컬럼·덱 매핑, 자동 처리·중복 방지·충돌 비교/명시적 덮어쓰기 | Cloze·오디오/영상·양방향 학습 정보·여러 DB 매핑 |

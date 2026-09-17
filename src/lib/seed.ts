@@ -1,4 +1,5 @@
 import { call } from './api';
+import { sqlQueryMarkdown, type SqlCatalog } from './sqlQuery';
 import type { Database, Note, Row } from './types';
 
 // Only runs after an explicit choice to create a new vault with examples.
@@ -14,6 +15,8 @@ export async function seedVault(vault: string) {
       await call<Row>(vault, 'record.create', { databaseId: database.id, values: { title, status, date } }),
     );
   }
+  const catalog = await call<SqlCatalog>(vault, 'query.catalog');
+  const starterQuery = catalog.tables.find((table) => table.databaseId === database.id)!.sql;
   const starters = [
     {
       title: '연결하는 기록',
@@ -30,9 +33,9 @@ export async function seedVault(vault: string) {
     {
       title: '폴트라에 오신 것을 환영해요',
       body:
-        '# A place for connected thought.\n\n**작은 기록이 모여, 나만의 지형이 됩니다.**\n\nFoltra는 노트와 데이터를 함께 다루는 로컬 지식 공간입니다. 이 노트들은 시작을 돕는 예제이며 자유롭게 수정하거나 삭제할 수 있어요.\n\n## 한 곳에서, 자연스럽게\n\n[[연결하는 기록]]에서 생각을 확장하고, [[키보드로 흐름 이어가기]]에서 나만의 조작법을 찾아보세요. 아직 정리되지 않은 생각은 [[생각의 씨앗]]에 남겨도 좋아요.\n\n## Reading room\n\n아래는 DB의 실제 데이터를 보여주는 쿼리입니다. 왼쪽 Reading room에서 값을 바꾸면 이 결과에도 반영됩니다.\n\n```foltra-query\n' +
-        JSON.stringify({ databaseId: database.id, limit: 10 }, null, 2) +
-        '\n```\n\n> 기록을 따라, 생각을 잇다.\n',
+        '# A place for connected thought.\n\n**작은 기록이 모여, 나만의 지형이 됩니다.**\n\nFoltra는 노트와 데이터를 함께 다루는 로컬 지식 공간입니다. 이 노트들은 시작을 돕는 예제이며 자유롭게 수정하거나 삭제할 수 있어요.\n\n## 한 곳에서, 자연스럽게\n\n[[연결하는 기록]]에서 생각을 확장하고, [[키보드로 흐름 이어가기]]에서 나만의 조작법을 찾아보세요. 아직 정리되지 않은 생각은 [[생각의 씨앗]]에 남겨도 좋아요.\n\n## Reading room\n\n아래 SQL은 데이터베이스와 컬럼 이름으로 조회합니다. WHERE로 필터하거나 ORDER BY로 정렬해 보세요. 왼쪽 Reading room에서 값을 바꾸면 이 결과에도 반영됩니다.' +
+        sqlQueryMarkdown(starterQuery) +
+        '\n> 기록을 따라, 생각을 잇다.\n',
     },
   ];
   for (const item of starters.slice(0, -1)) await call<Note>(vault, 'note.create', item);

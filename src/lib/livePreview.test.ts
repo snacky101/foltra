@@ -57,16 +57,19 @@ test('live preview hides inactive Markdown syntax without modifying the document
   const active = s.update({ selection: { anchor: 3 } }).state;
   expect(replacements(active).some((r) => r.from === 0)).toBe(false);
 });
-test('block previews reveal their original source when selected', () => {
-  const doc = 'Before\n\n```foltra-query\n{"databaseId":"test"}\n```\n\nAfter';
-  const s = state(doc);
-  const block = replacements(s).find((r) => r.block)!;
-  expect(block).toBeDefined();
-  expect(replacements(s.update({ selection: { anchor: block.from + 4 } }).state).some((r) => r.block)).toBe(
-    false,
-  );
-  expect(s.doc.toString()).toBe(doc);
-});
+test.each(['foltra-query', 'foltra-sql'])(
+  '%s block previews reveal their original source when selected',
+  (language) => {
+    const doc = `Before\n\n\`\`\`${language}\nSELECT * FROM "Projects";\n\`\`\`\n\nAfter`;
+    const s = state(doc);
+    const block = replacements(s).find((r) => r.block)!;
+    expect(block).toBeDefined();
+    expect(replacements(s.update({ selection: { anchor: block.from + 4 } }).state).some((r) => r.block)).toBe(
+      false,
+    );
+    expect(s.doc.toString()).toBe(doc);
+  },
+);
 test('multiline selections expose syntax rather than concealing selected text', () => {
   const s = state('# Header\n\n**bold**\n\nEnd');
   const selected = s.update({ selection: EditorSelection.range(0, s.doc.length) }).state;

@@ -1,4 +1,7 @@
 import { HighlightedCode } from './HighlightedCode';
+import { SqlQuery } from './SqlQuery';
+import { isQueryLanguage } from '../lib/sqlQuery';
+import { externalLinkUrl, openExternalLink } from '../lib/openExternalLink';
 import { remarkTags } from '../lib/remarkTags';
 import { AttachmentImage } from './AttachmentImage';
 import { TagNavigation } from '../lib/tagNavigation';
@@ -108,6 +111,7 @@ const PreviewContext = createContext<Omit<NotePreviewProps, 'body'> | null>(null
 const markdownComponents: Components = {
   a: function PreviewLink({ href, children }) {
     const { workspace, openLink, openTag } = useContext(PreviewContext)!;
+    const [error, setError] = useState('');
     if (href?.startsWith('#foltra-tag:')) {
       const tag = decodeURIComponent(href.slice('#foltra-tag:'.length));
       return openTag ? (
@@ -143,10 +147,26 @@ const markdownComponents: Components = {
         </button>
       );
     }
+    const url = externalLinkUrl(href ?? '');
+    if (!url) return <span>{children}</span>;
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer">
-        {children}
-      </a>
+      <>
+        <a
+          href={url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(event) => {
+            event.preventDefault();
+            setError('');
+            void openExternalLink(url).catch((error: unknown) =>
+              setError(error instanceof Error ? error.message : String(error)),
+            );
+          }}
+        >
+          {children}
+        </a>
+        {error && <span role="alert"> 링크를 열지 못했습니다: {error}</span>}
+      </>
     );
   },
   img: function PreviewImage({ src, alt }) {
@@ -156,7 +176,15 @@ const markdownComponents: Components = {
   pre: ({ children }) => <div className="code-container">{children}</div>,
   code: function PreviewCode({ className, children }) {
     const { workspace, openNote, executeQueries } = useContext(PreviewContext)!;
-    return executeQueries && className === 'language-foltra-query' ? (
+    const language = className?.match(/(?:^|\s)language-(\S+)/)?.[1] ?? '';
+    const source = String(children);
+    if (
+      executeQueries &&
+      isQueryLanguage(language) &&
+      (language === 'foltra-sql' || !source.trimStart().startsWith('{'))
+    )
+      return <SqlQuery source={source} workspace={workspace} />;
+    return executeQueries && language === 'foltra-query' ? (
       <EmbeddedQuery
         key={JSON.stringify([workspace.path, String(children)])}
         source={String(children)}

@@ -450,6 +450,30 @@
     }
   },
   {
+    "id": "query.sql",
+    "title": "Query vault databases with SQL",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": { "sql": { "type": "string" } },
+      "required": ["sql"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "query.catalog",
+    "title": "List SQL tables and columns",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "links.list",
     "title": "Read knowledge links",
     "readOnly": true,

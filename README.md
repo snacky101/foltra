@@ -51,7 +51,7 @@ npm run dev
 - `[[노트 제목]]` 원문 저장과 `[[노트 제목|표시 이름]]` alias, 이름 변경 시 참조 갱신([링크 규칙](docs/LINKS.md)), 문맥 백링크, 힘 기반 노트 그래프(겹침 방지·연결 강조·확대·이동)와 생성/수정 타임라인.
 - [주제 모음](docs/TOPICS.md): 같은 `[[주제]]`를 적은 문단·제목·인용문과 bullet/하위 목록을 여러 노트에서 카드로 모아 보기. 주제 검색·페이지·날짜/드래그 사용자 지정 정렬·원본 위치 이동, CLI 조회.
 - 노트 파일 없이 만드는 DB와 행. 표·보드·날짜 타임라인, 컬럼 타입 변경·너비 조절·필터·정렬, 이름 셀에서 본문 노트 열기/생성/연결.
-- 노트 안의 `foltra-query` 코드 블록으로 실제 DB 조회.
+- 노트 안의 [`foltra-sql` 블록](docs/SQL.md)에서 DB·컬럼 이름으로 SQL 조회·필터·정렬·집계·조인. 로컬 DuckDB를 사용하며 기존 `foltra-query` JSON도 유지.
 - 설정의 확장 탭에서 Anki 설치·사용자 확장 파일 관리·단축키 지정. 테마 탭에서 Paper & Pine/Midnight 선택, Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula 설치와 사용자 테마 파일 추가·삭제.
 - 기본 확장 카탈로그는 Anki 연결을 제공합니다. 코드 플러그인 SDK v1의 독립 뷰·설정·변경 이벤트, 노트/DB API와 편집기 선택 변환으로 별도 확장을 만들어 파일로 설치할 수 있습니다. 코드 패키지는 권한 확인 후 기기별로 활성화하며 일반 네트워크·외부 파일·앱 DOM 직접 접근은 제공하지 않습니다.
 - 앱을 열지 않아도 같은 vault를 다루는 JSON CLI, 휴지통, 백업 내보내기/복원.
@@ -89,6 +89,8 @@ cargo build -p foltra-cli
 ```sh
 ./target/debug/foltra --vault /absolute/path/to/vault record create --database DATABASE_UUID --values '{"title":"노트 없이 저장한 행","status":"To do"}'
 ./target/debug/foltra --vault /absolute/path/to/vault query run --args '{"databaseId":"DATABASE_UUID","limit":100}'
+./target/debug/foltra --vault /absolute/path/to/vault query catalog
+./target/debug/foltra --vault /absolute/path/to/vault query sql --args '{"sql":"SELECT COUNT(*) AS total FROM \"Tasks\""}'
 ./target/debug/foltra --vault /absolute/path/to/vault note read --id NOTE_UUID
 ./target/debug/foltra --vault /absolute/path/to/vault note update --id NOTE_UUID --expected-revision REVISION_FROM_READ --body-file ./draft.md
 ./target/debug/foltra --vault /absolute/path/to/vault extension install --manifest-file examples/plugins/anki.json

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LanguageDescription, type LanguageSupport } from '@codemirror/language';
-import { languages } from '@codemirror/language-data';
+import { type LanguageDescription, type LanguageSupport } from '@codemirror/language';
+import { codeLanguage } from '../lib/codeLanguages';
 import { highlightTree } from '@lezer/highlight';
 import { editorHighlightStyle } from '../lib/codeHighlighting';
 
 export function HighlightedCode({ className, source }: { className?: string; source: string }) {
   const name = className?.match(/(?:^|\s)language-(\S+)/)?.[1];
-  const language = name ? LanguageDescription.matchLanguageName(languages, name, false) : null;
+  const language = name ? codeLanguage(name) : null;
   const [loaded, setLoaded] = useState<{ language: LanguageDescription; support: LanguageSupport } | null>(
     null,
   );
