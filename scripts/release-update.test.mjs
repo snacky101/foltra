@@ -17,6 +17,7 @@ import {
   validateManifest,
   verifyUpdaterSignature,
   versionFromTag,
+  waitForGitHubVisibility,
 } from './release-update.mjs';
 
 function manifest(version = '0.1.0-preview.2') {
@@ -237,4 +238,59 @@ test('actual Tauri signer output verifies and rejects an altered artifact', asyn
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+test('release publication waits for an absent draft and stale publication/feed reads', async () => {
+  for (const states of [
+    [null, null, { draft: true }],
+    [{ draft: true }, { draft: false }],
+    [null, { version: 'old' }, { version: 'new' }],
+  ]) {
+    const expected = states.at(-1);
+    const delays = [];
+    const reads = [...states];
+    const result = await waitForGitHubVisibility(
+      () => reads.shift(),
+      (value) => value === expected,
+      'fixture release',
+      async (delay) => {
+        delays.push(delay);
+      },
+    );
+    assert.equal(result, expected);
+    assert.equal(reads.length, 0);
+    assert.equal(delays.length, states.length - 1);
+  }
+});
+
+test('visibility retries are bounded and do not hide API errors', async () => {
+  let reads = 0;
+  const delays = [];
+  await assert.rejects(
+    waitForGitHubVisibility(
+      () => {
+        reads++;
+        return null;
+      },
+      Boolean,
+      'missing release',
+      async (delay) => {
+        delays.push(delay);
+      },
+    ),
+    /GitHub has not exposed missing release/,
+  );
+  assert.equal(reads, 6);
+  assert.deepEqual(delays, [1000, 2000, 4000, 8000, 16000]);
+  await assert.rejects(
+    waitForGitHubVisibility(
+      () => {
+        throw new Error('HTTP 403');
+      },
+      Boolean,
+      'forbidden release',
+      async () => assert.fail('Permission failures must not be retried'),
+    ),
+    /HTTP 403/,
+  );
 });

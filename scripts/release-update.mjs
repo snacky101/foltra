@@ -4,6 +4,7 @@ import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promi
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { setTimeout } from 'node:timers/promises';
 
 export const REPOSITORY = 'snacky101/foltra';
 export const FEED_TAG = 'updater';
@@ -257,6 +258,17 @@ function releaseFor(tag) {
   return pages.flat().find((release) => release.tag_name === tag) ?? null;
 }
 
+// GitHub may briefly return the old release list after a successful write.
+// Retry reads only; never repeat creation, uploads or publication automatically.
+export async function waitForGitHubVisibility(read, ready, description, pause = setTimeout) {
+  for (const delay of [0, 1000, 2000, 4000, 8000, 16000]) {
+    if (delay) await pause(delay);
+    const result = read();
+    if (ready(result)) return result;
+  }
+  throw new Error(`GitHub has not exposed ${description} yet; retry after checking the release.`);
+}
+
 function currentFeed() {
   const release = releaseFor(FEED_TAG);
   if (!release) return null;
@@ -433,7 +445,7 @@ async function downloadAndVerify(tag, version, publicKey) {
 
 function validateRelease(release, tag, head) {
   requireValue(
-    release.tag_name === tag && release.target_commitish === head,
+    release && release.tag_name === tag && release.target_commitish === head,
     'Existing release points to a different source commit',
   );
   requireValue(
@@ -466,7 +478,7 @@ async function publish(tag, source) {
         `Foltra ${source.version}`,
         '--generate-notes',
       ]);
-      release = releaseFor(tag);
+      release = await waitForGitHubVisibility(() => releaseFor(tag), Boolean, `the draft ${tag}`);
     }
     validateRelease(release, tag, source.head);
     requireValue(release.draft, 'Cannot replace artifacts of a published release');
@@ -483,7 +495,11 @@ async function publish(tag, source) {
     // No installation can see this version until every asset has been verified.
     run('gh', ['release', 'edit', tag, '--repo', REPOSITORY, '--draft=false', '--latest=false']);
   }
-  release = releaseFor(tag);
+  release = await waitForGitHubVisibility(
+    () => releaseFor(tag),
+    (value) => value && !value.draft,
+    `the published release ${tag}`,
+  );
   validateRelease(release, tag, source.head);
   requireValue(!release.draft, 'Release must be published before promoting the feed');
   const candidate = await downloadAndVerify(tag, source.version, source.publicKey);
@@ -512,9 +528,10 @@ async function publish(tag, source) {
         'Update metadata only. Download installers from the versioned Foltra releases.',
       ]);
     }
-    requireValue(
-      JSON.stringify(currentFeed()) === JSON.stringify(candidate),
-      'Published updater feed does not match the verified release',
+    await waitForGitHubVisibility(
+      currentFeed,
+      (value) => JSON.stringify(value) === JSON.stringify(candidate),
+      'the verified updater feed',
     );
   } finally {
     await rm(directory, { recursive: true, force: true });
