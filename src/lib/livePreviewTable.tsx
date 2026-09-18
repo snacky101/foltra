@@ -50,7 +50,8 @@ class TableEditor {
       'Enter: 편집/확정 · Tab: 오른쪽 셀/끝에서 열 추가 · Shift+Tab: 이전 셀 · Alt+Enter: 아래 행 추가 · Vim o/O: 아래/위 행 추가 · dd/dc: 행/열 삭제';
     this.input.className = 'cm-table-input';
     this.input.hidden = true;
-    this.input.spellcheck = false;
+    this.input.spellcheck = true;
+    this.input.setAttribute('autocorrect', 'on');
     this.preview.className = 'cm-table-preview';
     this.dom.append(this.preview, this.input);
     for (const [kind, label, run] of [

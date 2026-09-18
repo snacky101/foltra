@@ -7,6 +7,7 @@ export const settingsGroups = [
   { id: 'keyboard', title: 'Vim 및 단축키', description: '익숙한 키로 나만의 작업 흐름을 만드세요.' },
   { id: 'theme', title: '테마', description: '오래 머물기 편안한 색을 선택하세요.' },
   { id: 'extensions', title: '확장', description: '작업 방식에 맞는 도구와 명령을 더하세요.' },
+  { id: 'updates', title: '앱 업데이트', description: '새로운 Foltra 버전을 확인하고 설치합니다.' },
 ] as const;
 export type SettingsGroup = (typeof settingsGroups)[number]['id'];
 

@@ -197,7 +197,13 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           ),
           keymap.of([...defaultKeymap, ...historyKeymap]),
           EditorView.lineWrapping,
-          EditorView.contentAttributes.of({ 'aria-label': '노트 본문', spellcheck: 'false' }),
+          // WebKit gates macOS Text Replacements on these attributes. CodeMirror's
+          // code-editor defaults disable both, including user-defined shortcuts.
+          EditorView.contentAttributes.of({
+            'aria-label': '노트 본문',
+            spellcheck: 'true',
+            autocorrect: 'on',
+          }),
           EditorView.updateListener.of((update) => {
             if (update.selectionSet || update.docChanged) location.current?.changed();
             if (update.docChanged && !external.current) latest.current.onChange(update.state.doc.toString());

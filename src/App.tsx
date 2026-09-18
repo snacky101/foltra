@@ -1,6 +1,7 @@
 import { TagNavigation } from './lib/tagNavigation';
 import { PluginCompletionContext } from './lib/pluginCompletionContext';
 import { usePlugins } from './lib/usePlugins';
+import { GitConnectionDialog } from './components/GitConnectionDialog';
 import { PluginView } from './components/PluginView';
 import { PluginSidebarViews } from './components/PluginSidebarViews';
 import { useSettingsNavigation, settingsGroups, type SettingsGroup } from './lib/settingsNavigation';
@@ -55,6 +56,9 @@ import { GraphView } from './components/GraphView';
 import { useOpenWikiLink } from './lib/useOpenWikiLink';
 import { SettingsView } from './components/SettingsView';
 import { TrashView } from './components/TrashView';
+import { useAppUpdates } from './lib/useAppUpdates';
+import { prepareAppUpdate } from './lib/appUpdateSave';
+import { AppUpdateDialogs } from './components/AppUpdatesPanel';
 
 export default function App() {
   const vault = useWorkspace();
@@ -119,7 +123,12 @@ export default function App() {
     (error: unknown) => setToast(error instanceof Error ? error.message : String(error)),
     [],
   );
-  useCloseGuard(note.isDirty, note.save, onError);
+  const updates = useAppUpdates({ prepare: () => prepareAppUpdate(note.save), notify: setToast });
+  useCloseGuard(
+    () => updates.isBlocking() || note.isDirty(),
+    () => (updates.isBlocking() ? Promise.resolve(false) : note.save()),
+    onError,
+  );
   const closeDialog = useCallback(() => setDialog(null), []);
   const closePalette = useCallback(() => setPalette(false), []);
   const closeVaultPicker = useCallback(() => setVaultPicker(false), []);
@@ -140,7 +149,8 @@ export default function App() {
   useEffect(() => {
     if (
       workspace &&
-      (selectedVault.current !== workspace.path || (noteId && !workspace.notes.some((n) => n.id === noteId)))
+      (selectedVault.current !== workspace.path ||
+        (noteId && !workspace.notes.some((n) => n.id === noteId) && !note.isDirty()))
     ) {
       setNoteId(workspace.notes[0]?.id ?? null);
       selectedVault.current = workspace.path;
@@ -389,6 +399,7 @@ export default function App() {
   const commands = createBuiltinCommands({
     'command.palette': () => setPalette(true),
     'vault.switch': () => setVaultPicker(true),
+    'app.update': updates.open,
     'note.create': () => setDialog({ kind: 'new-note' }),
     'note.find': () => setPalette(true),
     search: () => setDialog({ kind: 'search' }),
@@ -543,6 +554,9 @@ export default function App() {
       !!noteActions.moving ||
       !!folderDialog ||
       !!databaseActions.deleting ||
+      !!plugins.git.connection ||
+      updates.opened ||
+      updates.blocking ||
       noteActions.busy,
     onError,
   );
@@ -563,12 +577,26 @@ export default function App() {
   };
   if (!workspace)
     return (
-      <Welcome
-        open={vault.open}
-        create={vault.create}
-        error={vault.error}
-        previousPath={vault.recentVaults[0]?.path ?? ''}
-      />
+      <>
+        <div inert={updates.blocking}>
+          <Welcome
+            open={vault.open}
+            create={vault.create}
+            error={vault.error}
+            previousPath={vault.recentVaults[0]?.path ?? ''}
+            checkUpdates={updates.open}
+          />
+        </div>
+        <AppUpdateDialogs updates={updates} />
+        {toast && (
+          <div className="toast" role="status">
+            <span>{toast}</span>
+            <button aria-label="알림 닫기" onClick={() => setToast('')}>
+              <X size={15} />
+            </button>
+          </div>
+        )}
+      </>
     );
 
   const titles: Record<View, string> = {
@@ -586,7 +614,7 @@ export default function App() {
     <TagNavigation value={(tag) => setDialog({ kind: 'search', query: `tag:${tag}` })}>
       <div
         className={`app-shell${sidebarHidden ? ' sidebar-collapsed' : ''}`}
-        inert={noteActions.busy}
+        inert={noteActions.busy || updates.blocking}
         onFocusCapture={(e) => rememberWorkspaceFocus(e.target)}
       >
         <Sidebar
@@ -872,6 +900,7 @@ export default function App() {
                 pluginErrors={plugins.errors}
                 beforeDisablePlugin={plugins.stop}
                 invokePluginSettings={plugins.invokeSettings}
+                pluginViewRevision={plugins.viewRevision}
                 active={settingsNavigation.opened}
                 group={settingsNavigation.group}
                 workspace={workspace}
@@ -879,6 +908,7 @@ export default function App() {
                 update={updateSettings}
                 refresh={vault.refresh}
                 onError={onError}
+                updates={updates}
               />
             </div>
           </div>
@@ -940,6 +970,15 @@ export default function App() {
               closePalette();
               void openNote(id);
             }}
+          />
+        )}
+        {plugins.git.connection && (
+          <GitConnectionDialog
+            connection={plugins.git.connection}
+            busy={plugins.git.busy}
+            error={plugins.git.error}
+            confirm={plugins.git.confirm}
+            close={plugins.git.close}
           />
         )}
         {dialog && (
@@ -1025,6 +1064,7 @@ export default function App() {
           </div>
         )}
       </div>
+      <AppUpdateDialogs updates={updates} />
       {noteActions.busy && (
         <div className="note-action-progress" role="status">
           <Loader2 size={18} />

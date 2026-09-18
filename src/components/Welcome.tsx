@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, FolderOpen, Sprout } from 'lucide-react';
+import { ArrowRight, FolderOpen, RefreshCw, Sprout } from 'lucide-react';
 import { useVaultLocation } from '../lib/useVaultLocation';
 import { VaultPathField } from './VaultPathField';
 import { isTauri } from '@tauri-apps/api/core';
@@ -10,11 +10,13 @@ export function Welcome({
   create,
   error,
   previousPath,
+  checkUpdates,
 }: {
   open: (path: string) => Promise<void>;
   create: (path: string, name: string, demo: boolean) => Promise<void>;
   error: string;
   previousPath: string;
+  checkUpdates?: () => void;
 }) {
   const location = useVaultLocation(previousPath, 'Personal');
   const { path, setPath, name, setName } = location;
@@ -141,6 +143,12 @@ export function Welcome({
       </div>
       <div className="welcome-bottom">
         FOLIO + TRAIL <span>기록을 따라, 생각을 잇다.</span>
+        {checkUpdates && (
+          <button className="welcome-update-button" onClick={checkUpdates}>
+            <RefreshCw size={13} />
+            업데이트 확인
+          </button>
+        )}
       </div>
     </div>
   );

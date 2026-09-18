@@ -11,6 +11,7 @@ import type {
 } from './pluginTypes';
 import { PluginSession } from './pluginSession';
 import { pluginSettingsView } from './pluginSettings';
+import { usePluginGit } from './usePluginGit';
 
 interface Options {
   visible: boolean;
@@ -44,6 +45,15 @@ export function usePlugins(options: Options) {
   const [busy, setBusy] = useState(false);
   const [sidebarVersion, setSidebarVersion] = useState(0);
   const viewRequest = useRef(0);
+  const updateGitView = useRef<(id: string) => void>(() => {});
+  const git = usePluginGit({
+    workspace: options.workspace,
+    save: options.save,
+    refresh: options.refresh,
+    notify: options.notify,
+    onError: options.onError,
+    updateView: (id) => updateGitView.current(id),
+  });
   const enabled = (options.workspace?.pluginStates ?? []).filter((s) => s.enabled);
   const signature = JSON.stringify(enabled);
   const activationSignature = JSON.stringify(enabled.map((s) => [s.id, s.digest]));
@@ -60,6 +70,13 @@ export function usePlugins(options: Options) {
       if (!alive(id, session)) return null;
       for (const effect of response.effects) {
         if (!alive(id, session)) return null;
+        if (effect.type === 'git' && (event.type === 'command' || event.type === 'action')) {
+          git.request(
+            { path: session.path, id, digest: session.status.digest },
+            effect.args.action,
+            effect.args.params,
+          );
+        }
         if (effect.type === 'notify') latest.current.notify(effect.args.message ?? '');
         if (effect.type === 'openNote') await latest.current.openNote(effect.args.id!);
         if (effect.type === 'openView') {
@@ -228,6 +245,10 @@ export function usePlugins(options: Options) {
   };
   const renderRef = useRef(renderView);
   renderRef.current = renderView;
+  updateGitView.current = (id) => {
+    setSidebarVersion((value) => value + 1);
+    if (activeRef.current?.pluginId === id) void renderRef.current();
+  };
   useEffect(() => {
     const timer = setTimeout(() => {
       for (const extension of options.workspace?.extensions ?? []) {
@@ -344,6 +365,8 @@ export function usePlugins(options: Options) {
   };
   return {
     commands,
+    git,
+    viewRevision: sidebarVersion,
     active,
     tree,
     busy,

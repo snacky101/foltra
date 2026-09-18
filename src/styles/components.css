@@ -1218,6 +1218,14 @@
   font-size: 12px;
   line-height: 1.8;
 }
+.trash-search {
+  display: block;
+  max-width: 420px;
+  margin-bottom: 8px;
+}
+.trash-delete {
+  color: var(--danger);
+}
 .trash-row {
   display: flex;
   gap: 15px;
@@ -1225,8 +1233,15 @@
   padding: 18px 0;
   border-bottom: 1px solid var(--line);
 }
-.trash-row > span {
+.trash-kind-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+.trash-item-name {
   flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .trash-row strong {
   font-size: 13px;

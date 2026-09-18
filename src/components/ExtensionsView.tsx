@@ -40,9 +40,11 @@ export function ExtensionsView({
   pluginErrors = {},
   beforeDisable,
   invokeSettings,
+  pluginViewRevision,
   active = true,
 }: {
   active?: boolean;
+  pluginViewRevision?: number;
   invokeSettings?: PluginSettingsInvoke;
   beforeDisable?: (id: string) => Promise<void>;
   pluginErrors?: Record<string, string>;
@@ -152,7 +154,13 @@ export function ExtensionsView({
     const status = workspace.pluginStates?.find((s) => s.id === selected.id);
     const runtime = selected.runtime!;
     const settingsView = pluginSettingsView(selected);
-    const revision = JSON.stringify([workspace.notes, workspace.databases, workspace.records, status]);
+    const revision = JSON.stringify([
+      workspace.notes,
+      workspace.databases,
+      workspace.records,
+      status,
+      pluginViewRevision,
+    ]);
     return (
       <section className="settings-section extension-settings-page" aria-label={`${selected.name} 설정`}>
         <button

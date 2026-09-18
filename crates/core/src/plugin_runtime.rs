@@ -42,6 +42,17 @@ fn approved(store: &Store, id: &str, digest: &str) -> Result<bool> {
         Err(e) => Err(e.into()),
     }
 }
+pub(crate) fn authorize_git(store: &Store, id: &str, expected_digest: &str) -> Result<()> {
+    let (_, config, digest) = package(store, id)?;
+    if digest != expected_digest || !approved(store, id, &digest)? {
+        return Err(Error::new(
+            "plugin_disabled",
+            "Git 확장이 변경되거나 비활성화되어 작업을 중단했습니다.",
+        ));
+    }
+    permission(&config, "git.sync")?;
+    Ok(())
+}
 pub fn enable(store: &Store, id: &str, expected_digest: &str) -> Result<Value> {
     let (_, _, digest) = package(store, id)?;
     if digest != expected_digest {
@@ -296,6 +307,21 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                     "vaultId" => { let info:Value=serde_json::from_str(&store.read(".foltra/vault.json")?)?; Ok(info["id"].clone()) },
                     "createId" => Ok(json!(crate::new_id())),
                     "hash" => Ok(json!(revision(text(params,"text")?))),
+                    "git" => {
+                        permission(config,"git.sync")?;
+                        let action=text(params,"action")?;
+                        if action == "status" {
+                            if kind == "completion" { return Err(Error::new("permission_denied","Git is unavailable to completions")); }
+                            return crate::git_sync::status(store);
+                        }
+                        if readonly || headless { return Err(Error::new("requires_ui","Request Git operations from a desktop command or view action; CLI clients use the git.* commands directly")); }
+                        permission(config,"ui")?;
+                        if !["configure","sync","resolve"].contains(&action) { return Err(Error::new("invalid_arguments","Unknown Git operation")); }
+                        if effects.borrow().len() >= 16 { return Err(Error::new("plugin_limit","Too many UI effects")); }
+                        if !params["params"].is_object() { return Err(Error::new("invalid_arguments","Git parameters must be an object")); }
+                        effects.borrow_mut().push(json!({"type":"git","args":{"action":action,"params":params["params"]}}));
+                        Ok(Value::Null)
+                    },
                     "anki" => {
                         permission(config,"anki.connect")?;
                         if readonly { return Err(Error::new("permission_denied","AnkiConnect is available from commands and actions only")); }
@@ -939,5 +965,114 @@ mod tests {
             crate::dispatch(&store, "note.list", json!({})).unwrap(),
             json!([])
         );
+    }
+
+    #[test]
+    fn git_sdk_emits_bounded_host_requests_without_running_or_configuring_git() {
+        let (_dir, store, _) = setup(
+            "export default {commands:{run(api){const status=api.git('status');for(const action of ['configure','sync','resolve'])api.git(action,{example:true});return status}}}",
+            json!(["ui", "git.sync"]),
+        );
+        let request = json!({"id":"test-code","event":{"type":"command","id":"run"}});
+        assert_eq!(
+            invoke(&store, &request, false).unwrap_err().code,
+            "plugin_disabled"
+        );
+        allow(&store);
+        let before = crate::dispatch(&store, "vault.export", json!({})).unwrap()["files"].clone();
+        let result = invoke(&store, &request, false).unwrap();
+        assert_eq!(
+            result["effects"],
+            json!([
+                {"type":"git","args":{"action":"configure","params":{"example":true}}},
+                {"type":"git","args":{"action":"sync","params":{"example":true}}},
+                {"type":"git","args":{"action":"resolve","params":{"example":true}}}
+            ])
+        );
+        assert_eq!(result["changed"], false);
+        assert!(result["result"]["config"].is_null());
+        assert_eq!(
+            crate::dispatch(&store, "vault.export", json!({})).unwrap()["files"],
+            before
+        );
+        assert!(store
+            .optional(".foltra/local/git/config.json")
+            .unwrap()
+            .is_none());
+        assert!(store
+            .optional(".foltra/local/git/state.json")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn git_sdk_requires_permissions_and_rejects_passive_headless_or_direct_call_writes() {
+        let source = "function attempt(api){try{api.git('sync',{});return 'allowed'}catch(e){return e.code}}export default {commands:{run:attempt},onLoad:attempt,views:{main:{render(api){let direct;try{api.call('git.sync',{});direct='allowed'}catch(e){direct=e.code}return {type:'text',text:attempt(api)+','+direct}}}}}";
+        let (_dir, store, _) = setup(source, json!(["ui"]));
+        allow(&store);
+        let request = json!({"id":"test-code","event":{"type":"command","id":"run"}});
+        let denied = invoke(&store, &request, false).unwrap();
+        assert_eq!(denied["result"], "permission_denied");
+        assert_eq!(denied["effects"], json!([]));
+
+        let (_dir, store, mut manifest) = setup(source, json!(["ui", "git.sync"]));
+        allow(&store);
+        let loaded = invoke(
+            &store,
+            &json!({"id":"test-code","event":{"type":"load"}}),
+            false,
+        )
+        .unwrap();
+        assert_eq!(loaded["result"], "requires_ui");
+        assert_eq!(loaded["effects"], json!([]));
+        let rendered = invoke(
+            &store,
+            &json!({"id":"test-code","event":{"type":"render","id":"main"}}),
+            false,
+        )
+        .unwrap();
+        assert_eq!(rendered["view"]["text"], "requires_ui,permission_denied");
+        assert_eq!(rendered["effects"], json!([]));
+        assert_eq!(run(&store).unwrap()["result"], "requires_ui");
+
+        manifest["runtime"]["permissions"] = json!(["git.sync"]);
+        manifest["runtime"]["views"] = json!([]);
+        store
+            .commit(vec![(
+                "extensions/test-code.json".into(),
+                Some(manifest.to_string()),
+            )])
+            .unwrap();
+        allow(&store);
+        let denied = invoke(&store, &request, false).unwrap();
+        assert_eq!(denied["result"], "permission_denied");
+        assert_eq!(denied["effects"], json!([]));
+        assert!(store
+            .optional(".foltra/local/git/config.json")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn git_sdk_is_unavailable_to_completions_even_with_declared_permissions() {
+        let (_dir, store, _) = completion_plugin(
+            "export default {completions:{dates(api){return ['status','sync'].map(action=>{let label;try{api.git(action,{});label='allowed'}catch(e){label=e.code}return {label,insertText:action}})}}}",
+            json!(["ui", "editor.write", "git.sync"]),
+        );
+        allow(&store);
+        let result = complete(&store, "").unwrap();
+        assert_eq!(
+            result["result"],
+            json!([
+                {"label":"permission_denied","insertText":"status"},
+                {"label":"requires_ui","insertText":"sync"}
+            ])
+        );
+        assert_eq!(result["effects"], json!([]));
+        assert_eq!(result["changed"], false);
+        assert!(store
+            .optional(".foltra/local/git/state.json")
+            .unwrap()
+            .is_none());
     }
 }

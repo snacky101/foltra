@@ -97,6 +97,7 @@ test('bundled plugins are offered alongside local plugins', async () => {
     'anki',
     'daily-calendar',
     'date-mentions',
+    'git-sync',
   ]);
   expect(extensionCatalog.filter((e) => e.kind === 'theme').map((e) => e.id)).toEqual([
     'catppuccin-mocha',
@@ -108,6 +109,7 @@ test('bundled plugins are offered alongside local plugins', async () => {
     'Anki 연결',
     '일지 캘린더',
     '날짜 자동완성',
+    'Git 동기화',
   ]);
   const custom = { ...calendarFixture, id: 'local-calendar', name: 'My calendar' };
   await upload(JSON.stringify(custom));

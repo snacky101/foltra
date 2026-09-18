@@ -34,6 +34,9 @@ function fixture() {
   };
   const api: Api = {
     vaultId: 'vault-1',
+    git() {
+      throw new Error('Anki does not use Git');
+    },
     createId: () => '11111111-1111-4111-8111-111111111111',
     hash: (s) => {
       hostCalls.push('hash');

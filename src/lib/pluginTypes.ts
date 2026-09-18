@@ -7,6 +7,7 @@ export type PluginPermission =
   | 'editor.write'
   | 'ui'
   | 'anki.connect'
+  | 'git.sync'
   | 'automation';
 export interface PluginRuntime {
   apiVersion: 1;
@@ -83,8 +84,8 @@ export interface PluginResponse {
   state: Record<string, unknown>;
   view: PluginNode | null;
   effects: {
-    type: 'openView' | 'openNote' | 'notify' | 'editor.replaceSelection';
-    args: { id?: string; message?: string; text?: string };
+    type: 'openView' | 'openNote' | 'notify' | 'editor.replaceSelection' | 'git';
+    args: { id?: string; message?: string; text?: string; action?: string; params?: Record<string, unknown> };
   }[];
   changed: boolean;
 }
@@ -111,5 +112,6 @@ export const pluginPermissionLabels: Record<PluginPermission, string> = {
   'editor.write': '현재 선택 영역 편집',
   ui: '플러그인 화면·노트 열기, 알림 표시',
   'anki.connect': '이 기기의 AnkiConnect로 카드 읽기·생성·수정',
+  'git.sync': '사용자가 연결한 Git 저장소에 vault 데이터 전송·병합',
   automation: '노트·DB 변경 후 백그라운드 명령 실행',
 };

@@ -8,6 +8,10 @@ mod extensions;
 mod folder_lifecycle;
 mod folders;
 mod frontmatter;
+mod git_sync;
+#[cfg(test)]
+mod git_sync_tests;
+mod git_transport;
 mod model;
 mod notes;
 mod plugin_manifest;
@@ -16,6 +20,7 @@ mod query;
 mod sql_query;
 mod sql_rename;
 mod storage;
+mod sync_snapshot;
 mod tags;
 mod topic_order;
 mod topics;
@@ -115,6 +120,9 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
             .join("Foltra/Personal");
         return Ok(json!({"path":path}));
     }
+    if matches!(command, "git.sync" | "git.resolve") {
+        return git_sync::run(path, command, &args);
+    }
     let store = Store::open(path, command == "vault.init" || command == "vault.import")?;
     if command == "vault.init" {
         return vault::init(&store, &args);
@@ -138,6 +146,8 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
 pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Value> {
     validate_arguments(command, &args)?;
     match command {
+        "git.status" => git_sync::status(store),
+        "git.configure" => git_sync::configure(store, &args),
         "workspace.get" => vault::workspace(
             store,
             serde_json::from_str(&store.read(".foltra/vault.json")?)?,
@@ -174,6 +184,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "folder.delete" => folder_lifecycle::delete(store, &args),
         "trash.list" => vault::trash(store),
         "trash.restore" => vault::restore(store, &args),
+        "trash.delete" => vault::delete_trash(store, &args),
         "database.create" => databases::create_database(store, &args),
         "database.list" => Ok(serde_json::to_value(databases::databases(store)?)?),
         "database.inspect" => database_lifecycle::inspect(store, &args),

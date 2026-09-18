@@ -220,11 +220,33 @@
       "properties": {
         "id": {
           "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
         }
       },
       "required": [
         "id"
       ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "trash.delete",
+    "title": "Permanently delete trash item",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "expectedRevision"],
       "additionalProperties": false
     }
   },
@@ -1242,6 +1264,102 @@
       "required": [
         "path"
       ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "git.status",
+    "title": "Read Git sync status",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "git.configure",
+    "title": "Connect a Git repository",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "remote": {
+          "type": "string"
+        },
+        "branch": {
+          "type": "string"
+        },
+        "automatic": {
+          "type": "boolean"
+        },
+        "intervalMinutes": {
+          "type": "integer"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        }
+      },
+      "required": ["remote", "expectedRevision"],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "git.sync",
+    "title": "Synchronize vault with Git",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "automatic": {
+          "type": "boolean"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "git.resolve",
+    "title": "Resolve a Git sync conflict",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "jobId": {
+          "type": "string"
+        },
+        "choices": {
+          "type": "object"
+        },
+        "all": {
+          "type": "string"
+        },
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        }
+      },
+      "required": ["jobId"],
       "additionalProperties": false
     }
   }

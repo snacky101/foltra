@@ -1,4 +1,5 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
+import { runCoreRequest } from './coreRequestBarrier';
 declare const __DEV_BRIDGE_TOKEN__: string;
 
 export class CoreError extends Error {
@@ -10,6 +11,10 @@ export class CoreError extends Error {
   }
 }
 export async function call<T>(vault: string, command: string, args: object = {}): Promise<T> {
+  return runCoreRequest(() => execute<T>(vault, command, args));
+}
+
+async function execute<T>(vault: string, command: string, args: object): Promise<T> {
   try {
     if (isTauri()) return await invoke<T>('execute', { vault, command, args });
     if (!import.meta.env.DEV)

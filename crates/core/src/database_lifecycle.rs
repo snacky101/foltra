@@ -14,7 +14,7 @@ struct Snapshot {
     revision: String,
 }
 
-fn validate_database(database: &Database) -> Result<()> {
+pub(crate) fn validate_database(database: &Database) -> Result<()> {
     id(&database.id)?;
     nonempty(&database.name, "Database name")?;
     if database.properties.is_empty() || database.properties.len() > 100 {

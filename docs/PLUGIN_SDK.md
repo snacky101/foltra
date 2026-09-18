@@ -21,7 +21,7 @@ The module exports a default object with `commands`, `views`, `completions`, opt
 - `api.editor.read()` / `api.editor.replaceSelection(text)`: current editor selection and an undoable replacement. The application verifies the original note, document and selection still match before applying an asynchronous result. Live Preview/IME internals remain owned by the editor.
 - `api.state`: JSON session state; independent per plugin/vault and reset on deactivation.
 
-Permissions are `notes.read`, `notes.write`, `databases.read`, `databases.write`, `editor.read`, `editor.write`, `ui`, `anki.connect`, and `automation`. Own settings/storage do not expose any other plugin's data. General network/native-file APIs and arbitrary CodeMirror extensions are outside SDK v1.
+Permissions are `notes.read`, `notes.write`, `databases.read`, `databases.write`, `editor.read`, `editor.write`, `ui`, `anki.connect`, `git.sync`, and `automation`. Own settings/storage do not expose any other plugin's data. General network/native-file APIs and arbitrary CodeMirror extensions are outside SDK v1.
 
 ## Views and commands
 
@@ -87,7 +87,7 @@ Sidebar runtime errors use the host toast while retaining a disabled view instea
 
 ## Acceptance checks
 
-Anki, Daily Calendar and Date Completion are the bundled plugins. Keep SDK regression packages under `tests/fixtures/plugins/`, outside the app catalog. Verify install/approval/enable/disable/remove, plugin settings, custom views and actions, note/DB change events, CLI command execution, Leader/regular shortcut discovery, revision conflicts, stale editor results, changed-package trust rejection, permission denial, bounded loops/memory/output, and legacy package compatibility. Do not equate these checks with full Obsidian API compatibility, independent security auditing or verified behavior on untested platforms.
+Anki, Daily Calendar, Date Completion and Git Sync are the bundled plugins. Keep SDK regression packages under `tests/fixtures/plugins/`, outside the app catalog. Verify install/approval/enable/disable/remove, plugin settings, custom views and actions, note/DB change events, CLI command execution, Leader/regular shortcut discovery, revision conflicts, stale editor results, changed-package trust rejection, permission denial, bounded loops/memory/output, and legacy package compatibility. Do not equate these checks with full Obsidian API compatibility, independent security auditing or verified behavior on untested platforms.
 
 ## Implementation references
 
@@ -101,3 +101,7 @@ Anki, Daily Calendar and Date Completion are the bundled plugins. Keep SDK regre
 `api.vaultId`, `api.createId()` and `api.hash(text)` provide stable IDs and SHA-256 content fingerprints. `tags.list` and `tags.blocks` are read-only core commands under `notes.read`; `search` accepts an exact `tag:name` query.
 
 A manifest `backgroundCommand` requires `automation` and must reference a declared script command. Desktop dispatches it with `{automatic:true}` after 2.5s of settled data changes and periodically every 15s, while the app is running. Returning `{pending:true}` requests another batch after about 1s. Invocations serialize with other plugin actions; disposal cancels queued work. Background commands must be idempotent. A write to plugin storage also marks the workspace changed for UI refresh, but storage-only refresh does not restart the automation effect. The CLI runs one explicit bounded invocation and reports pending work; callers can repeat until pending is false.
+
+## Git host effects
+
+`api.git('status')` reads device-local connection, job, conflict previews and recent history under the `git.sync` permission. `api.git('configure' | 'sync' | 'resolve', params)` only queues a host effect from a desktop command/action with `git.sync` and `ui`; it never executes a shell or waits for Git inside QuickJS. Rendering/completions/headless effects and `api.call('git.*')` bypasses are rejected. The host verifies the current package grant, confirms connection changes in its own dialog, appends the real plugin ID/digest, saves the draft, and starts a separate core request. Core rechecks authorization before apply and push. Status polling runs independently of the plugin queue and vault data rerenders. Expected transport/merge failures become job states instead of disabling the interpreter session. Device-local settings are never read from synchronized plugin storage. See [GIT.md](GIT.md) for command contracts and limits.

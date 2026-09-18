@@ -1,4 +1,6 @@
 import { settingsGroups, type SettingsGroup } from '../lib/settingsNavigation';
+import { AppUpdatesPanel } from './AppUpdatesPanel';
+import type { AppUpdates } from '../lib/useAppUpdates';
 import { CursorSettings } from './CursorSettings';
 import { TaskMarkerHelp } from './TaskMarkerHelp';
 import { FontFamilySetting } from './FontFamilySetting';
@@ -157,8 +159,12 @@ export const SettingsView = memo(
     pluginErrors,
     beforeDisablePlugin,
     invokePluginSettings,
+    pluginViewRevision,
     active,
+    updates,
   }: {
+    updates?: AppUpdates;
+    pluginViewRevision?: number;
     invokePluginSettings?: import('../lib/pluginTypes').PluginSettingsInvoke;
     beforeDisablePlugin?: (id: string) => Promise<void>;
     pluginErrors?: Record<string, string>;
@@ -182,6 +188,9 @@ export const SettingsView = memo(
         <div className="eyebrow">PREFERENCES</div>
         <h1>{currentGroup.title}</h1>
         <p className="page-description">{currentGroup.description}</p>
+        <div className="settings-group" hidden={group !== 'updates'}>
+          {updates && <AppUpdatesPanel updates={updates} />}
+        </div>
         <div className="settings-group" hidden={group !== 'extensions'}>
           <ExtensionsView
             key={`${workspace.path}:${workspace.vault.id}`}
@@ -189,6 +198,7 @@ export const SettingsView = memo(
             pluginErrors={pluginErrors}
             beforeDisable={beforeDisablePlugin}
             invokeSettings={invokePluginSettings}
+            pluginViewRevision={pluginViewRevision}
             active={active && group === 'extensions'}
             workspace={workspace}
             refresh={refresh}

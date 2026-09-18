@@ -11,6 +11,7 @@
     createId: () => bridge('createId'),
     hash: (text) => bridge('hash', { text }),
     anki: (action, params = {}) => bridge('anki', { action, params }),
+    git: (action, params = {}) => bridge('git', { action, params }),
     settings: bridge('settings'),
     call: (command, args = {}) => bridge('call', { command, args }),
     storage: Object.freeze({ read: () => bridge('storage.read'), write: (value, expectedRevision) => bridge('storage.write', { value, expectedRevision }) }),

@@ -1,4 +1,5 @@
-import { defineConfig, type Plugin } from 'vite';
+import { type Plugin } from 'vite';
+import { configDefaults, defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
@@ -77,6 +78,7 @@ function coreBridge(): Plugin {
   };
 }
 export default defineConfig({
+  test: { exclude: [...configDefaults.exclude, 'scripts/**/*.test.mjs'] },
   plugins: [react(), coreBridge()],
   server: {
     host: '127.0.0.1',

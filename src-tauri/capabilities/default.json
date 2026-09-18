@@ -7,6 +7,10 @@
     "dialog:allow-open",
     "core:window:allow-destroy",
     "core:window:allow-start-dragging",
+    "updater:allow-check",
+    "updater:allow-download",
+    "updater:allow-install",
+    "process:allow-restart",
     {
       "identifier": "opener:allow-open-url",
       "allow": [{ "url": "https://*" }, { "url": "http://*" }, { "url": "mailto:*" }]

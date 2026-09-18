@@ -86,10 +86,8 @@ export function livePreviewLayout(state: EditorState, active: (from: number, to:
     result.push(
       Decoration.widget({ widget: new BlockGap(gap), block: true, side: -1 }).range(startLine.from),
     );
-    if (!node.nextSibling)
-      result.push(
-        Decoration.widget({ widget: new BlockGap(after), block: true, side: 1 }).range(state.doc.length),
-      );
+    // The editor's bottom padding supplies trailing space. A noneditable block
+    // at the end caret prevents WebKit from applying macOS Text Replacements.
     if (node.name.startsWith('SetextHeading') && !active(node.from, node.to))
       result.push(Decoration.line({ class: 'cm-live-hidden-separator' }).range(endLine.from));
     previousEnd = endLine.number;

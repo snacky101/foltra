@@ -10,7 +10,9 @@
 
 ## macOS 설치
 
-[v0.1.0-preview.1 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.1)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 비공개 저장소이므로 다운로드하려면 접근 가능한 GitHub 계정으로 로그인해야 합니다.
+[v0.1.0-preview.2 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.2)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
+
+앱 업데이트를 탑재한 버전부터 설정 → **앱 업데이트**에서 새 버전을 확인·다운로드·설치합니다. 기존 `preview.1`은 최초 한 번 새 DMG 설치가 필요합니다. 개발자의 버전 태그 배포와 서명 키 관리는 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
 
 앱 무결성을 위한 ad-hoc 서명을 적용한 개인용 프리뷰이며 Apple Developer ID 서명·공증은 없습니다. 첫 실행이 차단되면 [Apple 안내](https://support.apple.com/guide/mac-help/mh40616/mac)에 따라 시스템 설정 → 개인정보 보호 및 보안에서 해당 앱의 ‘확인 없이 열기’를 선택합니다. 현재 설치 파일은 Apple Silicon용이며 Intel Mac용은 제공하지 않습니다.
 
@@ -19,8 +21,8 @@
 Node.js 24와 Rust stable, 운영체제의 [Tauri 개발 요구사항](https://v2.tauri.app/start/prerequisites/)이 필요합니다. 현재 macOS에서 빌드했습니다.
 
 ```sh
-npm ci
-npm run tauri dev
+make install
+make dev
 ```
 
 첫 화면에서 빈 폴더를 선택해 vault를 만들거나 기존 Foltra vault를 엽니다. 예제 데이터는 “예제 노트와 DB를 담아 시작하기”를 선택한 경우에만 생성됩니다. 앱 이름은 Foltra, vault 이름과 위치는 사용자 지정입니다.
@@ -29,15 +31,19 @@ npm run tauri dev
 
 ```sh
 # macOS에서 독립 실행 가능한 개발용 앱 빌드
-npm run tauri -- build --debug
+make build
 open target/debug/bundle/macos/Foltra.app
 
-# 현재 Mac 아키텍처의 최적화된 앱과 DMG 생성
-npm run release:mac
+# Apple Silicon용 앱·DMG·서명된 업데이트 파일·CLI 생성
+make release
 
 # 브라우저로 UI 개발: 실제 파일 코어를 연결하는 로컬 개발 서버
-npm run dev
+make dev-web
 ```
+
+`make` 또는 `make help`로 전체 명령을 봅니다. `make build-web`은 프론트엔드 번들, `make build-cli`는 개발용 CLI만 빌드합니다. `make release`는 로컬 파일을 만들며 서명 키 설정은 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
+
+macOS 기본 Make 3.81을 지원합니다. 빌드 작업 수는 `CARGO_BUILD_JOBS=4`, macOS 최소 버전은 `11.0`을 기본값으로 사용합니다. standalone Command Line Tools가 있으면 이를 사용하며, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make build`처럼 개발 도구를 직접 지정할 수 있습니다. 시스템의 Xcode 선택 설정은 바꾸지 않습니다. 한 번의 `make -j` 호출 안에서도 타깃은 순서대로 실행합니다.
 
 브라우저 개발 주소는 `http://127.0.0.1:1420`입니다. 이 서버는 개발 전용이며 네트워크 공유나 호스팅용이 아닙니다. 빌드한 데스크톱 앱은 이 서버 없이 실행됩니다.
 
@@ -78,7 +84,7 @@ Vim 명령 입력줄은 화면 하단에 표시합니다. `:q`는 현재 노트�
 ## CLI와 agent 연동
 
 ```sh
-cargo build -p foltra-cli
+make build-cli
 ./target/debug/foltra --vault /absolute/path/to/vault vault init --name Personal
 ./target/debug/foltra --vault /absolute/path/to/vault note create --title "첫 기록" --body "본문"
 ./target/debug/foltra --vault /absolute/path/to/vault commands list
@@ -112,17 +118,19 @@ cargo build -p foltra-cli
 ## 개발과 구조
 
 ```sh
-npm test       # 코어 계약, 실제 CLI 프로세스, 키 라우팅 테스트
-npm run check # TS/프로덕션 번들, Rust 포맷, 전체 workspace Clippy
-npm run format
+make test   # core·실제 CLI·프론트엔드·배포 검증·desktop native 테스트
+make check  # TS/프로덕션 번들, Rust 포맷, 전체 workspace Clippy
+make verify # test → check
+make format
 ```
 
 - [구조와 실행 흐름](docs/ARCHITECTURE.md): 모듈 책임, 저장 계약, 기능 추가 위치.
 - [개발 현황과 남은 작업](docs/STATUS.md): 원래 요구사항별 구현·검증 구분.
 - [전체 제품 설계](docs/DESIGN.md): 장기 요구사항과 설계 가설. 현재 구현의 사실은 위 두 문서를 기준으로 합니다.
 - [코드 플러그인 SDK](packages/plugin-sdk/README.md), [SDK 계약·제한](docs/PLUGIN_SDK.md), [Anki 확장 소스](examples/code/anki/), [테마 팔레트·출처](docs/THEMES.md).
+- [Git 동기화 확장](docs/GIT.md): 설치·저장소 연결, 동기화 범위와 충돌 해결.
 
-아직 공개 플러그인 실행 환경, Git 동기화, 모바일, 관계·수식 DB, 대규모 vault 품질 기준을 완료하지 않았습니다. 저장 포맷은 버전을 포함하지만 범용 포맷 마이그레이션은 구현 전입니다.
+아직 공개 플러그인 실행 환경, 모바일, 관계·수식 DB, 대규모 vault 품질 기준을 완료하지 않았습니다. 저장 포맷은 버전을 포함하지만 범용 포맷 마이그레이션은 구현 전입니다.
 
 컬럼 타입 변경은 모든 행을 먼저 검사합니다. CLI에서도 `database.property.preview`에 `databaseId`와 `property`를 보내 결과를 확인한 뒤, 그 `revision`을 `expectedRevision`으로 붙여 `database.property.update`를 호출합니다. 검사 이후 데이터가 바뀌면 다시 검사해야 하며, 변환 불가 값은 삭제하거나 강제로 변환하지 않습니다. 이름 컬럼은 텍스트로 유지됩니다.
 

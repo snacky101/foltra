@@ -142,8 +142,8 @@ test('blank block separators keep the same layout across cursor and focus change
   expect(typed.doc.lines).toBe(s.doc.lines);
 });
 
-test('the trailing block margin stays after the final editable line', () => {
-  for (const doc of ['Paragraph\n', 'Paragraph\n\n', '- Item\n\n', 'Paragraph\n\na']) {
+test('the final editable line has no trailing noneditable gap', () => {
+  for (const doc of ['-> ', 'Paragraph\n', 'Paragraph\n\n', '- Item\n\n', 'Paragraph\n\na']) {
     const s = state(doc);
     const ends: number[] = [];
     livePreviewDecorations(s, { workspace, openNote() {}, openLink() {} }).between(
@@ -153,8 +153,44 @@ test('the trailing block margin stays after the final editable line', () => {
         if (value.spec.block && value.spec.side === 1 && value.spec.widget?.height) ends.push(from);
       },
     );
-    expect(ends).toEqual([doc.length]);
+    expect(ends).toEqual([]);
   }
+});
+
+test('editing the final blank line preserves earlier block gaps and source line positions', () => {
+  const doc = '# Heading\n\nParagraph\n\n- Item\n\n';
+  const before = state(doc);
+  const eof = before.doc.line(before.doc.lines).from;
+  const gaps = (s: EditorState) => {
+    const result: { from: number; height: string; side: number }[] = [];
+    livePreviewDecorations(s, { workspace, openNote() {}, openLink() {} }).between(
+      0,
+      s.doc.length,
+      (from, _to, value) => {
+        if (value.spec.block && value.spec.widget?.height)
+          result.push({ from, height: value.spec.widget.height, side: value.spec.side });
+      },
+    );
+    return result;
+  };
+  const original = gaps(before);
+  expect(original.map((gap) => gap.from)).toEqual([0, doc.indexOf('Paragraph'), doc.indexOf('- Item')]);
+  expect(original[1].height).toContain('max(var(--md-paragraph-before), var(--md-h1-after))');
+  expect(original[2].height).toContain('max(var(--md-list-before), var(--md-paragraph-after))');
+  expect(original.every((gap) => gap.side === -1)).toBe(true);
+
+  const typed = before.update(before.replaceSelection('ㅎ')).state;
+  expect(gaps(typed).filter((gap) => gap.from < eof)).toEqual(original);
+  expect(gaps(typed).find((gap) => gap.from === eof)?.height).toContain(
+    'max(var(--md-paragraph-before), var(--md-list-after))',
+  );
+  expect(typed.doc.lines).toBe(before.doc.lines);
+  expect(typed.doc.line(typed.doc.lines).from).toBe(eof);
+  expect(typed.doc.sliceString(0, eof)).toBe(doc);
+  expect(typed.selection.main.head).toBe(eof + 1);
+  const cleared = typed.update({ changes: { from: eof, to: eof + 1 } }).state;
+  expect(cleared.doc.toString()).toBe(doc);
+  expect(gaps(cleared)).toEqual(original);
 });
 
 test('setext underline remains editable with the heading and collapses when inactive', () => {

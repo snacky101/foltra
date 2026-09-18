@@ -67,6 +67,7 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `SearchDialog`, `Select`, `DateField`, `ResizableSidebar` | 검색 키 탐색, 테마 공통 입력과 패널 너비 | core 데이터 규칙 |
 | `src/components/*` | 노트·DB·뷰·설정 등의 표시와 입력 | 파일시스템 접근 |
 | `src/App.tsx` | 화면 전환, 선택 객체, 명령과 기능 연결 | 도메인 검증·저장 엔진 |
+| `useAppUpdates`, `appUpdateSave`, `coreRequestBarrier`, `AppUpdatesPanel`, `src-tauri/src/updates.rs` | 앱 업데이트 상태·설치 전 저장과 요청 정착·설치 중 종료 보호, Tauri의 서명 검증·다운로드·번들 교체 연결 | vault 설정에 기기 업데이트 상태 저장, 확장에 앱 설치 권한 부여, 자동 설치 |
 
 `src/lib/types.ts`의 프런트엔드 타입은 현재 수동 관리입니다. Rust에서 자동 생성된 스키마가 아닙니다. API 필드를 바꾸면 Rust 모델, 명령 스키마, TS 타입, 계약 테스트를 같이 수정합니다. 이를 자동 생성하는 작업은 별도 후속 과제입니다.
 
@@ -172,7 +173,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 **새 속성 종류**는 Rust 값 검증, 쿼리 의미, TS 타입, Cell 편집기, export/import 호환성을 함께 추가합니다. 단지 UI selector에 항목을 넣는 것으로 완료하지 않습니다.
 
-**동기화**를 넣을 때는 현재 파일 포맷과 journal/local/cache 경계를 유지하되, 원격 병합을 즉시 원본에 적용하지 않습니다. revision 비교, schema·ID 검증, 사용자에게 보여줄 충돌 해결 결과가 필요합니다. 현재는 Git 저장에 적합한 텍스트 원본과 제외 규칙만 있으며 sync adapter는 없습니다.
+**동기화**를 넣을 때는 현재 파일 포맷과 journal/local/cache 경계를 유지하되, 원격 병합을 즉시 원본에 적용하지 않습니다. revision 비교, schema·ID 검증, 사용자에게 보여줄 충돌 해결 결과가 필요합니다. Git 동기화는 선택 설치 확장과 코어의 제한된 Git 전송 API로 제공합니다. QuickJS는 host effect만 요청하고 별도 CLI/Tauri 요청이 네트워크 작업을 실행합니다. `.foltra/local/git/`의 bare 저장소에서 원본을 비교하고, vault 잠금을 놓은 동안 fetch한 결과는 전체 검증과 snapshot revision 비교 후 journal로 적용합니다. 기기 설정·확장 패키지·실행 승인은 동기화하지 않습니다. 상세 범위·한도는 `GIT.md`에 있습니다.
 
 ## 성능과 보안의 현재 경계
 

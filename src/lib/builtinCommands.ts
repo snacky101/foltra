@@ -9,6 +9,7 @@ const definitions = [
     bindings: [{ keys: platformModifier() === 'meta' ? 'Mod+k' : 'Mod+Shift+p', leader: false }],
   },
   { id: 'vault.switch', title: 'Vault 선택', group: '앱', bindings: [{ keys: 'vv', leader: true }] },
+  { id: 'app.update', title: '앱 업데이트 확인', group: '앱' },
   {
     id: 'note.create',
     title: '새 노트',

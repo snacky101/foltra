@@ -102,6 +102,10 @@ export interface Folder {
 }
 export interface TrashItem {
   id: string;
+  revision: string;
+  folderCount?: number;
+  noteCount?: number;
+  recordCount?: number;
   title: string;
   kind: string;
   deletedAt: string;

@@ -71,6 +71,7 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         "editor.write",
         "ui",
         "anki.connect",
+        "git.sync",
         "automation",
     ];
     let mut ids = HashSet::new();

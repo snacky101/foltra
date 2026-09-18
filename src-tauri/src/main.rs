@@ -2,6 +2,7 @@
 
 #[cfg(target_os = "macos")]
 mod menu;
+mod updates;
 
 #[tauri::command]
 async fn execute(
@@ -38,7 +39,10 @@ fn reopen_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
 
 fn main() {
     let builder = tauri::Builder::default()
+        .manage(updates::UpdateLifecycle::default())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .plugin(
             tauri_plugin_opener::Builder::new()
                 .open_js_links_on_click(false)
@@ -53,13 +57,30 @@ fn main() {
                 )
                 .build(),
         )
-        .invoke_handler(tauri::generate_handler![execute]);
+        .invoke_handler(tauri::generate_handler![
+            execute,
+            updates::set_update_in_progress,
+            updates::take_update_check_request
+        ]);
     #[cfg(target_os = "macos")]
     let builder = builder.menu(menu::create).on_menu_event(menu::handle);
     builder
         .build(tauri::generate_context!())
         .expect("Foltra could not start")
         .run(|_app, _event| {
+            use std::sync::atomic::Ordering;
+            use tauri::Manager;
+            if let tauri::RunEvent::ExitRequested { code, api, .. } = &_event {
+                if updates::block_exit(
+                    *code,
+                    _app.state::<updates::UpdateLifecycle>()
+                        .installing
+                        .load(Ordering::SeqCst),
+                ) {
+                    api.prevent_exit();
+                    return;
+                }
+            }
             #[cfg(target_os = "macos")]
             match _event {
                 // Closing the last window should leave the macOS app running.

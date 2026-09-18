@@ -46,7 +46,8 @@ pub fn workspace(store: &Store, info: VaultInfo) -> Result<Value> {
 pub fn trash(store: &Store) -> Result<Value> {
     let mut out = vec![];
     for path in store.files("trash", "json")? {
-        let mut item: Value = serde_json::from_str(&store.read(&path)?)?;
+        let raw = store.read(&path)?;
+        let mut item: Value = serde_json::from_str(&raw)?;
         let metadata = item
             .as_object_mut()
             .ok_or_else(|| Error::new("invalid_data", "Trash entry must be an object"))?;
@@ -55,21 +56,48 @@ pub fn trash(store: &Store) -> Result<Value> {
         metadata.remove("folders");
         metadata.remove("notes");
         metadata.remove("linkTargets");
+        metadata.insert("revision".into(), json!(crate::storage::revision(&raw)));
         out.push(item);
     }
     out.sort_by(|a, b| b["deletedAt"].as_str().cmp(&a["deletedAt"].as_str()));
     Ok(json!(out))
 }
 
-pub fn restore(store: &Store, args: &Value) -> Result<Value> {
+fn read_trash(store: &Store, args: &Value) -> Result<(String, Value)> {
     let path = format!("trash/{}.json", id(text(args, "id")?)?);
-    let item: Value = serde_json::from_str(&store.read(&path)?)?;
+    let raw = store.read(&path)?;
+    if args.get("expectedRevision").is_some() {
+        check_revision(
+            text(args, "expectedRevision")?,
+            &crate::storage::revision(&raw),
+        )?;
+    }
+    let item: Value = serde_json::from_str(&raw)?;
     if text(&item, "id")? != text(args, "id")? {
         return Err(Error::new(
             "invalid_data",
             "Trash ID does not match filename",
         ));
     }
+    Ok((path, item))
+}
+
+pub fn delete_trash(store: &Store, args: &Value) -> Result<Value> {
+    text(args, "expectedRevision")?;
+    let (path, item) = read_trash(store, args)?;
+    if !matches!(
+        item["kind"].as_str(),
+        Some("note" | "record" | "database" | "folder")
+    ) {
+        return Err(Error::new("invalid_data", "Unknown trash item type"));
+    }
+    // Delete only this saved trash bundle. Never follow its original paths or linked notes.
+    store.commit(vec![(path, None)])?;
+    Ok(json!({"deleted":item["id"]}))
+}
+
+pub fn restore(store: &Store, args: &Value) -> Result<Value> {
+    let (path, item) = read_trash(store, args)?;
     if item["kind"] == "database" {
         return crate::database_lifecycle::restore(store, &item, &path);
     }

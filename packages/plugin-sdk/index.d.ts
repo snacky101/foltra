@@ -95,6 +95,10 @@ export interface Api {
    * storeVaultImage({path, profile}) uploads a managed vault image to Anki media;
    * requires notes.read + anki.connect and a command/action context. Returns its filename. */
   anki<T = unknown>(action: string, params?: object): T;
+  /** git.sync permission. status reads device-local state; configure, sync and resolve
+   * queue host effects from desktop commands/actions. Configuration requires host confirmation.
+   * Git work runs outside the interpreter and vault writer lock. */
+  git<T = unknown>(action: 'status' | 'configure' | 'sync' | 'resolve', params?: object): T;
   /** Serialisable session state, reset on deactivation. */
   state: Record<string, unknown>;
   readonly settings: Readonly<Record<string, string | number | boolean>>;

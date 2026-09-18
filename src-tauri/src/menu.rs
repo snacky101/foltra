@@ -1,6 +1,6 @@
 use tauri::{
     menu::{AboutMetadata, Menu, SubmenuBuilder, HELP_SUBMENU_ID, WINDOW_SUBMENU_ID},
-    AppHandle, Manager,
+    AppHandle, Emitter, Manager,
 };
 
 pub fn create(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
@@ -14,6 +14,7 @@ pub fn create(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
                     version: Some(app.package_info().version.to_string()),
                     ..Default::default()
                 }))
+                .text("app.update", "Check for Updates…")
                 .separator()
                 .services()
                 .separator()
@@ -46,6 +47,16 @@ pub fn create(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 }
 
 pub fn handle(app: &AppHandle, event: tauri::menu::MenuEvent) {
+    if event.id.as_ref() == "app.update" {
+        app.state::<crate::updates::UpdateLifecycle>()
+            .check_requested
+            .store(true, std::sync::atomic::Ordering::SeqCst);
+        if let Err(error) =
+            crate::reopen_main_window(app).and_then(|_| app.emit("foltra:check-for-updates", ()))
+        {
+            eprintln!("Foltra could not open updates: {error}");
+        }
+    }
     if event.id.as_ref() == "window.close" {
         if let Some(window) = app.get_webview_window("main") {
             if let Err(error) = window.close() {

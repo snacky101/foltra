@@ -1,0 +1,31 @@
+{
+  "kind": "plugin",
+  "id": "git-sync",
+  "name": "Git 동기화",
+  "version": "1.0.0",
+  "description": "개인 Git 저장소로 Vault를 동기화하고 충돌을 확인합니다. 자동 동기화는 연결 설정에서 켤 수 있습니다.",
+  "commands": [
+    {
+      "id": "sync",
+      "title": "Git 지금 동기화",
+      "bindings": [
+        { "keys": "Mod+Shift+s", "leader": false },
+        { "keys": "gs", "leader": true }
+      ],
+      "action": { "type": "script" }
+    },
+    {
+      "id": "open",
+      "title": "Git 동기화 열기",
+      "bindings": [{ "keys": "go", "leader": true }],
+      "action": { "type": "script" }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": ["git.sync", "ui", "automation"],
+    "views": [{ "id": "sync", "title": "Git 동기화" }],
+    "settingsView": "sync",
+    "backgroundCommand": "sync"
+  }
+}
