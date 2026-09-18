@@ -1,0 +1,13 @@
+{
+  "kind": "plugin",
+  "id": "date-mentions",
+  "name": "날짜 자동완성",
+  "version": "1.0.0",
+  "description": "@를 입력하고 Today, Yesterday, Tomorrow를 선택하면 기기의 현지 날짜를 YYYY-MM-DD 형식으로 넣습니다.",
+  "commands": [],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": ["editor.write"],
+    "completions": [{ "id": "dates", "trigger": "@" }]
+  }
+}

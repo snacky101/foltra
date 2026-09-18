@@ -10,6 +10,7 @@ export function PluginSettingsView({
   invoke,
   error,
   title = '확장 설정',
+  preserveOnError = false,
 }: {
   pluginId: string;
   viewId: string;
@@ -17,6 +18,7 @@ export function PluginSettingsView({
   invoke: PluginSettingsInvoke;
   error?: string;
   title?: string;
+  preserveOnError?: boolean;
 }) {
   const [tree, setTree] = useState<PluginNode | null>(null);
   const [busy, setBusy] = useState(true);
@@ -32,6 +34,7 @@ export function PluginSettingsView({
     };
   }, []);
   const render = async () => {
+    if (error) return;
     const current = ++request.current;
     const response = await invoke(pluginId, { type: 'render', id: viewId });
     if (mounted.current && current === request.current && response) setTree(response.view);
@@ -50,11 +53,12 @@ export function PluginSettingsView({
     };
   }, [pluginId, viewId, revision]);
   const action = async (id: string, value?: string | boolean, payload?: unknown) => {
+    if (error) return;
     ++pending.current;
     setBusy(true);
     try {
-      await invoke(pluginId, { type: 'action', id: viewId, action: { id, value, payload } });
-      if (mounted.current) await renderRef.current();
+      const response = await invoke(pluginId, { type: 'action', id: viewId, action: { id, value, payload } });
+      if (response && mounted.current) await renderRef.current();
     } finally {
       --pending.current;
       if (mounted.current && !pending.current) setBusy(false);
@@ -67,6 +71,7 @@ export function PluginSettingsView({
       tree={tree}
       busy={busy}
       error={error}
+      preserveOnError={preserveOnError}
       action={action}
       refresh={() => void renderRef.current()}
     />

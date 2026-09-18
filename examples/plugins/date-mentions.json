@@ -1,0 +1,21 @@
+{
+  "kind": "plugin",
+  "id": "date-mentions",
+  "name": "날짜 자동완성",
+  "version": "1.0.0",
+  "description": "@를 입력하고 Today, Yesterday, Tomorrow를 선택하면 기기의 현지 날짜를 YYYY-MM-DD 형식으로 넣습니다.",
+  "commands": [],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": [
+      "editor.write"
+    ],
+    "completions": [
+      {
+        "id": "dates",
+        "trigger": "@"
+      }
+    ],
+    "source": "// examples/code/date-mentions/main.ts\nvar dates = [\n  { label: \"Today\", offset: 0, detail: \"\\uC624\\uB298\" },\n  { label: \"Yesterday\", offset: -1, detail: \"\\uC5B4\\uC81C\" },\n  { label: \"Tomorrow\", offset: 1, detail: \"\\uB0B4\\uC77C\" }\n];\nvar pad = (number, length = 2) => String(number).padStart(length, \"0\");\nvar plugin = {\n  completions: {\n    dates(_api, { query }) {\n      const today = /* @__PURE__ */ new Date();\n      return dates.filter(({ label }) => label.toLowerCase().startsWith(query.toLowerCase())).map(({ label, offset, detail }) => {\n        const date = new Date(today);\n        date.setDate(today.getDate() + offset);\n        return {\n          label,\n          insertText: `${pad(date.getFullYear(), 4)}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`,\n          detail\n        };\n      });\n    }\n  }\n};\nvar main_default = plugin;\nexport {\n  main_default as default\n};\n"
+  }
+}

@@ -28,6 +28,8 @@ struct Contribution {
     action: Action,
     #[serde(default)]
     headless: bool,
+    #[serde(default)]
+    bindings: Vec<Value>,
 }
 #[derive(Deserialize)]
 #[serde(tag = "type", rename_all = "camelCase", deny_unknown_fields)]
@@ -93,6 +95,8 @@ fn validate(value: &Value) -> Result<Manifest> {
                     || !seen.insert(&contribution.id)
                     || contribution.title.trim().is_empty()
                     || contribution.title.len() > 120
+                    || contribution.bindings.len() > 10
+                    || !crate::vault::valid_bindings(&json!(contribution.bindings))
                 {
                     return Err(Error::new(
                         "invalid_extension",
@@ -243,11 +247,15 @@ pub fn command_specs(store: &Store) -> Result<Vec<Value>> {
         if let Some(commands) = manifest["commands"].as_array() {
             for command in commands {
                 let kind = command["action"]["type"].as_str().unwrap_or("");
-                specs.push(json!({
+                let mut spec = json!({
                     "id":format!("plugin.{}.{}",manifest["id"].as_str().unwrap(),command["id"].as_str().unwrap()),
                     "title":command["title"], "headless": if kind == "script" { command["headless"].as_bool().unwrap_or(false) } else {kind != "view"}, "readOnly":kind != "template" && kind != "script",
                     "argsSchema":{"type":"object","properties":{},"required":[],"additionalProperties":kind == "script"}
-                }));
+                });
+                if let Some(bindings) = command.get("bindings") {
+                    spec["bindings"] = bindings.clone();
+                }
+                specs.push(spec);
             }
         }
     }

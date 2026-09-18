@@ -229,9 +229,9 @@ test.each([
       .split('\n')
       .at(-1)!
       .search(/[-+*]|\d+[.)]/);
-  const prefix = doc.slice(prefixFrom, from + 3);
+  const prefix = doc.slice(prefixFrom, from + 4);
   const view = live(doc);
-  for (let anchor = prefixFrom; anchor < from + 3; anchor++) {
+  for (let anchor = prefixFrom; anchor < from + 4; anchor++) {
     view.dispatch({ selection: { anchor } });
     expect(view.dom.querySelector('.cm-live-task')).toBeNull();
     const position = view.domAtPos(anchor);
@@ -241,7 +241,7 @@ test.each([
     expect(view.contentDOM.textContent).toContain(prefix);
     expect(reading(doc).querySelector('.task-icon')).not.toBeNull();
   }
-  for (const anchor of [from + 3, doc.length]) {
+  for (const anchor of [from + 4, doc.length]) {
     view.dispatch({ selection: { anchor } });
     expect(view.dom.querySelector('.cm-live-task')).not.toBeNull();
   }
@@ -265,7 +265,7 @@ test.each(markers)('arrow navigation enters the whole [%s] prefix from either si
   view.focus();
   expect(cursorCharLeft(view)).toBe(true);
   expect(view.state.selection.main.head).toBe(from + 5);
-  expect(view.dom.querySelector('.cm-live-task')).not.toBeNull();
+  expect(view.dom.querySelector('.cm-live-task')).toBeNull();
   for (let offset = 4; offset >= 0; offset--) {
     cursorCharLeft(view);
     expect(view.state.selection.main.head).toBe(from + offset);
@@ -275,14 +275,14 @@ test.each(markers)('arrow navigation enters the whole [%s] prefix from either si
   cursorCharLeft(view);
   expect(view.state.selection.main.head).toBe(from - 1);
   expect(view.dom.querySelector('.cm-live-task')).not.toBeNull();
-  for (let offset = 0; offset <= 4; offset++) {
+  for (let offset = 0; offset <= 5; offset++) {
     cursorCharRight(view);
     expect(view.state.selection.main.head).toBe(from + offset);
     expect(view.dom.querySelector('.cm-live-task')).toBeNull();
     expect(view.contentDOM.textContent).toContain(`- [${marker}] Text`);
   }
   cursorCharRight(view);
-  expect(view.state.selection.main.head).toBe(from + 5);
+  expect(view.state.selection.main.head).toBe(from + 6);
   expect(view.dom.querySelector('.cm-live-task')).not.toBeNull();
 });
 
@@ -294,7 +294,7 @@ test.each(markers)('Vim h/l can enter [%s], edit its list marker and state, and 
   for (let offset = 5; offset >= 0; offset--) {
     Vim.handleKey(cm, 'h', 'user');
     expect(view.state.selection.main.head).toBe(offset);
-    if (offset < 5) expect(view.contentDOM.textContent).toContain(doc);
+    expect(view.contentDOM.textContent).toContain(doc);
   }
   Vim.handleKey(cm, 'r', 'user');
   Vim.handleKey(cm, '+', 'user');
@@ -307,6 +307,8 @@ test.each(markers)('Vim h/l can enter [%s], edit its list marker and state, and 
   Vim.handleKey(cm, 'b', 'user');
   expect(view.state.doc.toString()).toBe('+ [b] Text');
   Vim.handleKey(cm, 'l', 'user');
+  Vim.handleKey(cm, 'l', 'user');
+  expect(view.dom.querySelector('.cm-live-task')).toBeNull();
   Vim.handleKey(cm, 'l', 'user');
   expect(view.dom.querySelector('.task-icon')?.getAttribute('data-task-status')).toBe('bookmark');
   expect(undo(view)).toBe(true);
@@ -348,6 +350,8 @@ test('deleting and retyping a state preserves native input through temporarily i
   expect(view.dom.querySelector('.cm-live-task')).toBeNull();
   expect(view.contentDOM.textContent).toContain('- [b] Text');
   cursorCharRight(view);
+  expect(view.dom.querySelector('.cm-live-task')).toBeNull();
+  cursorCharRight(view);
   expect(view.dom.querySelector('.task-icon')?.getAttribute('data-task-status')).toBe('bookmark');
   expect(undo(view)).toBe(true);
   expect(view.state.doc.toString()).toBe('- [x] Text');
@@ -364,6 +368,8 @@ test('an unsupported intermediate state remains editable without inventing a tas
   view.dispatch({ selection: EditorSelection.range(3, 4) });
   view.dispatch(view.state.replaceSelection('!'));
   expect(view.contentDOM.textContent).toContain('- [!] Text');
+  cursorCharRight(view);
+  expect(view.dom.querySelector('.cm-live-task')).toBeNull();
   cursorCharRight(view);
   expect(view.dom.querySelector('.task-icon')?.getAttribute('data-task-status')).toBe('important');
 });

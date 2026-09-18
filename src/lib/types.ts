@@ -90,7 +90,7 @@ export interface Extension {
   name: string;
   version: string;
   description?: string;
-  commands?: { id: string; title: string; action: PluginAction; headless?: boolean }[];
+  commands?: { id: string; title: string; action: PluginAction; headless?: boolean; bindings?: Binding[] }[];
   runtime?: import('./pluginTypes').PluginRuntime;
   tokens?: Record<string, string>;
 }

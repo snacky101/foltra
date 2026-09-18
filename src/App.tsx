@@ -1,4 +1,5 @@
 import { TagNavigation } from './lib/tagNavigation';
+import { PluginCompletionContext } from './lib/pluginCompletionContext';
 import { usePlugins } from './lib/usePlugins';
 import { PluginView } from './components/PluginView';
 import { PluginSidebarViews } from './components/PluginSidebarViews';
@@ -154,7 +155,8 @@ export default function App() {
   }, [toast]);
   const editorReady = () => {
     if (pendingEditorFocus.current && editor.current) {
-      editor.current.focus();
+      // A double-click can start inline naming while the first click is still loading the note.
+      if (!document.querySelector('[data-inline-rename]')) editor.current.focus();
       pendingEditorFocus.current = false;
     }
     if (pendingInsert.current !== null && editor.current) {
@@ -187,7 +189,8 @@ export default function App() {
         editor.current.restoreLocation(pendingLocation.current);
         pendingLocation.current = null;
       }
-      document.querySelector<HTMLElement>('.note-scroll')?.focus({ preventScroll: true });
+      if (!document.querySelector('[data-inline-rename]'))
+        document.querySelector<HTMLElement>('.note-scroll')?.focus({ preventScroll: true });
       pendingEditorFocus.current = false;
     });
     return () => cancelAnimationFrame(frame);
@@ -292,7 +295,10 @@ export default function App() {
     pendingEditorFocus.current = false;
   });
   useEffect(() => {
-    if (treeEditing.editing) setSidebarCollapsed(false);
+    if (treeEditing.editing) {
+      setSidebarCollapsed(false);
+      pendingEditorFocus.current = false;
+    }
   }, [treeEditing.editing?.id]);
   const noteActions = useNoteActions(
     vault.path,
@@ -502,6 +508,7 @@ export default function App() {
         id: `plugin.${extension.id}.${contribution.id}`,
         title: contribution.title,
         group: extension.name,
+        bindings: contribution.bindings,
         run: async () => {
           const action = contribution.action;
           if (action.type === 'template') {
@@ -597,6 +604,7 @@ export default function App() {
           noteId={noteId}
           databaseId={databaseId}
           openNote={(id) => void openNote(id)}
+          renameNote={(target) => void noteActions.run('rename', target).catch(onError)}
           navigate={(v, id) => void navigate(v, id)}
           search={() => dispatch('search')}
           createNote={(folderId) => void treeEditing.create('note', folderId).catch(onError)}
@@ -753,35 +761,37 @@ export default function App() {
                 />
               )}
               {workView === 'notes' && (
-                <NotePane
-                  commands={commands}
-                  workspace={workspace}
-                  noteId={noteId}
-                  note={note}
-                  preview={preview}
-                  backlinks={backlinks}
-                  sidebar={
-                    plugins.sidebarViews.length ? (
-                      <PluginSidebarViews
-                        views={plugins.sidebarViews}
-                        revision={plugins.sidebarRevision}
-                        invoke={plugins.invokeSidebar}
-                        errors={plugins.errors}
-                      />
-                    ) : undefined
-                  }
-                  editor={editor}
-                  dispatch={dispatch}
-                  openNote={openNote}
-                  openLink={openLink}
-                  setNoteId={setNoteId}
-                  setMode={setMode}
-                  setDialog={setDialog}
-                  onError={onError}
-                  onEditorReady={editorReady}
-                  commandLineHost={commandLineHost}
-                  onNoteCommand={noteCommand}
-                />
+                <PluginCompletionContext value={plugins.complete}>
+                  <NotePane
+                    commands={commands}
+                    workspace={workspace}
+                    noteId={noteId}
+                    note={note}
+                    preview={preview}
+                    backlinks={backlinks}
+                    sidebar={
+                      plugins.sidebarViews.length ? (
+                        <PluginSidebarViews
+                          views={plugins.sidebarViews}
+                          revision={plugins.sidebarRevision}
+                          invoke={plugins.invokeSidebar}
+                          errors={plugins.errors}
+                        />
+                      ) : undefined
+                    }
+                    editor={editor}
+                    dispatch={dispatch}
+                    openNote={openNote}
+                    openLink={openLink}
+                    setNoteId={setNoteId}
+                    setMode={setMode}
+                    setDialog={setDialog}
+                    onError={onError}
+                    onEditorReady={editorReady}
+                    commandLineHost={commandLineHost}
+                    onNoteCommand={noteCommand}
+                  />
+                </PluginCompletionContext>
               )}
               {workView === 'database' &&
                 (activeDatabase ? (

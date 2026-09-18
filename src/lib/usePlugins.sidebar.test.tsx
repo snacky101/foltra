@@ -240,9 +240,59 @@ test('failed sidebar isolates its error while another plugin remains interactive
     return response(state, event, 'healthy ');
   });
   await render();
-  expect(host.querySelector('[role=alert]')?.textContent).toContain('Calendar failed');
+  expect(host.querySelector('[role=alert]')).toBeNull();
+  expect(host.textContent).not.toContain('Calendar failed');
   expect(host.textContent).toContain('healthy month 0');
   await act(async () => host.querySelector('button')!.click());
   expect(host.textContent).toContain('healthy month 1');
   expect(onError).toHaveBeenCalledTimes(1);
 });
+
+test.each(['action', 'render'] as const)(
+  'a sidebar %s failure retains the calendar, disables controls, and reports only once',
+  async (failure) => {
+    let fail = false;
+    vi.mocked(call).mockImplementation(async (_path, _command, args) => {
+      const { state, event } = args as { state: Record<string, unknown>; event: PluginEvent };
+      if (fail && event.type === failure) throw new Error('Calendar stopped');
+      return {
+        ...response(state, event),
+        view: {
+          type: 'calendar',
+          month: '2026-09',
+          today: '2026-09-18',
+          markedDates: ['2026-09-18'],
+          action: 'open',
+          previousAction: 'previous',
+          nextAction: 'next',
+          todayAction: 'today',
+        },
+      };
+    });
+    await render();
+    const calendar = host.querySelector('[data-plugin-calendar]');
+    const day = host.querySelector<HTMLButtonElement>('[data-calendar-date="2026-09-18"]')!;
+    const text = calendar!.textContent;
+    expect(day.disabled).toBe(false);
+    fail = true;
+    if (failure === 'action') await act(async () => day.click());
+    else {
+      noteId = 'other-note';
+      await render();
+    }
+    expect(host.querySelector('[data-plugin-calendar]')).toBe(calendar);
+    expect(calendar!.textContent).toBe(text);
+    expect(host.querySelector('[role=alert]')).toBeNull();
+    expect(host.querySelector('.plugin-error')).toBeNull();
+    expect([...host.querySelectorAll('button')].every((button) => button.disabled)).toBe(true);
+    expect(onError).toHaveBeenCalledTimes(1);
+    const calls = vi.mocked(call).mock.calls.length;
+    await act(async () => day.click());
+    workspace = { ...workspace, settings: { ...workspace.settings, vim: true } };
+    await render();
+    await act(async () => vi.advanceTimersByTimeAsync(125));
+    expect(vi.mocked(call)).toHaveBeenCalledTimes(calls);
+    expect(onError).toHaveBeenCalledTimes(1);
+    expect(host.querySelector('[data-plugin-calendar]')).toBe(calendar);
+  },
+);

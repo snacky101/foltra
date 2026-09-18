@@ -108,7 +108,8 @@ export function useNote(
           base.current = result;
           setNote(result);
           if (current.current.title === sent.title && current.current.body === sent.body) {
-            current.current = { title: result.title, body: result.body };
+            // Storage trims titles, but an autosave must not remove the space before the next word.
+            current.current = { title: sent.title, body: result.body };
             dirty.current = false;
             pendingSince.current = null;
             setDraft(current.current);

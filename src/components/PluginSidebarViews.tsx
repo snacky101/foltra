@@ -24,6 +24,7 @@ export function PluginSidebarViews({
             revision={revision}
             invoke={invoke}
             error={errors[view.pluginId]}
+            preserveOnError
           />
         </section>
       ))}

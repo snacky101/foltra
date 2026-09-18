@@ -189,7 +189,7 @@ pub(crate) fn validate_settings(values: &Map<String, Value>) -> Result<()> {
     Ok(())
 }
 
-fn valid_bindings(value: &Value) -> bool {
+pub(crate) fn valid_bindings(value: &Value) -> bool {
     if let Some(bindings) = value.as_array() {
         return bindings.iter().all(|binding| {
             binding.as_object().is_some_and(|fields| {

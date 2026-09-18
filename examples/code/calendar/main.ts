@@ -48,9 +48,28 @@ function selectedNotes(api: Api, notes = dailyNotes(api)): DailyNote[] {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
 }
 
+function selectDate(api: Api, date: string, createMissing: boolean): boolean {
+  api.state.selectedDate = date;
+  api.state.notePage = 0;
+  const notes = selectedNotes(api);
+  if (notes.length > 1) return true;
+  if (notes.length === 1) api.openNote(notes[0].id);
+  else if (createMissing) {
+    // The core resolves and creates under the vault lock, including concurrent requests.
+    const note = api.call<{ id: string }>('note.open-link', { target: date });
+    api.openNote(note.id);
+  } else api.notify(`${date} · 노트가 없습니다.`);
+  return false;
+}
+
 const plugin = {
   onLoad: today,
   commands: {
+    'open-today'(api) {
+      const date = localDate();
+      api.state.month = date.slice(0, 7);
+      if (selectDate(api, date, true)) api.openView('calendar');
+    },
     today(api) {
       today(api);
       api.openView('calendar');
@@ -88,13 +107,7 @@ const plugin = {
         ];
         if (isDate(api.state.selectedDate) && api.state.selectedDate.startsWith(visibleMonth)) {
           const matching = selectedNotes(api, notes);
-          if (!matching.length)
-            children.push({
-              type: 'text',
-              tone: 'muted',
-              text: `${api.state.selectedDate} · 노트가 없습니다.`,
-            });
-          else if (matching.length > 1) {
+          if (matching.length > 1) {
             const maxPage = Math.floor((matching.length - 1) / pageSize);
             const requestedPage = Number(api.state.notePage) || 0;
             const page = Math.max(0, Math.min(maxPage, Math.floor(requestedPage)));
@@ -129,10 +142,7 @@ const plugin = {
         else if (action.id === 'previous-month') move(api, -1);
         else if (action.id === 'next-month') move(api, 1);
         else if (action.id === 'select-date' && isDate(action.value) && action.value.startsWith(month(api))) {
-          api.state.selectedDate = action.value;
-          api.state.notePage = 0;
-          const notes = selectedNotes(api);
-          if (notes.length === 1) api.openNote(notes[0].id);
+          selectDate(api, action.value, api.settings['create-missing-notes'] === true);
         } else if (action.id === 'open-note') {
           const note = selectedNotes(api).find((note) => note.id === action.payload);
           if (note) api.openNote(note.id);

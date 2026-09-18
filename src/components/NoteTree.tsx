@@ -11,6 +11,7 @@ export function NoteTree({
   workspace,
   activeId,
   openNote,
+  renameNote,
   noteMenu,
   folderMenu,
   rootMenu,
@@ -23,6 +24,7 @@ export function NoteTree({
   workspace: Workspace;
   activeId: string | null;
   openNote: (id: string) => void;
+  renameNote: (note: NoteSummary) => void;
   noteMenu: (target: NoteMenuTarget) => void;
   folderMenu: (target: { folder: Folder; x: number; y: number }) => void;
   rootMenu: (position: { x: number; y: number }) => void;
@@ -47,6 +49,12 @@ export function NoteTree({
   const dragSource = useRef<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
+  const destinationName =
+    dropTarget === null
+      ? '폴더로 이동'
+      : dropTarget === ''
+        ? '최상위로 이동'
+        : `${workspace.folders.find((folder) => folder.id === dropTarget)?.name ?? ''} 폴더로 이동`;
   const endDrag = () => {
     dragSource.current = null;
     setDragging(null);
@@ -105,11 +113,14 @@ export function NoteTree({
         .filter((f) => f.parentId === parentId)
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((folder) => (
-          <div className="folder-branch" key={folder.id}>
+          <div
+            className={`folder-branch${dropTarget === folder.id ? ' note-drop-branch' : ''}`}
+            key={folder.id}
+            {...dropEvents(folder.id)}
+          >
             <div
               className={`note-navigation-row${dropTarget === folder.id ? ' note-drop-target' : ''}`}
               data-folder-id={folder.id}
-              {...dropEvents(folder.id)}
             >
               {editing?.kind === 'folder' && editing.id === folder.id ? (
                 <InlineTreeName
@@ -127,6 +138,11 @@ export function NoteTree({
                   aria-expanded={!collapsed.has(folder.id)}
                   title={folder.name}
                   onClick={() => toggle(folder.id)}
+                  onDoubleClick={(event) => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    folderDialog({ kind: 'rename', folder });
+                  }}
                   onContextMenu={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
@@ -181,7 +197,14 @@ export function NoteTree({
                 data-parent-folder={note.folderId ?? ''}
                 className={activeId === note.id ? 'active' : ''}
                 title={note.title}
-                onClick={() => openNote(note.id)}
+                onClick={(event) => {
+                  if (event.detail < 2) openNote(note.id);
+                }}
+                onDoubleClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  renameNote(note);
+                }}
                 onContextMenu={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -222,7 +245,8 @@ export function NoteTree({
         {...dropEvents('')}
       >
         <span>
-          <ChevronDown size={12} /> NOTES {dragging && <small>최상위로 이동</small>}
+          <ChevronDown size={12} /> NOTES{' '}
+          {dragging && <small title={destinationName}>{destinationName}</small>}
         </span>
         <div className="sidebar-section-actions">
           <button
@@ -238,18 +262,7 @@ export function NoteTree({
           </button>
         </div>
       </div>
-      <div
-        className="note-navigation"
-        aria-label="노트와 폴더"
-        onDragOver={(event) => {
-          event.preventDefault();
-          event.dataTransfer.dropEffect = 'none';
-        }}
-        onDrop={(event) => {
-          event.preventDefault();
-          endDrag();
-        }}
-      >
+      <div className="note-navigation" aria-label="노트와 폴더" {...dropEvents('')}>
         {branch(null)}
         {!workspace.notes.length && !workspace.folders.length && (
           <button data-sidebar-item onClick={() => createNote()}>

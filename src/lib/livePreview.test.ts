@@ -289,12 +289,14 @@ test('inactive unordered markers render as bullets without changing source or ne
   expect(s.doc.toString()).toBe(doc);
 });
 
-test('bullets remain dots while editing, including an empty new item and nested items', () => {
+test('bullets remain dots in content but expose selected syntax, including empty and nested items', () => {
   const s = state('- Parent\n  - Child\n- Sibling', 3);
   expect(bulletMarkers(s)).toEqual(['-', '-', '-']);
   expect(bulletMarkers(s, false)).toEqual(['-', '-', '-']);
   const selected = s.update({ selection: EditorSelection.range(0, s.doc.length) }).state;
-  expect(bulletMarkers(selected)).toEqual(['-', '-', '-']);
+  expect(bulletMarkers(selected)).toEqual([]);
+  const contentSelected = s.update({ selection: EditorSelection.range(2, 8) }).state;
+  expect(bulletMarkers(contentSelected)).toEqual(['-', '-', '-']);
   expect(bulletMarkers(state('- '))).toEqual(['-']);
 });
 

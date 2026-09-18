@@ -3,6 +3,7 @@ import { fontFamilyStack } from '../lib/fontFamily';
 import type { CSSProperties } from 'react';
 import { useContext } from 'react';
 import { TagNavigation } from '../lib/tagNavigation';
+import { PluginCompletionContext } from '../lib/pluginCompletionContext';
 import { pluginEditorSnapshot, applyPluginEditorEdit } from '../lib/pluginEditor';
 import type { PluginEditorSnapshot } from '../lib/pluginTypes';
 import { tags } from '@lezer/highlight';
@@ -89,8 +90,9 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
   const parent = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const openTag = useContext(TagNavigation);
-  const latest = useRef({ ...props, openTag, openMarkdownLink });
-  latest.current = { ...props, openTag, openMarkdownLink };
+  const complete = useContext(PluginCompletionContext);
+  const latest = useRef({ ...props, openTag, openMarkdownLink, complete });
+  latest.current = { ...props, openTag, openMarkdownLink, complete };
   function openMarkdownLink(target: string) {
     void openExternalLink(target).catch((error) => latest.current.onError(error));
   }
@@ -181,6 +183,7 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
           noteCompletionExtension(
             () => latest.current.workspace,
             (error) => latest.current.onError(error),
+            () => latest.current.complete,
           ),
           editorLinkNavigation({
             openWiki: (target) => latest.current.openLink(target),

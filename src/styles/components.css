@@ -2222,6 +2222,15 @@
 .notes-root small {
   font: 10px var(--body-font);
   letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-root > span {
+  min-width: 0;
+}
+.notes-root > span > svg {
+  flex-shrink: 0;
 }
 .notes-root.note-drag-active {
   color: var(--sidebar-ink);
@@ -2236,6 +2245,10 @@
   outline: 1px solid var(--sidebar-ink) !important;
   outline-offset: -1px;
   border-radius: 5px;
+}
+.note-drop-branch > .folder-children {
+  border-left-color: var(--sidebar-ink);
+  background: color-mix(in srgb, var(--sidebar-ink) 6%, transparent);
 }
 .note-dragging {
   opacity: 0.45;

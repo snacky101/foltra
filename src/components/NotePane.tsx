@@ -1,4 +1,12 @@
-import { lazy, Suspense, type RefObject, type Dispatch, type SetStateAction, type ReactNode } from 'react';
+import {
+  lazy,
+  Suspense,
+  useRef,
+  type RefObject,
+  type Dispatch,
+  type SetStateAction,
+  type ReactNode,
+} from 'react';
 import { FileText, Link2, Loader2, Plus, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Backlinks } from './Backlinks';
 import type { EditorHandle } from './Editor';
@@ -51,6 +59,12 @@ export function NotePane({
   commandLineHost,
   onNoteCommand,
 }: Props) {
+  const titleComposing = useRef(false);
+  const updateTitle = (input: HTMLInputElement, finish = false) => {
+    const title = finish ? input.value.trim() : input.value;
+    if (title !== note.draft.title) note.edit({ title });
+    if (finish) void note.save();
+  };
   return (
     <>
       <div className="note-scroll" tabIndex={-1}>
@@ -75,7 +89,34 @@ export function NotePane({
               aria-label="노트 제목"
               value={note.draft.title}
               disabled={note.status === 'loading'}
-              onChange={(e) => note.edit({ title: e.target.value })}
+              onChange={(e) =>
+                updateTitle(
+                  e.currentTarget,
+                  !titleComposing.current && document.activeElement !== e.currentTarget,
+                )
+              }
+              onCompositionStart={() => {
+                titleComposing.current = true;
+              }}
+              onCompositionEnd={(e) => {
+                titleComposing.current = false;
+                if (document.activeElement !== e.currentTarget) updateTitle(e.currentTarget, true);
+              }}
+              onBlur={(e) => {
+                // Some input methods commit their final value after blur.
+                if (!titleComposing.current) updateTitle(e.currentTarget, true);
+              }}
+              onKeyDown={(e) => {
+                if (
+                  e.key !== 'Enter' ||
+                  titleComposing.current ||
+                  e.nativeEvent.isComposing ||
+                  e.nativeEvent.keyCode === 229
+                )
+                  return;
+                e.preventDefault();
+                e.currentTarget.blur();
+              }}
               placeholder="Untitled"
             />
             <div className="note-subline">

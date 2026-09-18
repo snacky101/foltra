@@ -109,7 +109,8 @@ function PluginChoice({ node, action }: { node: PluginNode; action: Action }) {
     </div>
   );
 }
-function Node({ node, action }: { node: PluginNode; action: Action }) {
+function Node({ node, action, disabled = false }: { node: PluginNode; action: Action; disabled?: boolean }) {
+  if (disabled) node = { ...node, disabled: true };
   if (node.type === 'calendar') return <PluginCalendar node={node} action={action} />;
   if (node.type === 'text') return <p className={`plugin-text ${node.tone ?? ''}`}>{node.text}</p>;
   if (node.type === 'heading') return <h2 className="plugin-heading">{node.text}</h2>;
@@ -130,6 +131,7 @@ function Node({ node, action }: { node: PluginNode; action: Action }) {
           key={`${child.action ?? child.type}:${JSON.stringify(child.payload) ?? index}`}
           node={child}
           action={action}
+          disabled={disabled}
         />
       ))}
     </div>
@@ -143,6 +145,7 @@ export function PluginView({
   action,
   refresh,
   embedded = false,
+  preserveOnError = false,
 }: {
   title: string;
   tree: PluginNode | null;
@@ -151,6 +154,7 @@ export function PluginView({
   action: Action;
   refresh: () => void;
   embedded?: boolean;
+  preserveOnError?: boolean;
 }) {
   return (
     <section className={embedded ? 'plugin-view plugin-view-embedded' : 'plugin-view'}>
@@ -173,17 +177,17 @@ export function PluginView({
           </button>
         </header>
       )}
-      {error ? (
+      {error && !preserveOnError ? (
         <div className="plugin-error" role="alert">
           <strong>플러그인 실행을 중지했습니다.</strong>
           <p>{error}</p>
           <p>설정 → 확장에서 껐다 켜면 다시 실행할 수 있습니다.</p>
         </div>
       ) : tree ? (
-        <div aria-busy={busy}>
-          <Node node={tree} action={action} />
+        <div aria-busy={busy} aria-disabled={error ? true : undefined}>
+          <Node node={tree} action={action} disabled={!!error} />
         </div>
-      ) : (
+      ) : error ? null : (
         <p className="muted">{busy ? '화면을 불러오는 중…' : '설정 → 확장에서 플러그인을 활성화하세요.'}</p>
       )}
     </section>

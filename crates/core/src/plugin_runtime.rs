@@ -216,6 +216,36 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                 return Err(Error::new("invalid_view", "Plugin view is unavailable"));
             }
         }
+        "completion" => {
+            if headless {
+                return Err(Error::new(
+                    "requires_ui",
+                    "Completions need the desktop editor",
+                ));
+            }
+            if !config
+                .completions
+                .iter()
+                .any(|provider| event["id"] == provider.id)
+            {
+                return Err(Error::new(
+                    "invalid_completion",
+                    "Undeclared completion provider",
+                ));
+            }
+            let valid_query = event["args"].as_object().is_some_and(|args| {
+                args.len() == 1
+                    && args
+                        .get("query")
+                        .and_then(Value::as_str)
+                        .is_some_and(|query| {
+                            query.len() <= 256 && !query.chars().any(char::is_control)
+                        })
+            });
+            if !valid_query {
+                return Err(Error::new("invalid_completion", "Invalid completion query"));
+            }
+        }
         "event" => {
             if !config.events.iter().any(|e| event["name"] == *e) {
                 return Err(Error::new("invalid_plugin", "Undeclared event"));
@@ -299,10 +329,12 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                     },
                     "editor.read" => {
                         permission(config,"editor.read")?;
+                        if kind == "completion" { return Err(Error::new("permission_denied","Completions receive only their query")); }
                         if headless || !args["editor"].is_object() { return Err(Error::new("requires_editor","Open an editable note first")); }
                         Ok(args["editor"].clone())
                     },
                     op @ ("openView" | "openNote" | "notify" | "editor.replaceSelection") => {
+                        if kind == "completion" { return Err(Error::new("permission_denied","Completion requests cannot produce UI effects")); }
                         if headless { return Err(Error::new("requires_ui","This action needs the desktop app")); }
                         permission(config,if op == "editor.replaceSelection" {"editor.write"} else {"ui"})?;
                         if readonly && op != "notify" { return Err(Error::new("permission_denied","UI navigation and editing require a command or view action")); }
@@ -362,6 +394,9 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
     if !output["view"].is_null() {
         plugin_manifest::validate_tree(&output["view"])?;
     }
+    if kind == "completion" {
+        plugin_manifest::validate_completions(&output["result"])?;
+    }
     output["effects"] = json!(*effects.borrow());
     output["changed"] = json!(changed.get());
     Ok(output)
@@ -393,6 +428,235 @@ mod tests {
     fn run(store: &Store) -> Result<Value> {
         extensions::execute_command(store, "plugin.test-code.run", &json!({}))
     }
+    fn completion_plugin(source: &str, permissions: Value) -> (tempfile::TempDir, Store, Value) {
+        let dir = tempfile::tempdir().unwrap();
+        crate::execute(
+            dir.path().to_str().unwrap(),
+            "vault.init",
+            json!({"name":"Completions"}),
+        )
+        .unwrap();
+        let store = Store::open(dir.path().to_str().unwrap(), false).unwrap();
+        let manifest = json!({"id":"test-code","kind":"plugin","name":"Completions","version":"1.0.0",
+            "commands":[],"runtime":{"apiVersion":1,"source":source,"permissions":permissions,
+            "completions":[{"id":"dates","trigger":"@"}]}});
+        extensions::install(&store, &manifest).unwrap();
+        (dir, store, manifest)
+    }
+    fn complete(store: &Store, query: &str) -> Result<Value> {
+        invoke(
+            store,
+            &json!({"id":"test-code","event":{"type":"completion","id":"dates","args":{"query":query}}}),
+            false,
+        )
+    }
+
+    #[test]
+    fn completion_invokes_declared_handler_without_creating_notes_or_effects() {
+        let (_dir,store,_) = completion_plugin(
+            "export default {completions:{dates(api,{query}){api.state.query=query;return [{label:'@'+query,insertText:'2026-09-18',detail:'Local date'}]}}}",
+            json!(["editor.write"]));
+        assert_eq!(
+            complete(&store, "Today").unwrap_err().code,
+            "plugin_disabled"
+        );
+        allow(&store);
+        let result = complete(&store, "Today").unwrap();
+        assert_eq!(
+            result["result"],
+            json!([{"label":"@Today","insertText":"2026-09-18","detail":"Local date"}])
+        );
+        assert_eq!(result["state"]["query"], "Today");
+        assert_eq!(result["effects"], json!([]));
+        assert_eq!(result["changed"], false);
+        assert_eq!(
+            crate::dispatch(&store, "note.list", json!({})).unwrap(),
+            json!([])
+        );
+        assert!(store
+            .optional("plugin-data/test-code.json")
+            .unwrap()
+            .is_none());
+        disable(&store, "test-code").unwrap();
+        assert_eq!(
+            complete(&store, "Today").unwrap_err().code,
+            "plugin_disabled"
+        );
+    }
+
+    #[test]
+    fn bundled_date_completion_installs_and_returns_local_plain_dates() {
+        let dir = tempfile::tempdir().unwrap();
+        crate::execute(
+            dir.path().to_str().unwrap(),
+            "vault.init",
+            json!({"name":"Date completion"}),
+        )
+        .unwrap();
+        let store = Store::open(dir.path().to_str().unwrap(), false).unwrap();
+        let manifest: Value =
+            serde_json::from_str(include_str!("../../../examples/plugins/date-mentions.json"))
+                .unwrap();
+        extensions::install(&store, &manifest).unwrap();
+        let request = json!({"id":"date-mentions","event":{"type":"completion","id":"dates","args":{"query":""}}});
+        assert_eq!(
+            invoke(&store, &request, false).unwrap_err().code,
+            "plugin_disabled"
+        );
+        let status = statuses(&store).unwrap();
+        enable(
+            &store,
+            "date-mentions",
+            status[0]["digest"].as_str().unwrap(),
+        )
+        .unwrap();
+        let before = chrono::Local::now().date_naive();
+        let result = invoke(&store, &request, false).unwrap();
+        let after = chrono::Local::now().date_naive();
+        let items = result["result"].as_array().unwrap();
+        assert_eq!(items.len(), 3);
+        let today =
+            chrono::NaiveDate::parse_from_str(items[0]["insertText"].as_str().unwrap(), "%Y-%m-%d")
+                .unwrap();
+        assert!(today == before || today == after);
+        for (item, (label, offset)) in
+            items
+                .iter()
+                .zip([("Today", 0), ("Yesterday", -1), ("Tomorrow", 1)])
+        {
+            assert_eq!(item["label"], label);
+            assert_eq!(
+                item["insertText"],
+                (today + chrono::Duration::days(offset))
+                    .format("%Y-%m-%d")
+                    .to_string()
+            );
+        }
+        let mut filtered = request;
+        filtered["event"]["args"]["query"] = json!("tom");
+        let result = invoke(&store, &filtered, false).unwrap();
+        assert_eq!(result["result"].as_array().unwrap().len(), 1);
+        assert_eq!(result["result"][0]["label"], "Tomorrow");
+        assert_eq!(result["effects"], json!([]));
+        assert_eq!(result["changed"], false);
+        assert_eq!(
+            crate::dispatch(&store, "note.list", json!({})).unwrap(),
+            json!([])
+        );
+    }
+
+    #[test]
+    fn completion_rejects_undeclared_headless_invalid_queries_and_stale_packages() {
+        let (_dir, store, mut manifest) = completion_plugin(
+            "export default {completions:{dates(){return []}}}",
+            json!(["editor.write"]),
+        );
+        allow(&store);
+        let base = json!({"id":"test-code","event":{"type":"completion","id":"dates","args":{"query":""}}});
+        assert_eq!(invoke(&store, &base, true).unwrap_err().code, "requires_ui");
+        let mut request = base.clone();
+        request["event"]["id"] = json!("missing");
+        assert_eq!(
+            invoke(&store, &request, false).unwrap_err().code,
+            "invalid_completion"
+        );
+        for args in [
+            Value::Null,
+            json!({}),
+            json!({"query":1}),
+            json!({"query":"\n"}),
+            json!({"query":"x","body":"private"}),
+            json!({"query":"a".repeat(257)}),
+        ] {
+            request = base.clone();
+            request["event"]["args"] = args;
+            assert_eq!(
+                invoke(&store, &request, false).unwrap_err().code,
+                "invalid_completion"
+            );
+        }
+        assert!(complete(&store, &"a".repeat(256)).is_ok());
+        let old_digest = statuses(&store).unwrap()[0]["digest"].clone();
+        manifest["description"] = json!("Changed package");
+        store
+            .commit(vec![(
+                "extensions/test-code.json".into(),
+                Some(manifest.to_string()),
+            )])
+            .unwrap();
+        request = base;
+        request["digest"] = old_digest;
+        assert_eq!(
+            invoke(&store, &request, false).unwrap_err().code,
+            "plugin_changed"
+        );
+        assert_eq!(
+            complete(&store, "Today").unwrap_err().code,
+            "plugin_disabled"
+        );
+    }
+
+    #[test]
+    fn completion_cannot_write_navigate_notify_connect_or_read_editor() {
+        let source = r#"export default {completions:{dates(api){
+          const attempts = {
+            note: () => api.call('note.create',{title:'Unwanted'}),
+            storage: () => api.storage.write({bad:true},api.storage.read().revision),
+            openNote: () => api.openNote('example'), openView: () => api.openView('missing'),
+            notify: () => api.notify('unwanted'), replace: () => api.editor.replaceSelection('bad'),
+            editor: () => api.editor.read(), anki: () => api.anki('version')
+          };
+          return Object.entries(attempts).map(([label,run]) => {
+            let insertText='allowed'; try{run()}catch(error){insertText=error.code}
+            return {label,insertText};
+          });
+        }}}"#;
+        let (_dir, store, _) = completion_plugin(
+            source,
+            json!([
+                "editor.read",
+                "editor.write",
+                "notes.write",
+                "ui",
+                "anki.connect"
+            ]),
+        );
+        allow(&store);
+        let result = invoke(&store,&json!({"id":"test-code","event":{"type":"completion","id":"dates","args":{"query":""}},"editor":{"body":"private","selection":"private"}}),false).unwrap();
+        for candidate in result["result"].as_array().unwrap() {
+            assert_eq!(
+                candidate["insertText"], "permission_denied",
+                "{}",
+                candidate["label"]
+            );
+        }
+        assert_eq!(result["effects"], json!([]));
+        assert_eq!(result["changed"], false);
+        assert_eq!(
+            crate::dispatch(&store, "note.list", json!({})).unwrap(),
+            json!([])
+        );
+        assert!(store
+            .optional("plugin-data/test-code.json")
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn completion_rejects_missing_async_and_malformed_handlers() {
+        for (source, code) in [
+            ("export default {}", "plugin_error"),
+            ("export default {completions:{dates(){return Promise.resolve([])}}}", "plugin_error"),
+            ("export default {completions:{dates(){return null}}}", "invalid_completion"),
+            ("export default {completions:{dates(){return [{label:'Today',insertText:'date',html:'<b>bad</b>'}]}}}", "invalid_completion"),
+            ("export default {completions:{dates(){return Array.from({length:101},()=>({label:'Today',insertText:'date'}))}}}", "invalid_completion"),
+        ] {
+            let (_dir,store,_) = completion_plugin(source,json!(["editor.write"]));
+            allow(&store);
+            assert_eq!(complete(&store,"").unwrap_err().code,code,"{source}");
+        }
+    }
+
     #[test]
     fn vault_images_require_both_capabilities_and_an_action() {
         let source = "export default {commands:{run(api){try{api.anki('storeVaultImage',{path:'../private.png',profile:'QA'})}catch(e){return e.code}}},views:{main:{render(api){try{api.anki('storeVaultImage',{path:'../private.png',profile:'QA'})}catch(e){return {type:'text',text:e.code}}}}}}";

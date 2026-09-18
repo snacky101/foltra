@@ -2,7 +2,13 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type RefObje
 import type { EditorHandle } from '../components/Editor';
 import type { Workspace } from './types';
 import type { Command } from './commands';
-import type { PluginEvent, PluginNode, PluginSettingsInvoke } from './pluginTypes';
+import type {
+  PluginCompletionInvoke,
+  PluginCompletionItem,
+  PluginEvent,
+  PluginNode,
+  PluginSettingsInvoke,
+} from './pluginTypes';
 import { PluginSession } from './pluginSession';
 import { pluginSettingsView } from './pluginSettings';
 
@@ -29,6 +35,7 @@ export function usePlugins(options: Options) {
   const latest = useRef(options);
   latest.current = options;
   const sessions = useRef(new Map<string, PluginSession>());
+  const completionErrors = useRef(new WeakSet<PluginSession>());
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [active, setActive] = useState<{ pluginId: string; id: string; title: string } | null>(null);
   const activeRef = useRef(active);
@@ -110,6 +117,36 @@ export function usePlugins(options: Options) {
     )
       return Promise.resolve(null);
     return invokeRef.current(id, event);
+  }, []);
+  const complete = useCallback<PluginCompletionInvoke>(async (id, providerId, query) => {
+    const session = sessions.current.get(id);
+    const current = () => {
+      const workspace = latest.current.workspace;
+      const extension = workspace?.extensions.find((item) => item.id === id);
+      const status = workspace?.pluginStates?.find((item) => item.id === id && item.enabled);
+      return (
+        session &&
+        alive(id, session) &&
+        !session.error &&
+        session.path === workspace?.path &&
+        session.status.digest === status?.digest &&
+        extension?.runtime?.permissions.includes('editor.write') &&
+        extension.runtime.completions?.some((provider) => provider.id === providerId)
+      );
+    };
+    if (!session || !current()) return [];
+    try {
+      // Candidate requests never capture the editor or run command/view effects.
+      const response = await session.invoke({ type: 'completion', id: providerId, args: { query } });
+      return response && current() ? (response.result as PluginCompletionItem[]) : [];
+    } catch (error) {
+      if (alive(id, session) && !completionErrors.current.has(session)) {
+        completionErrors.current.add(session);
+        setErrors((old) => ({ ...old, [id]: error instanceof Error ? error.message : String(error) }));
+        latest.current.onError(error);
+      }
+      return [];
+    }
   }, []);
   // Establish sessions before embedded settings views issue their first passive render.
   useLayoutEffect(() => {
@@ -264,6 +301,7 @@ export function usePlugins(options: Options) {
         id: `plugin.${extension.id}.${command.id}`,
         title: command.title,
         group: extension.name,
+        bindings: command.bindings,
         run: async () => {
           if (!(await latest.current.save())) return;
           await invokeRef.current(extension.id, { type: 'command', id: command.id });
@@ -317,5 +355,6 @@ export function usePlugins(options: Options) {
     sidebarViews,
     sidebarRevision,
     invokeSidebar,
+    complete,
   };
 }

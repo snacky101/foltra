@@ -50,6 +50,51 @@ test('idle autosave persists the exact body, including newlines', async () => {
   expect(note.isDirty()).toBe(false);
 });
 
+test.each(['idle', 'window blur'])(
+  'title spacing survives a normalized %s save response',
+  async (trigger) => {
+    vi.mocked(call).mockImplementation(async (_vault, command, args) => {
+      if (command === 'note.update')
+        return {
+          ...original,
+          ...args,
+          title: String((args as { title: string }).title).trim(),
+          revision: `r${writes().length + 1}`,
+        };
+      throw new Error(command);
+    });
+    await act(async () => note.edit({ title: '한글 ' }));
+    if (trigger === 'idle') await tick(650);
+    else await act(async () => window.dispatchEvent(new Event('blur')));
+    expect(note.draft.title).toBe('한글 ');
+    expect(note.currentNote()).toMatchObject({ title: '한글', revision: 'r2' });
+    expect(note.isDirty()).toBe(false);
+    await tick(3000);
+    expect(writes()).toHaveLength(1);
+    await act(async () => note.edit({ title: `${note.draft.title}English` }));
+    await tick(650);
+    expect(writes().at(-1)?.[2]).toMatchObject({ title: '한글 English', expectedRevision: 'r2' });
+  },
+);
+
+test('title edits during a normalized save retain spacing and use the acknowledged revision', async () => {
+  let finish!: (value: Note) => void;
+  vi.mocked(call).mockImplementationOnce(() => new Promise((resolve) => (finish = resolve)));
+  await act(async () => note.edit({ title: '한글 ' }));
+  let saving!: Promise<boolean>;
+  await act(async () => {
+    saving = note.save();
+  });
+  await act(async () => note.edit({ title: '한글 English ' }));
+  vi.mocked(call).mockResolvedValueOnce({ ...original, title: '한글 English', revision: 'r3' });
+  await act(async () => finish({ ...original, title: '한글', revision: 'r2' }));
+  expect(await saving).toBe(true);
+  expect(writes().at(-1)?.[2]).toMatchObject({ title: '한글 English ', expectedRevision: 'r2' });
+  expect(note.draft.title).toBe('한글 English ');
+  expect(note.currentNote()?.revision).toBe('r3');
+  expect(note.isDirty()).toBe(false);
+});
+
 test('continuous typing cannot postpone autosave indefinitely', async () => {
   for (let i = 0; i < 8; i++) {
     await edit(`typing ${i}`);

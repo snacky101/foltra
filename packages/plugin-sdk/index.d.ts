@@ -78,6 +78,15 @@ export interface Action {
   value?: string | boolean;
   payload?: unknown;
 }
+/** Plain-text candidates. Only explicit acceptance edits the current token. */
+export interface CompletionItem {
+  /** Nonempty label, at most 120 UTF-8 bytes. */
+  label: string;
+  /** Literal replacement text without snippet expansion, at most 8000 UTF-8 bytes. */
+  insertText: string;
+  /** Optional plain-text description, at most 240 UTF-8 bytes. */
+  detail?: string;
+}
 export interface Api {
   readonly vaultId: string;
   createId(): string;
@@ -105,5 +114,9 @@ export interface Plugin {
   onUnload?(api: Api): void;
   onEvent?(api: Api, event: { name: string; args?: Record<string, unknown> }): void;
   commands?: Record<string, (api: Api, args: Record<string, unknown>) => unknown>;
+  /** Declare runtime.completions [{id, trigger}] and editor.write in the manifest.
+   * Read-only desktop requests; at most 100 candidates and 256 query UTF-8 bytes.
+   * No editor snapshot, UI effects, writes or AnkiConnect calls are available. */
+  completions?: Record<string, (api: Api, context: { query: string }) => CompletionItem[]>;
   views?: Record<string, { render(api: Api): ViewNode; onAction?(api: Api, action: Action): unknown }>;
 }

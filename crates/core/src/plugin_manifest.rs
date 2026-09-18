@@ -13,6 +13,8 @@ pub(crate) struct RuntimeConfig {
     #[serde(default)]
     pub views: Vec<ViewSpec>,
     #[serde(default)]
+    pub completions: Vec<CompletionSpec>,
+    #[serde(default)]
     pub settings_view: Option<String>,
     #[serde(default)]
     pub events: Vec<String>,
@@ -28,6 +30,12 @@ pub(crate) struct ViewSpec {
     pub title: String,
     #[serde(default)]
     pub placement: Option<String>,
+}
+#[derive(Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct CompletionSpec {
+    pub id: String,
+    pub trigger: String,
 }
 #[derive(Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -78,6 +86,7 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
             !valid_slug(id) || !config.permissions.iter().any(|p| p == "automation")
         })
         || config.views.len() > 12
+        || config.completions.len() > 12
         || config.settings.len() > 30
         || config.events.len() > 2
         || config
@@ -106,6 +115,20 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         }
     }
     ids.clear();
+    for completion in &config.completions {
+        if !valid_slug(&completion.id)
+            || !ids.insert(&completion.id)
+            || completion.trigger.len() != 1
+            || !completion.trigger.as_bytes()[0].is_ascii_punctuation()
+            || !config.permissions.iter().any(|p| p == "editor.write")
+        {
+            return Err(Error::new(
+                "invalid_plugin",
+                "Invalid completion declaration",
+            ));
+        }
+    }
+    ids.clear();
     if config
         .settings_view
         .as_ref()
@@ -129,6 +152,35 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         }
     }
     Ok(config)
+}
+
+pub(crate) fn validate_completions(value: &Value) -> Result<()> {
+    let valid = value.as_array().is_some_and(|items| {
+        items.len() <= 100
+            && items.iter().all(|item| {
+                item.as_object().is_some_and(|fields| {
+                    fields
+                        .keys()
+                        .all(|key| ["label", "insertText", "detail"].contains(&key.as_str()))
+                        && item["label"]
+                            .as_str()
+                            .is_some_and(|text| !text.trim().is_empty() && text.len() <= 120)
+                        && item["insertText"]
+                            .as_str()
+                            .is_some_and(|text| text.len() <= 8000)
+                        && item.get("detail").is_none_or(|detail| {
+                            detail.as_str().is_some_and(|text| text.len() <= 240)
+                        })
+                })
+            })
+    });
+    if !valid {
+        return Err(Error::new(
+            "invalid_completion",
+            "Invalid completion candidates",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_tree(tree: &Value) -> Result<()> {
@@ -256,6 +308,63 @@ mod tests {
     use serde_json::json;
 
     #[test]
+    fn completions_require_bounded_declarations_and_editor_permission() {
+        let base = json!({"apiVersion":1,"source":"export default {}", "permissions":["editor.write"],
+            "completions":[{"id":"dates","trigger":"@"}]});
+        assert!(validate(&base).is_ok());
+        for declarations in [
+            json!([{"id":"dates","trigger":"@"}, {"id":"dates","trigger":"!"}]),
+            json!([{"id":"../dates","trigger":"@"}]),
+            json!([{"id":"dates","trigger":"@", "script":"untrusted"}]),
+            json!((0..13)
+                .map(|i| json!({"id":format!("dates-{i}"),"trigger":"@"}))
+                .collect::<Vec<_>>()),
+        ] {
+            let mut value = base.clone();
+            value["completions"] = declarations;
+            assert!(validate(&value).is_err());
+        }
+        for trigger in ["", "@@", "a", "1", " ", "\n", "。"] {
+            let mut value = base.clone();
+            value["completions"][0]["trigger"] = json!(trigger);
+            assert!(validate(&value).is_err(), "{trigger:?}");
+        }
+        let mut value = base;
+        value["permissions"] = json!(["editor.read"]);
+        assert!(validate(&value).is_err());
+        value.as_object_mut().unwrap().remove("completions");
+        assert!(validate(&value).is_ok());
+    }
+
+    #[test]
+    fn completion_candidates_are_plain_bounded_data() {
+        let item = json!({"label":"@Today","insertText":"2026-09-18","detail":"오늘"});
+        assert!(validate_completions(&json!([])).is_ok());
+        assert!(validate_completions(&json!([{"label":"Remove","insertText":""}])).is_ok());
+        assert!(validate_completions(&json!(vec![item.clone(); 100])).is_ok());
+        for invalid in [
+            Value::Null,
+            json!({"label":"@Today","insertText":"date"}),
+            json!([true]),
+            json!([{"label":" ","insertText":"date"}]),
+            json!([{"label":"@Today"}]),
+            json!([{"label":"@Today","insertText":1}]),
+            json!([{"label":"@Today","insertText":"date","detail":null}]),
+            json!([{"label":"@Today","insertText":"date","apply":"script"}]),
+            json!(vec![item.clone(); 101]),
+        ] {
+            assert!(validate_completions(&invalid).is_err(), "{invalid}");
+        }
+        for (key, limit) in [("label", 120), ("insertText", 8000), ("detail", 240)] {
+            let mut bounded = item.clone();
+            bounded[key] = json!("a".repeat(limit));
+            assert!(validate_completions(&json!([bounded.clone()])).is_ok());
+            bounded[key] = json!("a".repeat(limit + 1));
+            assert!(validate_completions(&json!([bounded])).is_err());
+        }
+    }
+
+    #[test]
     fn settings_view_requires_a_declared_permissioned_view() {
         let mut value = json!({"apiVersion":1,"source":"export default {}",
             "permissions":["ui"],"views":[{"id":"preferences","title":"Preferences"}],
@@ -331,7 +440,7 @@ mod tests {
     }
 
     #[test]
-    fn bundled_calendar_runs_read_only_with_live_dates_and_session_navigation() {
+    fn bundled_calendar_defaults_to_read_only_with_live_dates_and_session_navigation() {
         use crate::{dispatch, extensions, plugin_runtime, storage::Store};
         let dir = tempfile::tempdir().unwrap();
         crate::execute(
@@ -347,7 +456,7 @@ mod tests {
         .unwrap();
         assert_eq!(
             manifest["runtime"]["permissions"],
-            json!(["notes.read", "ui"])
+            json!(["notes.read", "notes.write", "ui"])
         );
         extensions::install(&store, &manifest).unwrap();
         let status = plugin_runtime::statuses(&store).unwrap();
@@ -405,7 +514,11 @@ mod tests {
             json!({"type":"action","id":"calendar","action":{"id":"select-date","value":"2000-02-28"}}),
             json!({"month":"2000-02"}),
         );
-        assert_eq!(missing["effects"], json!([]));
+        assert_eq!(
+            missing["effects"],
+            json!([{"type":"notify",
+            "args":{"message":"2000-02-28 · 노트가 없습니다."}}])
+        );
         let next = invoke(
             json!({"type":"command","id":"next-month"}),
             json!({"month":"1999-12"}),

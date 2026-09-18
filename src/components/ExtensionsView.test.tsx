@@ -92,10 +92,11 @@ afterEach(async () => {
   host.remove();
 });
 
-test('Anki and the daily calendar are offered in the catalog, while local plugins remain available', async () => {
+test('bundled plugins are offered alongside local plugins', async () => {
   expect(extensionCatalog.filter((e) => e.kind === 'plugin').map((e) => e.id)).toEqual([
     'anki',
     'daily-calendar',
+    'date-mentions',
   ]);
   expect(extensionCatalog.filter((e) => e.kind === 'theme').map((e) => e.id)).toEqual([
     'catppuccin-mocha',
@@ -106,6 +107,7 @@ test('Anki and the daily calendar are offered in the catalog, while local plugin
   expect([...host.querySelectorAll('.extension-card')].map((e) => e.getAttribute('aria-label'))).toEqual([
     'Anki 연결',
     '일지 캘린더',
+    '날짜 자동완성',
   ]);
   const custom = { ...calendarFixture, id: 'local-calendar', name: 'My calendar' };
   await upload(JSON.stringify(custom));

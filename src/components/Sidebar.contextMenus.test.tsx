@@ -96,6 +96,7 @@ beforeEach(() => {
     collapse: vi.fn(),
     toggleCompactNavigation: vi.fn(),
     openNote: vi.fn(),
+    renameNote: vi.fn(),
     navigate: vi.fn(),
     search: vi.fn(),
     createNote: vi.fn(),

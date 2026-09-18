@@ -14,6 +14,7 @@ export interface PluginRuntime {
   source: string;
   permissions: PluginPermission[];
   views?: { id: string; title: string; placement?: 'main' | 'right-sidebar' }[];
+  completions?: { id: string; trigger: string }[];
   settingsView?: string;
   events?: ('workspace.changed' | 'note.opened')[];
   settings?: {
@@ -71,7 +72,7 @@ export interface PluginNode {
   todayAction?: string;
 }
 export interface PluginEvent {
-  type: 'load' | 'unload' | 'command' | 'render' | 'action' | 'event';
+  type: 'load' | 'unload' | 'command' | 'render' | 'action' | 'event' | 'completion';
   id?: string;
   name?: string;
   action?: { id: string; value?: string | boolean; payload?: unknown };
@@ -91,6 +92,16 @@ export type PluginSettingsInvoke = (
   pluginId: string,
   event: PluginEvent & { type: 'render' | 'action' },
 ) => Promise<PluginResponse | null>;
+export interface PluginCompletionItem {
+  label: string;
+  insertText: string;
+  detail?: string;
+}
+export type PluginCompletionInvoke = (
+  pluginId: string,
+  id: string,
+  query: string,
+) => Promise<PluginCompletionItem[]>;
 export const pluginPermissionLabels: Record<PluginPermission, string> = {
   'notes.read': '노트·링크 읽기',
   'notes.write': '노트·폴더 생성, 수정, 삭제',

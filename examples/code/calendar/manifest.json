@@ -2,16 +2,33 @@
   "kind": "plugin",
   "id": "daily-calendar",
   "name": "일지 캘린더",
-  "version": "1.0.0",
-  "description": "우측 사이드바에서 오늘과 날짜별 노트를 확인합니다. YYYY-MM-DD 제목의 노트가 있는 날짜에 점을 표시합니다.",
+  "version": "1.1.0",
+  "description": "우측 사이드바에서 날짜별 노트를 확인하고 오늘의 노트를 엽니다. 설정에서 빈 날짜를 클릭할 때 노트를 만들도록 선택할 수 있습니다.",
   "commands": [
+    {
+      "id": "open-today",
+      "title": "오늘의 노트 열기",
+      "bindings": [
+        { "keys": "Mod+Shift+d", "leader": false },
+        { "keys": "nd", "leader": true }
+      ],
+      "action": { "type": "script" }
+    },
     { "id": "today", "title": "캘린더 오늘로 이동", "action": { "type": "script" } },
     { "id": "previous-month", "title": "캘린더 이전 달", "action": { "type": "script" } },
     { "id": "next-month", "title": "캘린더 다음 달", "action": { "type": "script" } }
   ],
   "runtime": {
     "apiVersion": 1,
-    "permissions": ["notes.read", "ui"],
-    "views": [{ "id": "calendar", "title": "일지 캘린더", "placement": "right-sidebar" }]
+    "permissions": ["notes.read", "notes.write", "ui"],
+    "views": [{ "id": "calendar", "title": "일지 캘린더", "placement": "right-sidebar" }],
+    "settings": [
+      {
+        "id": "create-missing-notes",
+        "label": "노트가 없는 날짜를 누르면 생성",
+        "type": "checkbox",
+        "default": false
+      }
+    ]
   }
 }

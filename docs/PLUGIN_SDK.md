@@ -12,7 +12,7 @@ Installation does not enable code. Activation requires explicit approval of the 
 
 ## SDK contract
 
-The module exports a default object with `commands`, `views`, optional `onLoad`, `onUnload`, and `onEvent` functions. Commands and views are keyed by declared IDs. Handlers receive an `api` object; event/action payloads are separate arguments. They are synchronous (no ambient background jobs or timers). Only commands and view actions can write vault/plugin data or navigate/edit the UI; lifecycle and change notifications compute session state/read data. This avoids event-driven write feedback loops in SDK v1. Use `api.state` for JSON session state across invocations; use the plugin's own storage for durable data. The host delivers lifecycle and subscribed events, serializes invocations, and discards stale results when the vault/package changes.
+The module exports a default object with `commands`, `views`, `completions`, optional `onLoad`, `onUnload`, and `onEvent` functions. Commands and views are keyed by declared IDs. Handlers receive an `api` object; event/action payloads are separate arguments. They are synchronous (no ambient background jobs or timers). Only commands and view actions can write vault/plugin data or navigate/edit the UI; lifecycle and change notifications compute session state/read data. This avoids event-driven write feedback loops in SDK v1. Use `api.state` for JSON session state across invocations; use the plugin's own storage for durable data. The host delivers lifecycle and subscribed events, serializes invocations, and discards stale results when the vault/package changes.
 
 - `api.call(command, args)`: permitted note/database/query/link operations. Updates require the revision obtained when the data was read. Link/backlink queries require both note and database read permissions because they include record-body relationships; opening/creating a record body requires database read/write plus note read/write. Plugin installation, arbitrary paths and app settings are unavailable.
 - `api.settings`: validated plugin-specific settings, configured in Settings → Extensions.
@@ -29,7 +29,26 @@ A plugin computes its own view tree: stacks, rows, grids, cards, text/headings, 
 
 Commands use `plugin.<package-id>.<command-id>` in the existing registry, palette, slash menu, normal shortcuts and Leader bindings. A command marked `headless: true` also runs from the CLI through the same interpreter and permission checks. UI-only methods reject headless invocation. Views and event handlers are desktop lifecycle features; the CLI does not run a background plugin daemon.
 
+Commands may declare optional default `bindings`, for example `[{"keys":"Mod+Shift+d","leader":false},{"keys":"nd","leader":true}]`. Up to 10 bindings per command use the same validation and keyboard router as user shortcuts. `commands.list` exposes the defaults, and the settings page uses them when that command has no saved override. An explicit saved empty array disables all bindings. Installation, updates, activation and removal do not rewrite user shortcut settings. `Mod` means Cmd on macOS and Ctrl elsewhere; Leader sequences use the configured Leader key. Script commands and their defaults become active only after permission approval.
+
 Views may declare `placement: "right-sidebar"`; omission means the main view. Enabled sidebar views use the same serialized plugin session and appear below backlinks even without an open note. Calling `api.openView` for such a view reveals the sidebar without opening a central plugin page. Load/render handlers do not navigate. The `calendar` view node accepts a real `YYYY-MM` month, a real `YYYY-MM-DD` today, at most 31 unique marked dates in that month, and declared navigation/date actions. The host owns its themed rendering and keyboard focus; plugins do not receive DOM access. `examples/code/calendar/` demonstrates this contract.
+
+## Text completions
+
+Declare up to 12 providers in `runtime.completions`, each with a unique slug `id` and a single ASCII punctuation `trigger`. Providers require `editor.write` because accepting a candidate edits the token:
+
+```json
+"permissions": ["editor.write"],
+"completions": [{ "id": "dates", "trigger": "@" }]
+```
+
+Implement `completions.dates(api, {query})` and return up to 100 `{label, insertText, detail?}` items. `query` excludes the trigger, may be empty, and is limited to 256 UTF-8 bytes without control characters. Labels must be nonblank and at most 120 bytes; literal `insertText` allows up to 8000 bytes (including an empty replacement); optional plain-text `detail` allows 240 bytes. Extra fields, asynchronous handlers and malformed output are rejected. The shared 512 KiB output limit also applies.
+
+Completion calls are desktop-only, serialized with the plugin's existing session and read-only. They receive no editor snapshot and cannot use `api.editor.read`, data/storage writes, AnkiConnect, navigation, notifications or other UI effects. Permissioned reads of saved vault data, settings and own storage remain available. Failed providers stop with the normal plugin error until re-enabled. Late results are discarded when the vault, package or activation changes.
+
+The host opens suggestions only at a token boundary, outside code, links, escaped text and unfinished wiki links. Existing wiki/tag completion takes precedence. Subsequent letters, numbers, combining marks, `_` and `-` form the query. Clicking a candidate or accepting the highlighted option with Enter/Tab replaces the trigger and token as one undoable editor transaction. Input-method composition cannot accept a candidate. Escape, blur or continuing with a space leaves the original text intact; no background rewrite or note creation occurs.
+
+`examples/code/date-mentions/` implements **날짜 자동완성**, installed and enabled from Settings → Extensions. `@Today`, `@Yesterday` and `@Tomorrow` offer case-insensitive prefix completion to the device's local `YYYY-MM-DD` date. Calendar arithmetic accounts for month/year boundaries and daylight-saving transitions. To link the resulting date, users may apply ordinary wiki-link syntax themselves; the extension inserts plain text only.
 
 ## Extension settings
 
@@ -58,9 +77,17 @@ Implement `views.preferences.render(api)` and `onAction(api, action)` using the 
 
 Existing installed packages are not silently replaced by catalog updates. The extension manager offers an explicit update for a newer stable catalog version. `extension.update {manifest, expectedDigest}` checks the installed manifest digest and matching ID/kind, then atomically replaces only that manifest. Plugin storage, settings and user documents remain intact; changed code requires fresh activation approval. The host provides a narrow compatibility mapping for Anki 1.0.0: its existing declared `sync` view already contains its settings and is accessible from the settings button without reinstalling or changing its approval. New packages should declare `settingsView` explicitly. Other views are not automatically treated as settings.
 
+## Daily Calendar and note creation
+
+The installable **일지 캘린더** package (`examples/code/calendar/`, version 1.1.0) includes `plugin.daily-calendar.open-today`, titled **오늘의 노트 열기**, with `Mod+Shift+d` and `<leader>nd` defaults. It computes the current local `YYYY-MM-DD` on invocation, opens an existing note or uses the atomic `note.open-link` command to create an empty note at the vault root. Existing notes retain their body, folder and revision. Duplicate date titles open the calendar's existing selection list without guessing or creating another note.
+
+The static checkbox setting `create-missing-notes` defaults to false and controls clicks on empty calendar dates. Off sends `api.notify` with an informational toast; on creates/opens the date note. The explicit open-today command creates a missing note regardless of this click preference. Load and render never create notes or send toasts. The package requests `notes.read`, `notes.write` and `ui`, so users updating from 1.0.0 must approve activation again. The host saves the current draft before invoking the command. The existing `today` command only returns the calendar to the current month.
+
+Sidebar runtime errors use the host toast while retaining a disabled view instead of inserting an inline error block. Main and settings views retain their diagnostic display. Failed actions do not request another render of the failed session.
+
 ## Acceptance checks
 
-Anki and Daily Calendar are the bundled plugins. Keep SDK regression packages under `tests/fixtures/plugins/`, outside the app catalog. Verify install/approval/enable/disable/remove, plugin settings, custom views and actions, note/DB change events, CLI command execution, Leader/regular shortcut discovery, revision conflicts, stale editor results, changed-package trust rejection, permission denial, bounded loops/memory/output, and legacy package compatibility. Do not equate these checks with full Obsidian API compatibility, independent security auditing or verified behavior on untested platforms.
+Anki, Daily Calendar and Date Completion are the bundled plugins. Keep SDK regression packages under `tests/fixtures/plugins/`, outside the app catalog. Verify install/approval/enable/disable/remove, plugin settings, custom views and actions, note/DB change events, CLI command execution, Leader/regular shortcut discovery, revision conflicts, stale editor results, changed-package trust rejection, permission denial, bounded loops/memory/output, and legacy package compatibility. Do not equate these checks with full Obsidian API compatibility, independent security auditing or verified behavior on untested platforms.
 
 ## Implementation references
 

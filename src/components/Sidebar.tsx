@@ -36,6 +36,7 @@ interface Props {
   noteId: string | null;
   databaseId: string | null;
   openNote: (id: string) => void;
+  renameNote: (note: NoteSummary) => void;
   navigate: (view: View, databaseId?: string) => void;
   search: () => void;
   createNote: (folderId?: string) => void;
@@ -70,6 +71,7 @@ export function Sidebar({
   noteId,
   databaseId,
   openNote,
+  renameNote,
   navigate,
   search,
   createNote,
@@ -202,6 +204,7 @@ export function Sidebar({
                 workspace={workspace}
                 activeId={view === 'notes' ? noteId : null}
                 openNote={openNote}
+                renameNote={renameNote}
                 noteMenu={(target) => {
                   closeMenu();
                   noteMenu(target);

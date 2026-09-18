@@ -5,9 +5,15 @@ import { getCM } from '@replit/codemirror-vim';
 import { call } from './api';
 import { wikiCompletions } from './wikiCompletion';
 import { tagCompletionRange, tagCompletions, type TagSuggestion } from './tagCompletion';
+import { pluginCompletions } from './pluginCompletion';
+import type { PluginCompletionInvoke } from './pluginTypes';
 import type { Workspace } from './types';
 
-export function noteCompletionExtension(workspace: () => Workspace, onError: (error: unknown) => void) {
+export function noteCompletionExtension(
+  workspace: () => Workspace,
+  onError: (error: unknown) => void,
+  complete?: () => PluginCompletionInvoke | undefined,
+) {
   let composing = false;
   return [
     EditorView.domEventObservers({
@@ -32,7 +38,8 @@ export function noteCompletionExtension(workspace: () => Workspace, onError: (er
           if (vim && !vim.insertMode) return null;
           const wiki = wikiCompletions(context, workspace(), () => composing);
           if (wiki) return wiki;
-          if (!tagCompletionRange(context, () => composing)) return null;
+          if (!tagCompletionRange(context, () => composing))
+            return pluginCompletions(context, workspace, complete?.(), () => composing);
           return call<TagSuggestion[]>(workspace().path, 'tags.list')
             .then((tags) => (context.aborted ? null : tagCompletions(context, tags, () => composing)))
             .catch((error) => {

@@ -136,21 +136,25 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 플러그인 관리 UI는 설정의 `extensions` 그룹에, 테마 설치·제거·선택은 `theme` 그룹에 있습니다. `extensions.open` 명령은 현재 작업을 저장한 뒤 확장 그룹을 직접 열며, 기존 작업 뷰는 유지합니다. 플러그인은 `ExtensionsView`, 테마는 `ThemeSettings`에서 관리합니다. 테마 기본 선택지는 Paper & Pine과 Midnight이고, 카탈로그와 파일로 추가한 테마는 선택 카드에서 바로 삭제합니다. 사용 중인 테마 삭제와 Paper 복귀는 코어의 한 저장 트랜잭션입니다. 파일 종류가 다른 경우 올바른 설정 그룹을 안내합니다.
 
-`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki와 일지 캘린더를 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
+`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki·일지 캘린더·날짜 자동완성를 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
 
 1. JSON 설치 시 `extensions.rs`가 허용 필드, command/action, theme token을 검사합니다. 읽을 때도 다시 검사합니다.
 2. core `commands.list`가 `plugin.<extension-id>.<command-id>`를 반환합니다. UI도 같은 ID를 팔레트와 단축키 설정에 등록합니다.
-3. 명령마다 `{ keys, leader }` 배열을 저장합니다. 각 조합의 `leader`는 Leader 포함 여부이며 별도 Vim/일반 단축키 필드가 없습니다. `useCommandKeys`는 Leader/일반 조합을, `vimKeybindings`는 노트 본문 Normal 조합을 기존 Vim 엔진을 통해 공통 명령으로 전달합니다. 키 목록은 각 화면에 흩어 두지 않습니다.
+3. 확장 명령의 선택적 `bindings`는 최대 10개의 기본 `{ keys, leader }` 조합을 선언하고 기존 설정 validator로 검사합니다. `commands.list`와 GUI 명령에 같은 기본값을 전달하며 설치/활성화가 사용자 설정을 쓰지 않습니다. 명령별 저장 값이 있으면 기본값보다 우선하고 빈 배열은 명시적인 해제입니다. 명령마다 `{ keys, leader }` 배열을 저장합니다. 각 조합의 `leader`는 Leader 포함 여부이며 별도 Vim/일반 단축키 필드가 없습니다. `useCommandKeys`는 Leader/일반 조합을, `vimKeybindings`는 노트 본문 Normal 조합을 기존 Vim 엔진을 통해 공통 명령으로 전달합니다. 키 목록은 각 화면에 흩어 두지 않습니다.
 4. template 명령은 GUI/CLI 모두 core에서 노트를 생성합니다. query 명령은 CLI에서 결과를, UI에서는 DB 뷰를 제공합니다. view 명령은 UI에서 화면을 전환하며 CLI에서는 `requires_ui`를 반환합니다.
 5. 제거 시 확장 manifest만 제거합니다. 만들어진 사용자 노트·DB를 삭제하지 않습니다.
 
 카탈로그와 파일로 설치한 패키지를 하나의 목록으로 보여 주고, ‘설치된 것만’ 스위치로 현재 vault에 설치된 항목을 거릅니다. 필터를 바꿔도 검색어는 유지합니다. 같은 ID의 카탈로그 항목보다 실제 설치된 manifest의 이름·버전·내용을 우선하며, 설치 상태와 제거 버튼은 필터와 관계없이 표시합니다.
 
-기존 `template`, `query`, 내장 `view` 외에 SDK v1 `script` 명령을 지원합니다. `runtime`에 담긴 번들 JS 모듈은 core의 QuickJS에서 호출마다 새 문맥으로 실행됩니다. TypeScript 패키징은 `scripts/pack-plugin.mjs`, 작성 타입은 `packages/plugin-sdk/`에 있습니다. 새 화면의 구조/동작을 플러그인 코드가 계산하고 `PluginView`가 검증된 tree를 React로 표시합니다. 배포 확장 소스는 `examples/code/anki/`와 `examples/code/calendar/`에 있습니다. 칸반·편집 도구 등의 SDK 회귀 패키지는 fixture로만 유지하며 `npm test`에서 빌드합니다.
+기존 `template`, `query`, 내장 `view` 외에 SDK v1 `script` 명령을 지원합니다. `runtime`에 담긴 번들 JS 모듈은 core의 QuickJS에서 호출마다 새 문맥으로 실행됩니다. TypeScript 패키징은 `scripts/pack-plugin.mjs`, 작성 타입은 `packages/plugin-sdk/`에 있습니다. 새 화면의 구조/동작을 플러그인 코드가 계산하고 `PluginView`가 검증된 tree를 React로 표시합니다. 배포 확장 소스는 `examples/code/anki/`, `examples/code/calendar/`, `examples/code/date-mentions/`에 있습니다. 칸반·편집 도구 등의 SDK 회귀 패키지는 fixture로만 유지하며 `npm test`에서 빌드합니다.
 
 `extension.update {manifest,expectedDigest}`는 설치된 패키지의 semantic digest와 ID·kind를 확인하고 manifest만 원자적으로 교체합니다. 플러그인 설정·카드 연결 데이터·사용자 문서는 유지합니다. 카탈로그의 더 높은 정식 버전에만 업데이트 버튼을 표시하며, 바뀐 코드의 기존 승인은 유효하지 않아 사용자가 다시 활성화합니다. 파일 설치는 여전히 같은 ID를 덮어쓰지 않습니다.
 
-`runtime.views[].placement`는 기본 `main` 또는 `right-sidebar`를 선언합니다. 우측 뷰도 공통 직렬 세션·승인·오류 격리·갱신 경로를 사용하며 `PluginSidebarViews`가 연결 목록 아래에 표시합니다. `calendar` 노드는 실제 날짜·월과 최대 31개 점 표시 날짜, 선언된 action만 허용합니다. 일지 캘린더는 지역 날짜의 현재 월로 시작하며 `YYYY-MM-DD` 제목의 노트를 읽고 생성·이름 변경·삭제를 반영합니다. 키보드 이동은 기존 workspace 명령 라우터를 사용합니다.
+`runtime.views[].placement`는 기본 `main` 또는 `right-sidebar`를 선언합니다. 우측 뷰도 공통 직렬 세션·승인·오류 격리·갱신 경로를 사용하며 `PluginSidebarViews`가 연결 목록 아래에 표시합니다. `calendar` 노드는 실제 날짜·월과 최대 31개 점 표시 날짜, 선언된 action만 허용합니다. 일지 캘린더는 지역 날짜의 현재 월로 시작하며 `YYYY-MM-DD` 제목의 노트를 읽고 생성·이름 변경·삭제를 반영합니다. 키보드 이동은 기존 workspace 명령 라우터를 사용합니다. 우측 확장의 실행 오류는 앱 토스트로 알리고 기존 화면을 비활성 상태로 유지해 오류 블록이 레이아웃을 밀지 않도록 합니다. 설정과 주 화면의 진단 표시는 유지합니다.
+
+일지 캘린더의 `plugin.daily-calendar.open-today`는 실행할 때 지역 날짜의 `YYYY-MM-DD`를 계산하고 없으면 기존 `note.open-link`로 원자적으로 조회/생성한 뒤 `openNote` 효과를 반환합니다. 기존 제목이면 본문·폴더·revision을 유지하며 중복 제목은 캘린더의 기존 선택 목록을 엽니다. 빈 날짜 클릭의 생성 여부는 `create-missing-notes` 설정으로 정하고 기본값은 false입니다. 생성하지 않을 때는 `notify` 효과로 토스트를 보내며 렌더링과 시작 과정은 노트를 생성하지 않습니다. 기본 조합은 `Mod+Shift+d`와 `<leader>nd`이며 팔레트·설정·일반/Leader 라우터를 공유합니다. 현재 초안 저장과 노트 열기/편집기 포커스는 기존 `usePlugins` 및 앱의 경로를 사용합니다.
+
+`runtime.completions`는 `editor.write` 권한 아래 토큰 시작 기호와 후보 제공자 ID를 선언합니다. `usePlugins.complete`는 기존 직렬 세션에 검색어만 보내며 편집기 snapshot·명령 효과·저장·workspace 갱신을 실행하지 않습니다. 코어는 후보 호출에서 쓰기·UI 효과·편집기 읽기·Anki 연결을 거절하고 제한된 평문 후보만 허용합니다. `pluginCompletion`은 활성 패키지·digest·vault·현재 토큰·조합 상태를 다시 확인한 명시적 선택에만 CodeMirror transaction을 적용합니다. 코드·링크·이메일·이스케이프 안에서는 호출하지 않고, 선택하지 않은 원문은 유지합니다. 날짜 자동완성은 기기 현지 날짜를 계산해 `@Today`·`@Yesterday`·`@Tomorrow`를 `YYYY-MM-DD`로 대치하며 노트는 생성하지 않습니다.
 
 `usePlugins`는 활성 패키지별 직렬 세션, JSON 상태, load/unload, 변경 이벤트와 오류 중단을 담당합니다. `pluginSession`은 vault나 패키지가 바뀌면 대기 요청을 취소하고 늦은 응답을 버립니다. Core invocation은 최대 500ms/32MiB JS heap/512KiB stack/64 host calls/512KiB output으로 제한하며, DOM·Node·파일·네트워크는 노출하지 않습니다. 권한을 가진 명령/뷰 action만 데이터를 쓸 수 있습니다. 렌더링과 변경 이벤트는 읽기 전용이며 UI 결과는 고유한 패키지의 화면/허용된 노트/편집기 동작만 전달합니다. CodeMirror 선택 수정은 원래 노트·본문·선택·조합 상태를 다시 확인한 일반 transaction이므로 undo/자동저장을 유지합니다.
 
@@ -226,9 +230,11 @@ Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출�
 
 `NoteTree`는 트리 표시와 접기 상태, `FolderDialog`는 폴더 수정과 노트 이동 입력을 담당합니다. 노트 이동 전 미저장 초안 저장과 revision 확인은 `useNoteActions`가 담당합니다. 노트·폴더·DB 행 메뉴는 `ContextMenu`의 포커스/키보드 동작을 공유합니다. `workspaceFocus`가 영역 이동과 sidebar 탐색을 처리하며 모든 단축키는 기존 공통 command router를 거칩니다.
 
+사이드바 노트·폴더 버튼의 더블클릭도 기존 인라인 이름 변경 경로를 사용합니다. 노트는 `useNoteActions.run('rename')`로 초안을 저장한 뒤 선택한 revision을 전달하며 두 번째 클릭은 노트를 다시 열지 않습니다. 폴더는 기존 클릭 토글 뒤 이름 변경으로 들어가므로 두 번 클릭한 후의 펼침 상태는 유지됩니다. 첫 클릭의 노트 로딩이 늦게 끝나도 `editorReady`와 읽기 화면의 포커스 요청은 인라인 이름 입력을 우선합니다.
+
 ### 노트 드래그 이동
 
-`NoteTree`는 현재 트리에서 시작한 note ID를 ref에 보관합니다. drop payload는 노트 정보로 역직렬화하지 않습니다. 폴더 행 또는 NOTES 루트 영역에서만 이동할 수 있고, 같은 위치는 제외합니다. 드롭 시점의 workspace note snapshot을 `useNoteActions.moveTo`에 전달하면 공통 busy guard가 중복 실행을 막고 `moveNoteToFolder`가 편집 초안 저장 후 `expectedRevision`과 `folderId`만 core로 보냅니다. 성공 전 트리를 임의로 옮기지 않습니다. 대상 폴더 유효성 및 충돌 검사는 기존 core가 담당합니다. 컨텍스트 메뉴의 이동도 같은 함수로 처리합니다.
+`NoteTree`는 현재 트리에서 시작한 note ID를 ref에 보관합니다. drop payload는 노트 정보로 역직렬화하지 않습니다. 폴더 제목뿐 아니라 해당 폴더의 파일 행·행 사이·들여쓰기 여백도 드롭 대상으로 처리합니다. 중첩 폴더는 포인터가 포함된 가장 안쪽의 표시된 폴더 영역을 사용하며, 같은 위치 드롭도 이벤트 전파를 중단해 상위 폴더로 잘못 이동하지 않습니다. 최상위 노트·배경과 NOTES 제목에서는 최상위로 이동합니다. 대상 폴더 제목·하위 영역과 NOTES 안내에 목적지를 표시하고 취소·실패 시 강조를 해제합니다. 드롭 시점의 workspace note snapshot을 `useNoteActions.moveTo`에 전달하면 공통 busy guard가 중복 실행을 막고 `moveNoteToFolder`가 편집 초안 저장 후 `expectedRevision`과 `folderId`만 core로 보냅니다. 성공 전 트리를 임의로 옮기지 않습니다. 대상 폴더 유효성 및 충돌 검사는 기존 core가 담당합니다. 컨텍스트 메뉴의 이동도 같은 함수로 처리합니다.
 
 키 바인딩 설정은 `shortcutVersion: 4`에서 `keybindings[commandId]: [{ keys: string, leader: boolean }]` 형식을 사용합니다. Core는 기존 `leader`/`shortcut`/`vimNormal` 객체를 배열로 변환합니다. 버전 1의 대문자 일반 단축키는 이전 의미대로 소문자로 정규화하고, 버전 2 이상의 대소문자는 유지합니다. 이전 `note.follow-link`의 Normal 필드 누락은 기본 `gd`를 유지하며 명시적 빈 값은 해제로 보존합니다. 버전 1–3의 `note.follow-link`에 저장된 Leader 없는 소문자 `gd`만 `note.follow-existing-link`로 옮깁니다. 다른 조합과 명시적 해제는 보존하고, 새 명령을 이미 설정했다면 덮어쓰지 않습니다. 버전 4에서 사용자가 다시 지정한 조합은 이 변환을 적용하지 않습니다. 읽기는 원본 파일을 변경하지 않으며 다음 명시적 설정 저장 때 버전 4로 기록합니다. CLI도 새 배열을 조회·저장하며 이전 객체 형식의 입력은 호환 변환합니다. 버전 4를 모르는 구버전 앱으로의 downgrade는 지원하지 않습니다.
 

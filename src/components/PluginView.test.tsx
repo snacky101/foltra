@@ -23,6 +23,32 @@ afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
 });
+
+test.each([false, true])(
+  'main/settings error diagnostics remain visible (embedded: %s)',
+  async (embedded) => {
+    await act(async () =>
+      root.render(
+        <PluginView
+          title="Test"
+          tree={tree}
+          busy={false}
+          error="Plugin stopped"
+          embedded={embedded}
+          action={vi.fn().mockResolvedValue(undefined)}
+          refresh={() => {}}
+        />,
+      ),
+    );
+    expect(host.querySelector('[role="alert"]')?.textContent).toContain('Plugin stopped');
+    expect(host.querySelector('input')).toBeNull();
+    if (!embedded)
+      expect(host.querySelector<HTMLButtonElement>('[aria-label="플러그인 화면 새로고침"]')?.disabled).toBe(
+        true,
+      );
+  },
+);
+
 test('an input blur does not swallow the following button action while the input request is pending', async () => {
   let finish!: () => void;
   const action = vi.fn<(id: string, value?: string | boolean) => Promise<void>>();

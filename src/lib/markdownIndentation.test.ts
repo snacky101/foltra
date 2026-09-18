@@ -311,7 +311,12 @@ test('a selected run cannot drift into plain text on repeated Tab', () => {
   view.dispatch({ selection: { anchor: before.indexOf('- 하나'), head: before.length } });
   for (let count = 0; count < 8; count++) tab();
   expect(view.state.doc.toString()).toBe('- 부모\n  - 하나\n  - 둘');
+  expect(view.contentDOM.querySelectorAll('.cm-live-bullet')).toHaveLength(1);
+  expect(view.contentDOM.textContent).toContain('- 하나');
+  const selection = view.state.selection;
+  view.dispatch({ selection: { anchor: view.state.doc.length } });
   expect(view.contentDOM.querySelectorAll('.cm-live-bullet')).toHaveLength(3);
+  view.dispatch({ selection });
   tab(true);
   expect(view.state.doc.toString()).toBe(before);
 });
