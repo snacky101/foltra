@@ -23,7 +23,6 @@ export function nextFocusRegion(current: FocusRegion, direction: FocusDirection)
   }
   if (direction === 'left') return current === 'backlinks' ? 'main' : 'sidebar-tree';
   if (direction === 'right' && current !== 'backlinks') return 'backlinks';
-  if (direction === 'up' && current === 'main') return 'main-toolbar';
   if (direction === 'down' && current === 'main-toolbar') return 'main';
   return null;
 }
@@ -60,7 +59,11 @@ function focusRegion(name: FocusRegion) {
       (item) => !item.closest('[hidden], [inert]') && item.getClientRects().length,
     );
   const table = name === 'main' ? firstVisible('.database-view .data-table') : undefined;
-  if (table) {
+  const note = name === 'main' ? firstVisible('.note-scroll') : undefined;
+  if (note) {
+    // Pane navigation returns to content, even after clicking note actions or the title.
+    previous = firstVisible('.note-scroll .cm-content[contenteditable="true"]') ?? note;
+  } else if (table) {
     const row = previous?.closest<HTMLElement>('tbody tr[tabindex="0"]');
     previous =
       row && table.contains(row) && !row.closest('[hidden], [inert]') && row.getClientRects().length

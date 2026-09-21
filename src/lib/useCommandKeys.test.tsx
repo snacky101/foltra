@@ -172,6 +172,8 @@ function NavigationHarness({ configuration = {} }: { configuration?: Partial<Set
   const commands = createBuiltinCommands({} as Record<BuiltinCommandId, () => void>);
   commands.find((command) => command.id === 'focus.left')!.run = () => moveWorkspaceFocus('left');
   commands.find((command) => command.id === 'focus.right')!.run = () => moveWorkspaceFocus('right');
+  commands.find((command) => command.id === 'focus.up')!.run = () => moveWorkspaceFocus('up');
+  commands.find((command) => command.id === 'focus.down')!.run = () => moveWorkspaceFocus('down');
   commands.find((command) => command.id === 'note.task.cycle')!.run = cycleTask;
   const pending = useCommandKeys(
     commands,
@@ -196,6 +198,9 @@ function NavigationHarness({ configuration = {} }: { configuration?: Partial<Set
           <input aria-label="Rename" data-inline-rename />
         </div>
       </div>
+      <header data-focus-region="main-toolbar">
+        <button aria-label="Save note">Save</button>
+      </header>
       <section data-focus-region="main">
         <textarea aria-label="Draft" />
       </section>
@@ -292,6 +297,19 @@ test('left and right sidebars return to the remembered main input', async () => 
   expect(document.activeElement?.getAttribute('aria-label')).toBe('Incoming');
   await dispatch(document.activeElement as HTMLElement, 'h', { ctrlKey: true });
   expect(document.activeElement).toBe(editor);
+});
+
+test.each([
+  ['k', 'KeyK', {}],
+  ['ㅏ', 'KeyK', {}],
+  ['Process', 'KeyK', { isComposing: true, keyCode: 229 }],
+  ['j', 'KeyJ', {}],
+] as const)('Ctrl+%s keeps focus in the editor rather than its toolbar', async (key, code, signal) => {
+  await navigation();
+  const editor = host.querySelector('textarea')!;
+  expect((await dispatch(editor, key, { code, ctrlKey: true, ...signal })).defaultPrevented).toBe(true);
+  expect(document.activeElement).toBe(editor);
+  expect(onError).not.toHaveBeenCalled();
 });
 
 test.each([' ', ','])(
