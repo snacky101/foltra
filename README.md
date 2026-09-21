@@ -4,7 +4,7 @@
 
 메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.9) · [이번 버전의 변화](docs/releases/v0.1.0-preview.9.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.10) · [이번 버전의 변화](docs/releases/v0.1.0-preview.10.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
 ![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
@@ -13,7 +13,7 @@
 
 ## 설치하고 첫 노트 쓰기
 
-1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.9/Foltra_0.1.0-preview.9_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.10/Foltra_0.1.0-preview.10_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
 2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
 3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 
@@ -81,16 +81,19 @@
 
 **Vim은 기본으로 꺼져 있습니다.** 설정에서 켜세요. Leader는 여러 키를 차례로 눌러 명령을 실행하는 시작 키이며, 기본값은 `Space`입니다.
 
-| 동작           | macOS 기본 키 | Leader 조합     |
-| -------------- | ------------- | --------------- |
-| 명령 찾기      | `Cmd+k`       | —               |
-| 새 노트        | `Cmd+n`       | `Space → n → n` |
-| 저장           | `Cmd+s`       | `Space → n → s` |
-| 읽기·편집 전환 | `Cmd+e`       | `Space → n → p` |
-| 주제 모음      | —             | `Space → v → c` |
-| 설정 열기      | `Cmd+,`       | `Space → s → s` |
+| 동작             | macOS 기본 키 | Leader 조합       |
+| -------------- | ---------- | --------------- |
+| 명령 찾기          | `Cmd+k`    | —               |
+| 새 노트           | `Cmd+n`    | `Space → n → n` |
+| 저장             | `Cmd+s`    | `Space → n → s` |
+| 읽기·편집 전환       | `Cmd+e`    | `Space → n → p` |
+| 왼쪽 사이드바 접기·펼치기 | —          | `Space → e`     |
+| 주제 모음          | —          | `Space → v → c` |
+| 설정 열기          | `Cmd+,`    | `Space → s → s` |
 
 설정에서는 조합을 `<leader>nn`처럼 적거나 직접 키를 눌러 기록할 수 있습니다. 확장 명령에도 같은 방식으로 단축키를 붙입니다. Leader를 누른 뒤에는 다음 키를 기다리며, 취소하려면 `Esc`를 누르세요. 본문 입력 중에는 Leader가 글쓰기를 가로채지 않습니다.
+
+왼쪽 사이드바 토글의 기본 조합은 `<leader>e`입니다. 해당 명령의 키를 직접 바꿔 저장했다면 사용자 설정이 우선하며, 설정에서 키 조합을 수정할 수 있습니다.
 
 <details>
 <summary><strong>Vim을 켰을 때 자주 쓰는 키</strong></summary>

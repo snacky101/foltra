@@ -181,7 +181,7 @@ const definitions = [
     id: 'sidebar.toggle',
     title: '왼쪽 사이드바 접기 / 펼치기',
     group: '탐색',
-    bindings: [{ keys: 'sb', leader: true }],
+    bindings: [{ keys: 'e', leader: true }],
   },
   { id: 'sidebar.navigation.compact', title: '탐색 메뉴 컴팩트 모드 전환', group: '탐색' },
   {

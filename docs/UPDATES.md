@@ -32,10 +32,10 @@ https://github.com/snacky101/foltra/releases/download/updater/latest.json
 ## 릴리스 만드는 순서
 
 1. npm의 `package.json`과 `package-lock.json`, workspace `Cargo.toml`과 `Cargo.lock`의 Foltra 패키지 세 개, `src-tauri/tauri.conf.json` 버전을 동일하게 올립니다. 프리뷰도 `preview.2` → `preview.3`처럼 증가시킵니다. `+build` 부분만 바꾸는 것은 업데이트로 인정하지 않습니다.
-2. `docs/releases/vVERSION.md`에 사용자가 체감할 변화·업데이트 후 필요한 동작·다운로드 안내를 적습니다. 게시가 끝나면 아래 명령으로 GitHub 릴리스 본문에 반영합니다.
+2. `docs/releases/vVERSION.md`에 핵심 변경과 필요한 사용자 동작만 짧은 Markdown 목록으로 적습니다. 릴리스 제목은 태그명과 동일하게 사용합니다. 게시가 끝나면 아래 명령으로 제목과 본문을 반영합니다.
 
    ```sh
-   gh release edit vVERSION --repo snacky101/foltra --notes-file docs/releases/vVERSION.md
+   gh release edit vVERSION --repo snacky101/foltra --title vVERSION --notes-file docs/releases/vVERSION.md
    ```
 
 3. 변경을 커밋하고 `vVERSION` 태그가 정확히 그 커밋을 가리키도록 만듭니다.
@@ -116,7 +116,7 @@ GitHub의 동일 이름 파일 교체는 삭제 후 업로드이므로, 마지�
 
 ```sh
 foltra_feed_repair_dir=$(mktemp -d)
-gh release download v0.1.0-preview.9 --repo snacky101/foltra \
+gh release download v0.1.0-preview.10 --repo snacky101/foltra \
   --pattern latest.json --dir "$foltra_feed_repair_dir"
 gh release upload updater "$foltra_feed_repair_dir/latest.json" \
   --repo snacky101/foltra --clobber
