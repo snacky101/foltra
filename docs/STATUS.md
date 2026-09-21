@@ -1,10 +1,12 @@
 # 개발 현황 · 2026-09-21
 
-## 2026-09-21 preview.3 릴리스 대상
+## 2026-09-21 preview.4 릴리스 대상
 
-`0.1.0-preview.3`에는 아래의 Vim/서식·설정 복귀, CLI 경로 열기, 빌드 용량 관리 변경을 함께 포함합니다. npm/Cargo/Tauri 버전을 일치시켰으며 `v0.1.0-preview.3` 태그의 GitHub Actions가 전체 검사·Apple Silicon 앱/DMG·업데이트 서명·CLI를 만들고 다운로드 검증 후 업데이트 피드를 게시합니다. 이전 preview.2의 파일과 태그는 유지하며 새 버전으로 업데이트합니다. preview.1은 업데이트 기능이 없어 처음 한 번 DMG 설치가 필요합니다.
+`0.1.0-preview.4`에는 아래의 Vim/서식·설정 복귀, CLI 경로 열기, 빌드 용량 관리 변경을 함께 포함합니다. npm/Cargo/Tauri 버전을 일치시켰으며 `v0.1.0-preview.4` 태그의 GitHub Actions가 전체 검사·Apple Silicon 앱/DMG·업데이트 서명·CLI를 만들고 다운로드 검증 후 업데이트 피드를 게시합니다. 이전 preview.2의 파일과 태그는 유지하며 새 버전으로 업데이트합니다. preview.1은 업데이트 기능이 없어 처음 한 번 DMG 설치가 필요합니다.
 
-버전 변경 직전 소스는 전체 1,607개 테스트·정적 검사·macOS 개발 앱 빌드를 통과했고, 릴리스 준비 시 해당 검증 입력 441개가 현재 소스와 같음을 확인했습니다. 빌드 결과·개발 vault·검증 자료·환경 파일·개인 서명 키는 커밋 대상에서 제외합니다. Apple Developer ID 공증은 추가하지 않았습니다. 배포 결과와 원격 태그/피드/체크섬 검증 기록은 Git에서 제외한 `test-results/release-preview3/`에 보관합니다.
+기능 변경 소스는 버전 변경 전 전체 1,607개 테스트·정적 검사·macOS 개발 앱 빌드를 통과했고, preview.3의 원격 검사도 통과했습니다. 빌드 결과·개발 vault·검증 자료·환경 파일·개인 서명 키는 커밋 대상에서 제외합니다. Apple Developer ID 공증은 추가하지 않았습니다. 배포 결과와 원격 태그/피드/체크섬 검증 기록은 Git에서 제외한 `test-results/release-preview4/`에 보관합니다.
+
+`preview.3` 태그의 원격 테스트 1,607개와 정적 검사는 통과했지만, 개발 캐시 정리에서 전체 플랫폼의 Cargo metadata를 오프라인으로 조회하다가 캐시에 없는 Android 의존성 때문에 게시 전에 중단됐습니다. 기존 태그와 preview.2 피드는 유지하고 캐시 정리 수정본을 preview.4로 배포합니다. 실패 로그는 `test-results/release-preview3/`에 보존합니다. 정리 도구는 rustc host로 metadata 조회를 제한하고 실제 정리도 offline으로 수행합니다. Android crate가 없는 임시 로컬 registry로 이전 실패와 수정 후 성공, 잠금파일·실행파일·앱·release 보존을 확인했으며 스크립트 27개 테스트와 실제 저장소 dry-run을 통과했습니다.
 
 ## 2026-09-21 Vim text object·서식 편집·설정 Esc 복귀
 

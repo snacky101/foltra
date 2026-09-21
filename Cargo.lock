@@ -1508,7 +1508,7 @@ checksum = "77ce24cb58228fbb8aa041425bb1050850ac19177686ea6e0f41a70416f56fdb"
 
 [[package]]
 name = "foltra-cli"
-version = "0.1.0-preview.3"
+version = "0.1.0-preview.4"
 dependencies = [
  "clap",
  "foltra-core",
@@ -1518,7 +1518,7 @@ dependencies = [
 
 [[package]]
 name = "foltra-core"
-version = "0.1.0-preview.3"
+version = "0.1.0-preview.4"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1543,7 +1543,7 @@ dependencies = [
 
 [[package]]
 name = "foltra-desktop"
-version = "0.1.0-preview.3"
+version = "0.1.0-preview.4"
 dependencies = [
  "foltra-core",
  "serde_json",

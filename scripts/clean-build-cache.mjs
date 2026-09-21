@@ -22,6 +22,7 @@ export function buildCleanArguments(metadata, { dryRun = false } = {}) {
   return [
     'clean',
     '--locked',
+    '--offline',
     '--profile',
     'dev',
     ...(dryRun ? ['--dry-run', '--verbose'] : []),
@@ -32,12 +33,16 @@ export function buildCleanArguments(metadata, { dryRun = false } = {}) {
 export function run(args, { root = ROOT, execute = execFileSync } = {}) {
   if (args.length > 1 || (args.length === 1 && args[0] !== '--dry-run'))
     throw new Error('Usage: node scripts/clean-build-cache.mjs [--dry-run]');
+  const options = { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 };
+  const host = /^host: (\S+)$/m.exec(execute('rustc', ['-vV'], options))?.[1];
+  if (!host) throw new Error('Could not determine the Cargo host platform; refusing cleanup.');
   const metadata = JSON.parse(
-    execute('cargo', ['metadata', '--locked', '--offline', '--format-version', '1'], {
-      cwd: root,
-      encoding: 'utf8',
-      maxBuffer: 32 * 1024 * 1024,
-    }),
+    // Unfiltered metadata downloads source archives even for inactive Android/Windows dependencies.
+    execute(
+      'cargo',
+      ['metadata', '--locked', '--offline', '--format-version', '1', '--filter-platform', host],
+      options,
+    ),
   );
   execute('cargo', buildCleanArguments(metadata, { dryRun: args[0] === '--dry-run' }), {
     cwd: root,
