@@ -290,6 +290,11 @@ fn git_owner_revocation_blocks_saved_conflict_resolution_even_when_caller_omits_
     let digest = status[0]["digest"].clone();
     call(
         &pair.b,
+        "extension.policy.update",
+        json!({"enabled":true,"acceptConsent":true}),
+    );
+    call(
+        &pair.b,
         "extension.enable",
         json!({"id":"git-owner","digest":digest}),
     );

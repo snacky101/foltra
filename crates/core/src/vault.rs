@@ -39,7 +39,7 @@ pub fn workspace(store: &Store, info: VaultInfo) -> Result<Value> {
     let links = query::links(&notes, &records)?;
     let summary: Vec<_> = notes.iter().map(|n| json!({"id":n.meta.id,"title":n.meta.title,"folderId":n.meta.folder_id,"createdAt":n.meta.created_at,"updatedAt":n.meta.updated_at,"revision":n.revision,"words":n.body.split_whitespace().count()})).collect();
     Ok(
-        json!({"vault":info,"path":store.root,"notes":summary,"folders":crate::folders::list(store)?,"trash":trash(store)?,"databases":databases(store)?,"records":records.iter().map(|r|record_value(store,r)).collect::<Result<Vec<_>>>()?,"links":links,"settings":settings(store)?,"extensions":extensions::list(store)?,"pluginStates":crate::plugin_runtime::statuses(store)?,"topicOrderRevision":crate::topic_order::file_revision(store)?}),
+        json!({"vault":info,"path":store.root,"notes":summary,"folders":crate::folders::list(store)?,"trash":trash(store)?,"databases":databases(store)?,"records":records.iter().map(|r|record_value(store,r)).collect::<Result<Vec<_>>>()?,"links":links,"settings":settings(store)?,"extensions":extensions::list(store)?,"pluginStates":crate::plugin_runtime::statuses(store)?,"pluginPolicy":crate::plugin_runtime::policy(store)?,"topicOrderRevision":crate::topic_order::file_revision(store)?}),
     )
 }
 

@@ -37,6 +37,10 @@ impl Fixture {
 
     fn enable(&self) {
         self.call(
+            "extension.policy.update",
+            json!({"enabled":true,"acceptConsent":true}),
+        );
+        self.call(
             "extension.enable",
             json!({"id":"daily-calendar","digest":self.status()["digest"]}),
         );
@@ -396,10 +400,12 @@ fn disabled_or_changed_package_cannot_run_with_an_old_approval() {
     f.enable();
     let mut next = f.manifest.clone();
     next["version"] = json!("1.1.1");
-    f.call(
-        "extension.update",
-        json!({"manifest":next,"expectedDigest":request["digest"]}),
-    );
+    // External file changes still invalidate activation; explicit updates retain it.
+    std::fs::write(
+        f.vault.path().join("extensions/daily-calendar.json"),
+        next.to_string(),
+    )
+    .unwrap();
     assert_eq!(f.status()["enabled"], false);
     let before = f.files();
     assert_eq!(
@@ -426,7 +432,7 @@ fn disabled_or_changed_package_cannot_run_with_an_old_approval() {
 }
 
 #[test]
-fn upgrade_from_old_calendar_permissions_preserves_settings_data_and_requires_approval() {
+fn upgrade_from_old_calendar_permissions_preserves_settings_data_and_activation() {
     let current: Value = serde_json::from_str(include_str!(
         "../../../examples/plugins/daily-calendar.json"
     ))
@@ -467,7 +473,7 @@ fn upgrade_from_old_calendar_permissions_preserves_settings_data_and_requires_ap
         "extension.update",
         json!({"manifest":current,"expectedDigest":old["digest"]}),
     );
-    assert_eq!(f.status()["enabled"], false);
+    assert_eq!(f.status()["enabled"], true);
     assert_eq!(
         f.settings()["values"],
         json!({"create-missing-notes":false})
@@ -493,17 +499,12 @@ fn upgrade_from_old_calendar_permissions_preserves_settings_data_and_requires_ap
         .code,
         "plugin_changed"
     );
-    assert_eq!(
-        execute(
-            f.vault.path().to_str().unwrap(),
-            "extension.invoke",
-            f.request()
-        )
-        .unwrap_err()
-        .code,
-        "plugin_disabled"
-    );
-    f.enable();
+    assert!(execute(
+        f.vault.path().to_str().unwrap(),
+        "extension.invoke",
+        f.request()
+    )
+    .is_ok());
     f.create_missing(true);
     let settings = f.settings();
     let before = f.files();
@@ -514,7 +515,7 @@ fn upgrade_from_old_calendar_permissions_preserves_settings_data_and_requires_ap
         json!({"manifest":next,"expectedDigest":f.status()["digest"]}),
     );
     assert_eq!(f.settings(), settings);
-    assert_eq!(f.status()["enabled"], false);
+    assert_eq!(f.status()["enabled"], true);
     let after = f.files();
     for (path, content) in before.as_object().unwrap() {
         if path != "extensions/daily-calendar.json" {

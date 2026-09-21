@@ -1,4 +1,5 @@
 import { PluginControls } from './PluginControls';
+import { PluginPolicyControls } from './PluginPolicyControls';
 import { PluginSettingsForm } from './PluginSettingsForm';
 import { PluginSettingsView } from './PluginSettingsView';
 import type { PluginSettingsInvoke } from '../lib/pluginTypes';
@@ -100,7 +101,7 @@ export function ExtensionsView({
     run(`update:${extension.id}`, async () => {
       await call(workspace.path, 'extension.update', { manifest: extension, expectedDigest: digest });
       if (mounted.current) await beforeDisable?.(extension.id);
-      return '업데이트 완료 · 권한 확인 후 활성화하세요';
+      return '업데이트 완료 · 활성화 상태가 유지됩니다';
     });
   const installFile = (file: File) =>
     run('file:', async () => {
@@ -188,6 +189,7 @@ export function ExtensionsView({
           <span className="version">v{selected.version}</span>
         </header>
         <PluginControls
+          pluginsEnabled={workspace.pluginPolicy?.enabled ?? false}
           extension={selected}
           status={status}
           vault={workspace.path}
@@ -225,6 +227,20 @@ export function ExtensionsView({
   return (
     <section className="settings-section extension-manager">
       {kind === 'theme' && <h2>테마 설치</h2>}
+      {kind === 'plugin' && (
+        <PluginPolicyControls
+          key={workspace.path}
+          policy={workspace.pluginPolicy}
+          vault={workspace.path}
+          refresh={refresh}
+          onError={onError}
+          beforeDisable={async () => {
+            for (const status of workspace.pluginStates ?? []) {
+              if (status.enabled) await beforeDisable?.(status.id);
+            }
+          }}
+        />
+      )}
       <div className="extension-toolbar">
         <label className="extension-installed-filter">
           <input
@@ -326,6 +342,7 @@ export function ExtensionsView({
               )}
               {installed && extension.runtime && (
                 <PluginControls
+                  pluginsEnabled={workspace.pluginPolicy?.enabled ?? false}
                   beforeDisable={beforeDisable}
                   extension={extension}
                   status={status}

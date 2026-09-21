@@ -1,200 +1,155 @@
 # Foltra · 폴트라
 
-기록을 따라, 생각을 잇다.
+**내 컴퓨터에 기록하고, 생각을 연결하는 노트 앱.**
 
-선택 가능한 Vim 모드와 leader 단축키로 노트·데이터베이스·연결을 다루는 local-first 앱입니다. `snack-note`와 코드·저장소·데이터 형식을 공유하지 않는 독립 프로젝트입니다.
+메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-**현재는 0.1 개발 프리뷰입니다.** 원래 제품 요구사항 전체의 완성을 의미하지 않습니다. 구현 여부와 검증 범위는 [개발 현황](docs/STATUS.md)에 구분했습니다.
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.9) · [이번 버전의 변화](docs/releases/v0.1.0-preview.9.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
-![Foltra 개발 화면](docs/preview.png)
+![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
-## macOS 설치
+> [!NOTE]
+> 현재는 **Apple Silicon Mac용 개발 프리뷰**입니다. 기능별 구현·검증 범위는 [개발 현황](docs/STATUS.md)에 기록합니다. Intel Mac·Windows·Linux·모바일용 설치 파일은 아직 제공하지 않습니다.
 
-[v0.1.0-preview.7 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.7)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
+## 설치하고 첫 노트 쓰기
 
-앱 업데이트를 탑재한 버전부터 설정 → **앱 업데이트**에서 새 버전을 확인·다운로드·설치합니다. 기존 `preview.1`은 최초 한 번 새 DMG 설치가 필요합니다. 개발자의 버전 태그 배포와 서명 키 관리는 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.9/Foltra_0.1.0-preview.9_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
+3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 
-앱 무결성을 위한 ad-hoc 서명을 적용한 개인용 프리뷰이며 Apple Developer ID 서명·공증은 없습니다. 첫 실행이 차단되면 [Apple 안내](https://support.apple.com/guide/mac-help/mh40616/mac)에 따라 시스템 설정 → 개인정보 보호 및 보안에서 해당 앱의 ‘확인 없이 열기’를 선택합니다. 현재 설치 파일은 Apple Silicon용이며 Intel Mac용은 제공하지 않습니다.
+앱을 사용하는 데 Node.js나 Rust를 설치할 필요는 없습니다. 이미 사용 중이라면 **설정 → 앱 업데이트**에서 새 버전을 받을 수 있습니다. 업데이트 기능이 없는 `preview.1`은 DMG로 한 번 수동 설치해야 합니다.
 
-## 실행
+<details>
+<summary><strong>처음 실행할 때 macOS가 차단한다면</strong></summary>
 
-Node.js 24와 Rust stable, 운영체제의 [Tauri 개발 요구사항](https://v2.tauri.app/start/prerequisites/)이 필요합니다. 현재 macOS에서 빌드했습니다.
+현재 배포본에는 Apple Developer ID 서명·공증이 없습니다. 다운로드 출처를 확인한 뒤 실행하기로 했다면 **시스템 설정 → 개인정보 보호 및 보안 → 확인 없이 열기**를 사용하세요. macOS 버전에 따른 절차는 [Apple 안내](https://support.apple.com/guide/mac-help/mh40616/mac)를 참고하세요.
 
-```sh
-make install
-make dev
+</details>
+
+## 세 가지만 알면 시작할 수 있어요
+
+| 이름             | 쉽게 말하면                                | 이렇게 씁니다                                               |
+| ---------------- | ------------------------------------------ | ----------------------------------------------------------- |
+| **Vault**        | 여러 공책을 담는 가방                      | 개인 기록과 업무 기록을 서로 다른 vault에 보관              |
+| **노트와 링크**  | 공책의 한 페이지와 다른 페이지로 가는 표시 | `[[여행 계획]]`을 적어 관련 노트에 연결                     |
+| **데이터베이스** | 필요한 칸을 직접 만드는 표                 | 읽을 책의 제목·상태·날짜를 정리하고 필요하면 행에 본문 연결 |
+
+노트 본문과 데이터는 선택한 vault 안에 저장합니다. 이미지를 붙여넣으면 첨부파일도 vault에 저장합니다. Vim·글꼴·테마 등 앱 설정과 설치한 확장은 vault별로 관리합니다.
+
+## 흩어진 메모를 한 주제로 모으기
+
+월요일과 수요일 노트에 아래처럼 적었다고 해보세요.
+
+```markdown
+- 인터뷰 질문 정리 [[프로젝트]]
+  - 가장 불편한 순간을 물어보기
 ```
 
-첫 화면에서 빈 폴더를 선택해 vault를 만들거나 기존 Foltra vault를 엽니다. 예제 데이터는 “예제 노트와 DB를 담아 시작하기”를 선택한 경우에만 생성됩니다. 앱 이름은 Foltra, vault 이름과 위치는 사용자 지정입니다.
-
-새 Vault는 현재/최근 Vault의 상위 위치에 이름과 같은 폴더를 제안합니다. 경로 입력창 오른쪽의 폴더 선택으로 상위 위치를 바꿀 수 있으며, 전체 경로를 직접 입력하면 그 경로를 유지합니다. Vim·Leader·단축키·편집 모드·테마와 설치한 확장은 현재 Vault별로 관리합니다. 사이드바 너비와 최근 Vault 목록은 기기별로 유지됩니다.
-
-```sh
-# macOS에서 독립 실행 가능한 개발용 앱 빌드
-make build
-open target/debug/bundle/macos/Foltra.app
-
-# Apple Silicon용 앱·DMG·서명된 업데이트 파일·CLI 생성
-make release
-
-# 브라우저로 UI 개발: 실제 파일 코어를 연결하는 로컬 개발 서버
-make dev-web
+```markdown
+- 첫 시제품을 보여주고 의견 받기 [[프로젝트]]
 ```
 
-`make` 또는 `make help`로 전체 명령을 봅니다. `make build-web`은 프론트엔드 번들, `make build-cli`는 개발용 CLI만 빌드합니다. `make release`는 로컬 파일을 만들며 서명 키 설정은 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
+**주제 모음 → 프로젝트**를 열면 두 노트의 해당 블록이 카드로 모입니다. 첫 카드에는 하위 항목도 함께 나옵니다. 원본은 각 노트에 그대로 있고, 카드를 끌어 원하는 순서로 읽을 수 있습니다.
 
-검사·빌드·로컬 게시 명령은 성공 여부·소요 시간·로그 경로만 출력합니다. 전체 로그는 `test-results/tasks/명령.log`에 최근 실행 하나를 보관하며, 실패하면 마지막 40줄을 함께 표시합니다. 기존 배포 검증 자료는 덮어쓰지 않습니다.
+이 연결은 다른 화면에서도 활용합니다.
 
-macOS 기본 Make 3.81을 지원합니다. 빌드 작업 수는 `CARGO_BUILD_JOBS=4`, macOS 최소 버전은 `11.0`을 기본값으로 사용합니다. standalone Command Line Tools가 있으면 이를 사용하며, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make build`처럼 개발 도구를 직접 지정할 수 있습니다. 시스템의 Xcode 선택 설정은 바꾸지 않습니다. 한 번의 `make -j` 호출 안에서도 타깃은 순서대로 실행합니다.
+| 보고 싶은 것                 | 열어볼 곳                                 |
+| ---------------------------- | ----------------------------------------- |
+| 이 노트를 언급한 다른 노트   | 오른쪽 사이드바의 **연결된 생각**(백링크) |
+| 노트들이 서로 연결된 모습    | **지식 그래프**                           |
+| 기록을 만들거나 수정한 흐름  | **타임라인**                              |
+| 같은 주제를 다룬 문단과 목록 | **주제 모음**                             |
 
-### 개발 빌드 용량 관리
+자세한 규칙은 [링크](docs/LINKS.md)와 [주제 모음](docs/TOPICS.md) 안내에 있습니다. `[[노트 이름|화면에 보일 이름]]`처럼 표시 이름을 따로 지정할 수도 있습니다.
 
-개발·테스트 빌드는 기본적으로 디버그 정보를 생성하지 않고 증분 컴파일 캐시를 사용하지 않습니다. 테스트 프로필은 개발 프로필을 상속합니다. Rust의 assertion·overflow 검사는 유지되지만, 내장 DuckDB는 이 설정에서 C++ 디버그 assertion도 끕니다. 상세 디버깅이 필요하면 `CARGO_PROFILE_DEV_DEBUG=2 make build` 또는 `CARGO_PROFILE_TEST_DEBUG=2 make test`로 일시적으로 켤 수 있습니다. 이 경우 큰 캐시가 다시 생길 수 있습니다.
+## 필요한 방식으로 쓰세요
 
-`.cargo/config.toml`에도 macOS 최소 버전 `11.0`을 지정해 직접 실행하는 Cargo/npm과 Make의 빌드 환경을 맞춥니다. 명시적인 환경변수는 여전히 우선합니다.
+| 하고 싶은 일             | Foltra에서 할 수 있는 것                                                  | 안내                                                 |
+| ------------------------ | ------------------------------------------------------------------------- | ---------------------------------------------------- |
+| 편하게 메모하기          | Live Preview·원문·읽기 모드, 자동 저장, 이미지 붙여넣기, 표·코드 블록     | [편집](docs/EDITING.md)                              |
+| 할 일과 속성 정리하기    | `- [ ]` 체크리스트, 상태 아이콘, 태그·자동완성, YAML 속성                 | [할 일](docs/TASKS.md) · [속성](docs/FRONTMATTER.md) |
+| 표로 자료 관리하기       | 노트 없이도 행 추가, 컬럼 이름·타입·너비·순서 변경, 표·보드·날짜 타임라인 | [데이터 구조](docs/ARCHITECTURE.md)                  |
+| 노트 안에 조회 결과 넣기 | DB와 컬럼 이름으로 SQL을 작성해 필터·정렬·집계·조인                       | [SQL](docs/SQL.md)                                   |
+| 키보드로 작업하기        | 선택형 Vim, text object, Leader 조합, 일반 단축키·키 기록                 | [편집과 Vim](docs/EDITING.md)                        |
+| 필요한 도구만 더하기     | Anki, 일지 캘린더, 날짜 자동완성, Git 동기화, 사용자 확장 파일            | [확장 SDK](docs/PLUGIN_SDK.md)                       |
+| 색과 글꼴 바꾸기         | 편집기·DB 글꼴 설정, 기본 테마, 추가 테마 설치·삭제                       | [테마](docs/THEMES.md)                               |
+| 실수한 기록 되찾기       | 노트·폴더·DB 휴지통과 복원, 백업 내보내기·복원                            | [CLI의 관리 명령](docs/CLI.md)                       |
+
+데이터베이스의 **행은 노트 없이도 존재**합니다. 예를 들어 책 목록에 제목만 먼저 넣고, 나중에 그 행에 독서 메모를 연결할 수 있습니다. 노트 안 SQL은 로컬 데이터를 조회하며 외부 PostgreSQL 서버에 접속하는 기능은 아닙니다.
+
+## 키보드로 쓰고 싶다면
+
+**Vim은 기본으로 꺼져 있습니다.** 설정에서 켜세요. Leader는 여러 키를 차례로 눌러 명령을 실행하는 시작 키이며, 기본값은 `Space`입니다.
+
+| 동작           | macOS 기본 키 | Leader 조합     |
+| -------------- | ------------- | --------------- |
+| 명령 찾기      | `Cmd+k`       | —               |
+| 새 노트        | `Cmd+n`       | `Space → n → n` |
+| 저장           | `Cmd+s`       | `Space → n → s` |
+| 읽기·편집 전환 | `Cmd+e`       | `Space → n → p` |
+| 주제 모음      | —             | `Space → v → c` |
+| 설정 열기      | `Cmd+,`       | `Space → s → s` |
+
+설정에서는 조합을 `<leader>nn`처럼 적거나 직접 키를 눌러 기록할 수 있습니다. 확장 명령에도 같은 방식으로 단축키를 붙입니다. Leader를 누른 뒤에는 다음 키를 기다리며, 취소하려면 `Esc`를 누르세요. 본문 입력 중에는 Leader가 글쓰기를 가로채지 않습니다.
+
+<details>
+<summary><strong>Vim을 켰을 때 자주 쓰는 키</strong></summary>
+
+- `:w` 저장, `:q` 현재 노트 닫기, `:wq` 저장 후 닫기.
+- `gd`는 이미 있는 링크 대상으로 이동합니다. `Cmd+Enter`는 없는 노트 링크라면 생성해서 엽니다.
+- `Ctrl+o` / `Ctrl+i`로 링크 탐색의 이전 / 다음 위치를 엽니다.
+- `Ctrl+h/j/k/l`로 화면 영역을 옮기고, 사이드바에서 `j/k`로 항목을 고릅니다.
+- 굵게·기울임·링크·괄호 등의 범위를 편집하는 text object는 [편집 안내](docs/EDITING.md)에서 확인하세요.
+
+`:q!`는 아직 저장하지 않은 초안만 버립니다. 이미 자동 저장된 내용을 되돌리는 명령은 아닙니다. 단축키의 대소문자는 구분합니다.
+
+</details>
+
+## 확장과 테마
+
+**설정 → 확장 → 플러그인 사용**을 처음 켤 때 한 번 동의하세요. 그다음부터는 원하는 확장을 **설치 → 활성화**하면 됩니다. 동의는 현재 기기의 vault별로 기억하며, 다시 켜거나 앱에서 확장을 업데이트해도 반복하지 않습니다.
+
+| 확장                            | 하는 일                                                                                    |
+| ------------------------------- | ------------------------------------------------------------------------------------------ |
+| [Anki 연결](docs/ANKI.md)       | 태그가 붙은 블록이나 DB 행을 AnkiConnect로 카드에 동기화. 연결된 노트 본문과 이미지도 사용 |
+| [일지 캘린더](docs/CALENDAR.md) | 오른쪽 달력에 날짜 노트를 표시하고 오늘 노트를 열거나 생성                                 |
+| 날짜 자동완성                   | `@Today`, `@Yesterday`, `@Tomorrow` 후보를 고르면 실제 날짜 텍스트로 바꾸기                |
+| [Git 동기화](docs/GIT.md)       | 사용자가 연결한 Git 저장소에 기록을 보내고 다른 기기의 변경 가져오기                       |
+
+전체 플러그인 사용을 꺼도 개별 활성화 선택은 기억합니다. 확장이 사용하는 권한은 각 항목에서 펼쳐볼 수 있습니다. **파일로 설치**도 지원하며, 모든 Obsidian 플러그인을 그대로 설치하는 호환 기능은 아닙니다.
+
+테마는 **설정 → 테마**에서 관리합니다. 기본 **Paper & Pine / Midnight**, 설치형 **Catppuccin Mocha / Rosé Pine / Tokyo Night / Darcula**를 제공합니다. 테마에는 플러그인 사용 동의가 필요하지 않습니다.
+
+## 터미널이나 에이전트에서 사용하기
+
+CLI는 터미널에서 짧은 명령으로 Foltra를 다루는 도구입니다. 앱에 포함되어 있으며 **설정 → CLI → CLI 설치**를 한 번 누르면 `foltra` 명령을 사용할 수 있습니다.
 
 ```sh
-make storage        # 실제 빌드/검증 자료 용량 확인
-make check-storage  # target 15 GiB, test-results 1 GiB 초과 시 실패
-make clean-cache    # 다시 만들 수 있는 개발용 의존성·core 캐시 정리
-```
-
-표준 Make/npm 빌드·검사 명령은 시작과 완료 시 용량을 확인하며, 개발 서버는 시작 시 확인합니다. 기준을 넘으면 후속 작업을 중단하고 정리 방법을 안내합니다. 한 번의 빌드 중 증가량까지 제한하는 디스크 할당량은 아니며, 직접 Cargo를 실행할 때는 `make check-storage`를 함께 실행해야 합니다. `CARGO_TARGET_DIR`를 지정했다면 해당 경로를 검사합니다.
-
-`clean-cache`는 Cargo로 의존성·core의 개발 캐시만 지웁니다. 앱 번들·공용 CLI/앱 실행 파일·release 산출물·vault·검증 기록은 보존합니다. 다음 개발 빌드는 의존성을 다시 컴파일하므로 더 오래 걸립니다. 빌드·테스트와 동시에 실행하지 마세요. 검증용 CLI는 새로 빌드한 `target/debug/foltra`를 공유하고, 별도 작업 폴더마다 실행 파일이나 전체 소스를 복제해 남기지 않습니다. 릴리스 백업과 검증 증거는 자동 삭제하지 않습니다.
-
-브라우저 개발 주소는 `http://127.0.0.1:1420`입니다. 이 서버는 개발 전용이며 네트워크 공유나 호스팅용이 아닙니다. 빌드한 데스크톱 앱은 이 서버 없이 실행됩니다.
-
-## 써볼 수 있는 것
-
-- Markdown Live Preview·원문·읽기와 자동 저장. 코드 울타리(```` ```go ````) 뒤 Enter로 닫는 울타리 자동 생성과 언어별 문법 강조. Vim은 기본 OFF, 설정에서 켤 수 있고 슬래시 메뉴도 독립적으로 on/off.
-- [작업 항목](docs/TASKS.md)의 할 일·진행·완료·북마크 등 아이콘과 원문 편집, Mod+l 상태 순환. [노트 속성](docs/FRONTMATTER.md)은 Mod+;로 추가하며 편집기와 DB 글꼴은 따로 설정.
-- [서식 편집과 Vim text object](docs/EDITING.md): 굵게·기울임·밑줄·취소선·인라인 코드, Visual/Leader 단축키, Markdown 강조 영역 편집. 설정은 Esc로 이전 화면에 복귀.
-- 사이드바 최하단 Vault 메뉴, 최근 vault 선택 팝업, 새 vault 생성, 좌우 사이드바 너비 드래그와 복원.
-- 내용 검색의 ↑/↓ 결과 선택과 Enter 열기.
-- 모든 노트 목록의 제목 검색·폴더 필터·수정일/생성일/제목 정렬, 목록에서 노트 열기와 우클릭 관리.
-- 명령 팔레트와 leader/일반 단축키 설정, Leader 키·조합 기록. 기본 leader는 Space, 일반 단축키의 Mod는 Cmd 또는 Ctrl.
-- `[[노트 제목]]` 원문 저장과 `[[노트 제목|표시 이름]]` alias, 이름 변경 시 참조 갱신([링크 규칙](docs/LINKS.md)), 문맥 백링크, 힘 기반 노트 그래프(겹침 방지·연결 강조·확대·이동)와 생성/수정 타임라인.
-- [주제 모음](docs/TOPICS.md): 같은 `[[주제]]`를 적은 문단·제목·인용문과 bullet/하위 목록을 여러 노트에서 카드로 모아 보기. 폴더 포함·제외, 주제 검색·페이지·날짜/드래그 사용자 지정 정렬·원본 위치 이동, CLI 조회.
-- 노트 파일 없이 만드는 DB와 행. 표·보드·날짜 타임라인, 컬럼 이름·타입 변경·삭제·드래그 순서 이동·너비 조절·헤더 클릭 정렬. 컬럼 이름 변경 시 노트 안 SQL 참조를 함께 갱신하며, 노트 컬럼에서 본문 열기/생성/연결.
-- 노트 안의 [`foltra-sql` 블록](docs/SQL.md)에서 DB·컬럼 이름으로 SQL 조회·필터·정렬·집계·조인. 로컬 DuckDB를 사용하며 기존 `foltra-query` JSON도 유지.
-- 설정의 확장 탭에서 Anki·[일지 캘린더](docs/CALENDAR.md) 설치·업데이트·사용자 확장 파일 관리·단축키 지정. 테마 탭에서 Paper & Pine/Midnight 선택, Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula 설치와 사용자 테마 파일 추가·삭제.
-- [Anki 연결](docs/ANKI.md)은 DB 컬럼을 앞면으로, 다른 컬럼 또는 연결된 노트 본문을 뒷면으로 선택합니다. 일지 캘린더는 우측 사이드바에서 날짜 노트를 표시합니다. 코드 플러그인 SDK v1의 독립/사이드바 뷰·설정·변경 이벤트, 노트/DB API와 편집기 선택 변환으로 별도 확장을 만들어 파일로 설치할 수 있습니다. 코드 패키지는 권한 확인 후 기기별로 활성화하며 일반 네트워크·외부 파일·앱 DOM 직접 접근은 제공하지 않습니다.
-- 앱을 열지 않아도 같은 vault를 다루는 JSON CLI, 휴지통, 백업 내보내기/복원.
-
-| 동작 | 기본 키 |
-| --- | --- |
-| 명령 팔레트 | Mod+k |
-| 새 노트 | Mod+n / Space n n |
-| 저장 | Mod+s / Space n s / Vim `:w` |
-| 현재 노트 닫기 / 저장 후 닫기 | Vim `:q` / `:wq` 또는 `:x` |
-| 읽기·편집 전환 | Mod+e / Space n p |
-| 모든 노트 목록 | Space v n |
-| 그래프 / 타임라인 | Space v g / Space v t |
-| 주제 모음 | Space v c |
-| 새 DB / 새 행 | Space d c / Space d n |
-| 컬럼 타입 변경 | Space d t |
-| 설정 | Mod+, / Space s s |
-
-Vim 명령 입력줄은 화면 하단에 표시합니다. `:q`는 현재 노트를 닫으며 미저장 변경이 있으면 중단합니다. `:q!`는 미저장 초안만 버리고, 이미 자동 저장된 내용은 되돌리지 않습니다.
-
-본문 입력 모드에서는 leader를 시작하지 않습니다. Leader와 중간 조합은 시간 제한 없이 다음 키를 기다립니다. Esc, 명령 실행, 일치하지 않는 조합, 창 포커스 이탈로 종료합니다. 초기 키 설정은 설정 화면에서 바꿀 수 있습니다. 브라우저의 자체 Vim 확장과 단축키가 겹칠 수 있어 데스크톱 입력 검증은 별도로 진행해야 합니다.
-
-## CLI와 agent 연동
-
-전체 사용법은 [CLI 안내](docs/CLI.md)를 참고하세요. 명령별 도움말, 노트 이름 선택, 본문 추가, 일지·할 일·속성, 문맥 검색, DB/SQL, 쉘 자동완성과 출력 형식을 제공합니다.
-
-macOS 앱에 CLI가 포함됩니다. Foltra.app을 응용 프로그램 폴더로 옮겨 실행한 뒤 **설정 → CLI → CLI 설치**를 한 번 누르면 `/usr/local/bin/foltra`가 앱 내부 실행 파일에 연결됩니다. 필요한 경우 macOS가 관리자 인증을 요청하며, 기존의 다른 `foltra` 파일이나 링크는 덮어쓰지 않습니다. 명령 팔레트의 **터미널 명령 · CLI 설치**에서도 설정을 열 수 있습니다. 이후 앱 업데이트에 CLI도 포함되어 별도 다운로드가 필요 없습니다. PATH에 `/usr/local/bin`이 포함된 터미널에서 기존 볼트나 볼트 안의 노트를 바로 열 수 있습니다.
-
-```sh
+# 앱에서 이 vault 열기
 foltra ~/Foltra/Personal
-foltra .                       # 현재 디렉터리가 Foltra 볼트인 경우
-foltra "/path/to/vault/notes/NOTE_UUID.md"
-foltra open "./commands.list"  # CLI 명령과 같은 이름의 경로는 open 또는 ./로 구분
+
+# 아래 데이터 명령이 사용할 기존 vault 지정
+export FOLTRA_VAULT="$HOME/Foltra/Personal"
+
+# 앱을 켜지 않고 오늘 일지에 한 줄 추가
+foltra daily append --content '- 오늘 떠오른 생각'
+
+# 프로젝트 메모를 만들고 제목으로 읽기
+foltra create --title '프로젝트 메모' --content '# 프로젝트'
+foltra read --note '프로젝트 메모'
+foltra tasks --status todo
+
+# 사용할 수 있는 명령 확인
+foltra help all
 ```
 
-상대 경로와 한글·공백이 있는 경로를 지원합니다. 노트 파일은 현재 저장 형식인 `notes/<UUID>.md`를 사용합니다. 일반 Markdown 파일이나 초기화하지 않은 폴더는 자동 가져오기·볼트 생성 없이 오류를 반환합니다. 앱이 실행 중이면 기존 창을 사용하며, 창을 닫아 둔 상태이면 다시 엽니다. 편집 창이나 이름 변경·동기화 작업을 진행 중이거나 현재 노트를 저장할 수 없으면 이동하지 않습니다. 전환 중에는 입력을 잠시 막고 진행 중인 저장이 끝나기를 기다립니다.
+에이전트는 `foltra commands list --json`으로 명령과 인자 형식을 확인할 수 있습니다. JSON·JSONL·CSV·TSV 출력, 검색·속성·DB·SQL·백업 명령은 [CLI 안내](docs/CLI.md)에 정리했습니다. CLI와 앱은 같은 저장 규칙을 사용합니다.
 
-배포 CLI는 설치된 `Foltra.app`을 찾습니다. 개발용 `target/debug/foltra`는 함께 빌드한 `target/debug/bundle/macos/Foltra.app`을 사용하므로 `make build build-cli`로 둘 다 빌드하세요. 별도 앱 경로는 `FOLTRA_APP_PATH=/path/to/Foltra.app foltra /path/to/vault`로 지정할 수 있습니다. 새 버전으로 빌드하기 전에 실행해 둔 앱은 재시작해야 새 열기 기능이 적용됩니다. Linux/Windows의 기존 headless 명령은 유지하며, 이 데스크톱 실행 기능은 현재 macOS에서 지원합니다.
+## 더 알아보기
 
-앱을 띄우지 않는 기존 데이터 명령은 그대로 사용할 수 있습니다.
+- **직접 실행·개발하기:** [개발 환경과 Make 명령](docs/DEVELOPMENT.md)
+- **확장 만들기:** [SDK 시작하기](packages/plugin-sdk/README.md) · [실행 계약과 제한](docs/PLUGIN_SDK.md)
+- **프로젝트 이해하기:** [구조](docs/ARCHITECTURE.md) · [구현·검증 현황](docs/STATUS.md) · [장기 설계](docs/DESIGN.md)
+- **배포하기:** [업데이트와 릴리스](docs/UPDATES.md)
 
-```sh
-make build-cli
-./target/debug/foltra --vault /absolute/path/to/vault vault init --name Personal
-./target/debug/foltra --vault /absolute/path/to/vault note create --title "첫 기록" --body "본문"
-./target/debug/foltra --vault /absolute/path/to/vault commands list
-./target/debug/foltra --vault /absolute/path/to/vault database create --name Tasks
-```
-
-위 `vault init`은 새 빈 폴더에서 한 번만 실행합니다. `commands list`는 명령 ID·인자 스키마·읽기 전용 여부·headless 실행 가능 여부를 반환하며 해당 vault에 설치한 확장 명령도 포함합니다.
-
-```sh
-./target/debug/foltra --vault /absolute/path/to/vault record create --database DATABASE_UUID --values '{"title":"노트 없이 저장한 행","status":"To do"}'
-./target/debug/foltra --vault /absolute/path/to/vault query run --args '{"databaseId":"DATABASE_UUID","limit":100}'
-./target/debug/foltra --vault /absolute/path/to/vault query catalog
-./target/debug/foltra --vault /absolute/path/to/vault query sql --args '{"sql":"SELECT COUNT(*) AS total FROM \"Tasks\""}'
-./target/debug/foltra --vault /absolute/path/to/vault note read --id NOTE_UUID
-./target/debug/foltra --vault /absolute/path/to/vault note update --id NOTE_UUID --expected-revision REVISION_FROM_READ --body-file ./draft.md
-./target/debug/foltra --vault /absolute/path/to/vault extension install --manifest-file examples/plugins/anki.json
-./target/debug/foltra --vault /absolute/path/to/vault extension status
-```
-
-`DATABASE_UUID`, `NOTE_UUID`, `REVISION_FROM_READ`를 이전 명령의 실제 반환값으로 대체합니다. 코드 확장은 설치 후 앱에서 권한을 확인하고 활성화합니다. 수정과 삭제는 읽을 때 받은 revision을 사용합니다. 충돌이 나면 최신 내용을 읽고 병합한 뒤 다시 요청해야 합니다.
-
-기존 데이터 명령과 RPC의 기본 출력은 JSON입니다. 단축 명령 `read`·`daily`는 Markdown 본문을 출력하며 `--json`으로 전체 데이터를 받을 수 있습니다. `--format jsonl|text|csv|tsv`도 지원합니다. 결과는 stdout, 오류는 stderr에 기록합니다. 성공은 exit 0, revision 충돌은 exit 3, 나머지 실패는 exit 1입니다. `FOLTRA_VAULT` 환경변수로 기본 vault를 지정할 수도 있습니다. `--args`는 전체 인자 객체, `--body-file`은 본문 파일, `query run --file`은 쿼리 JSON 파일을 받습니다.
-
-```sh
-./target/debug/foltra --vault /absolute/path/to/vault vault export > snapshot.json
-./target/debug/foltra --vault /absolute/path/to/new-empty-folder vault import --snapshot-file snapshot.json
-```
-
-백업 복원은 비어 있는 새 폴더에만 허용됩니다. 캐시와 복구 journal은 내보내거나 복원하지 않습니다.
-
-## 개발과 구조
-
-```sh
-make test   # core·실제 CLI·프론트엔드·배포 검증·desktop native 테스트
-make check  # TS/프로덕션 번들, Rust 포맷, 전체 workspace Clippy
-make verify # test → check
-make format
-```
-
-`npm test`도 desktop native를 포함합니다. core·CLI·desktop은 Cargo workspace 한 번의 호출로 검사하여 공유 의존성의 중복 컴파일을 피합니다.
-
-- [구조와 실행 흐름](docs/ARCHITECTURE.md): 모듈 책임, 저장 계약, 기능 추가 위치.
-- [개발 현황과 남은 작업](docs/STATUS.md): 원래 요구사항별 구현·검증 구분.
-- [전체 제품 설계](docs/DESIGN.md): 장기 요구사항과 설계 가설. 현재 구현의 사실은 위 두 문서를 기준으로 합니다.
-- [코드 플러그인 SDK](packages/plugin-sdk/README.md), [SDK 계약·제한](docs/PLUGIN_SDK.md), [Anki 확장 소스](examples/code/anki/), [테마 팔레트·출처](docs/THEMES.md).
-- [Git 동기화 확장](docs/GIT.md): 설치·저장소 연결, 동기화 범위와 충돌 해결.
-
-아직 공개 플러그인 실행 환경, 모바일, 관계·수식 DB, 대규모 vault 품질 기준을 완료하지 않았습니다. 저장 포맷은 버전을 포함하지만 범용 포맷 마이그레이션은 구현 전입니다.
-
-컬럼 타입 변경은 모든 행을 먼저 검사합니다. CLI에서도 `database.property.preview`에 `databaseId`와 `property`를 보내 결과를 확인한 뒤, 그 `revision`을 `expectedRevision`으로 붙여 `database.property.update`를 호출합니다. 검사 이후 데이터가 바뀌면 다시 검사해야 하며, 변환 불가 값은 삭제하거나 강제로 변환하지 않습니다. 이름 컬럼은 텍스트로 유지됩니다.
-
-노트 영역의 빈 공간·제목을 우클릭하거나 새 폴더 버튼을 누르면 Vault 최상위에, 폴더 우클릭 메뉴에서는 해당 폴더 안에 새 노트·하위 폴더를 즉시 만들고 인라인 이름 입력을 시작합니다. 이름 변경은 Enter/포커스 이동으로 저장하고 Esc로 취소합니다. 새 항목은 취소해도 기본 이름으로 남습니다. 노트 우클릭 메뉴는 이름 변경·이동·복제·내부 링크 복사·휴지통 이동을 제공합니다. 폴더는 하위 폴더·노트 개수를 확인한 뒤 통째로 휴지통에 옮기고 함께 복원할 수 있습니다. `leader r n` 또는 `F2`로 포커스된 노트·폴더·DB의 이름을 사이드바에서 바꾸고 `leader n m`으로 노트를 이동합니다.
-
-DB 영역의 빈 공간·제목 우클릭은 새 DB 생성을, DB 항목 우클릭은 열기·이름 변경·새 행 추가·휴지통 이동을 제공합니다. DB 삭제·복원은 스키마와 소속 행을 함께 처리하고 연결된 노트는 유지합니다. 폴더·DB 묶음의 휴지통 파일이 16 MiB를 초과하면 변경 없이 거절합니다.
-
-노트의 YAML 속성은 [frontmatter](docs/FRONTMATTER.md)에서 설명합니다. 속성 패널과 원문 편집, 태그 검색·자동완성, CLI 조회를 지원합니다.
-
-`Ctrl+h/j/k/l`은 왼쪽/아래/위/오른쪽 영역으로 포커스를 옮깁니다. Vim을 켜면 사이드바 `j/k`는 노트·폴더·데이터베이스 사이에서 포커스 표시와 함께 이동하며 생성·설정 버튼은 건너뜁니다. `h/l`은 폴더 접기·펼치기/부모·자식 이동/노트 열기입니다. 오른쪽 패널의 j/k는 열 수 있는 백링크·outgoing link만 순회하며 선택한 항목을 배경과 테두리로 표시합니다. h는 선택을 유지하고 l은 링크를 엽니다. 목록 갱신 중 선택을 보존하고, 대상이 사라지면 인접 링크 또는 본문 영역으로 이동합니다. 설정에서 일반 단축키와 leader 조합을 변경할 수 있습니다. Leader 시작 키는 **키 기록**으로 지정하며 기존 단축키와 겹치면 저장을 막습니다. macOS의 Mod는 Command, Windows/Linux의 Mod는 Ctrl이며 Ctrl·Meta는 해당 키 자체입니다. 기본 명령 팔레트는 macOS `Mod+k`, 다른 플랫폼은 `Mod+shift+P`입니다.
-
-DB 표는 헤더와 데이터에 같은 세로선을 사용합니다. 별도 삭제 열 없이 행 번호 위치의 메뉴 또는 행 우클릭에서 휴지통으로 옮깁니다. 휴지통은 앱의 쓰기 직후 갱신되고 CLI 외부 변경은 최대 약 3초 뒤 반영됩니다.
-
-```sh
-foltra --vault ./my-vault folder create --name Projects
-foltra --vault ./my-vault folder create --name Drafts --parent-id FOLDER_UUID
-foltra --vault ./my-vault folder list
-foltra --vault ./my-vault note update --id NOTE_UUID --expected-revision REVISION --folder-id FOLDER_UUID
-```
-
-최상위로 이동할 때는 `--folder-id ''`를 사용합니다. 폴더 변경도 `expectedRevision`을 요구하며 모든 명령은 `commands list`에 포함됩니다.
-
-사이드바는 로고·검색 헤더 없이 탐색 메뉴부터 표시합니다. 파일 행의 별도 더보기 버튼 없이 우클릭 또는 Shift+F10으로 관리 메뉴를 엽니다. 로고는 시작 화면에 남기고, 내용 검색 메뉴와 명령 팔레트 단축키를 유지합니다. 노트를 폴더에 드래그하면 해당 폴더로 이동하고, **NOTES** 제목에 드롭하면 Vault 최상위로 꺼낼 수 있습니다. 접힌 대상 폴더는 이동 후 펼쳐집니다.
-
-일반 단축키는 대소문자를 구분합니다. `Ctrl+h`와 `Ctrl+H`는 다르며 `Ctrl+H`는 `Ctrl+Shift+h`와 같습니다. Leader 뒤의 `r`과 `R`도 구분합니다. 예전 설정은 기존 동작을 유지하도록 읽고 다음 설정 저장 시 `shortcutVersion: 2`로 기록합니다. 이 필드가 없는 구버전 앱으로 되돌리는 것은 지원하지 않습니다.
-
-한글 입력 소스에서 명령 키가 한글이나 `Process`/`Unidentified`로 전달되면 물리 키 위치와 Shift를 사용합니다. 영역 이동과 Vim Normal/Visual 명령에 적용하며, Insert 모드의 본문 입력과 `f`/`r` 뒤의 문자 인수는 기존 입력 경로를 유지합니다. 실제 macOS 입력기를 통한 검증 범위는 [개발 현황](docs/STATUS.md)을 참고하세요.
-
-AnkiConnect 연동과 태그 블록/DB 카드 동기화 사용법은 [Anki 연결](docs/ANKI.md)을 참고하세요.
+모바일, 관계·수식 DB, 대규모 vault 성능 보장은 아직 준비 중입니다. Git 동기화는 선택 기능이며 Foltra 계정이나 전용 클라우드에 가입하지 않고 로컬로만 사용할 수 있습니다.

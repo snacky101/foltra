@@ -122,6 +122,7 @@ export interface Workspace {
   settings: Settings;
   extensions: Extension[];
   pluginStates?: import('./pluginTypes').PluginStatus[];
+  pluginPolicy?: import('./pluginTypes').PluginPolicy;
   topicOrderRevision?: string;
 }
 export interface Topic {

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, expect, test, vi } from 'vitest';
 import { call } from '../lib/api';
 import { extensionCatalog } from '../lib/extensionCatalog';
 import calendarFixture from '../../tests/fixtures/plugins/calendar.json';
+import type { PluginPolicy } from '../lib/pluginTypes';
 import type { Extension, Workspace } from '../lib/types';
 import { ExtensionsView } from './ExtensionsView';
 
@@ -18,6 +19,7 @@ const onError = vi.fn();
 const invokeSettings = vi.fn();
 const beforeDisable = vi.fn<() => Promise<void>>();
 let enabled = false;
+let policy: PluginPolicy;
 const render = () =>
   root.render(
     <ExtensionsView
@@ -27,7 +29,12 @@ const render = () =>
         {
           path: '/temporary-catalog',
           extensions: [...installed],
-          pluginStates: installed.map((e) => ({ id: e.id, enabled, digest: 'test-digest' })),
+          pluginPolicy: policy,
+          pluginStates: installed.map((e) => ({
+            id: e.id,
+            enabled: enabled && policy.enabled,
+            digest: 'test-digest',
+          })),
         } as Workspace
       }
       invokeSettings={invokeSettings}
@@ -41,7 +48,7 @@ const button = (label: string) =>
     (b) => b.getAttribute('aria-label') === label || b.textContent?.trim() === label,
   )!;
 const click = (label: string) => act(async () => button(label).click());
-const installedFilter = () => host.querySelector<HTMLInputElement>('input[role=switch]')!;
+const installedFilter = () => host.querySelector<HTMLInputElement>('[aria-label="설치된 것만"]')!;
 const toggleInstalled = () => act(async () => installedFilter().click());
 const search = (query: string) =>
   act(async () => {
@@ -63,6 +70,7 @@ beforeEach(async () => {
   vi.resetAllMocks();
   installed = [];
   enabled = false;
+  policy = { enabled: true, consentAccepted: true };
   kind = 'plugin';
   host = document.createElement('div');
   document.body.append(host);
@@ -75,11 +83,17 @@ beforeEach(async () => {
       installed.push(manifest);
       return manifest;
     }
+    if (command === 'extension.policy.update') {
+      const request = args as { enabled: boolean; acceptConsent: boolean };
+      policy = { enabled: request.enabled, consentAccepted: policy.consentAccepted || request.acceptConsent };
+      return policy;
+    }
+    if (command === 'extension.enable') enabled = true;
+    if (command === 'extension.disable') enabled = false;
     if (command === 'extension.settings.get') return { values: {}, revision: 'test-revision' };
     if (command === 'extension.update') {
       const { manifest } = args as { manifest: Extension };
       installed = installed.map((extension) => (extension.id === manifest.id ? manifest : extension));
-      enabled = false;
       return manifest;
     }
     if (command === 'extension.remove')
@@ -90,6 +104,87 @@ beforeEach(async () => {
 afterEach(async () => {
   await act(async () => root.unmount());
   host.remove();
+});
+
+test('first plugin-use consent can be cancelled and is required only once', async () => {
+  installed = [extensionCatalog.find((extension) => extension.id === 'anki')!];
+  policy = { enabled: false, consentAccepted: false };
+  await act(async () => render());
+  const toggleUse = () =>
+    act(async () => host.querySelector<HTMLInputElement>('[aria-label="플러그인 사용"]')!.click());
+  const toggleAnki = () =>
+    act(async () => host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')!.click());
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')!.disabled).toBe(true);
+  await toggleUse();
+  expect(host.querySelector('[aria-label="플러그인 사용 동의"]')).not.toBeNull();
+  expect(call).not.toHaveBeenCalled();
+  await click('취소');
+  expect(host.querySelector('[aria-label="플러그인 사용 동의"]')).toBeNull();
+  expect(call).not.toHaveBeenCalled();
+  await toggleUse();
+  await click('동의하고 사용');
+  expect(call).toHaveBeenCalledWith('/temporary-catalog', 'extension.policy.update', {
+    enabled: true,
+    acceptConsent: true,
+  });
+  await toggleAnki();
+  expect(call).toHaveBeenCalledWith('/temporary-catalog', 'extension.enable', {
+    id: 'anki',
+    digest: 'test-digest',
+  });
+  expect(host.textContent).not.toContain('허용하고 활성화');
+  await toggleUse();
+  expect(beforeDisable).toHaveBeenCalledWith('anki');
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')!.disabled).toBe(true);
+  await toggleUse();
+  expect(call).toHaveBeenLastCalledWith('/temporary-catalog', 'extension.policy.update', {
+    enabled: true,
+    acceptConsent: false,
+  });
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')!.checked).toBe(true);
+  expect(host.querySelector('[aria-label="플러그인 사용 동의"]')).toBeNull();
+  await toggleAnki();
+  await toggleAnki();
+  expect(call).toHaveBeenLastCalledWith('/temporary-catalog', 'extension.enable', {
+    id: 'anki',
+    digest: 'test-digest',
+  });
+});
+
+test('failed consent save leaves plugin use off and allows retry', async () => {
+  policy = { enabled: false, consentAccepted: false };
+  await act(async () => render());
+  await act(async () => host.querySelector<HTMLInputElement>('[aria-label="플러그인 사용"]')!.click());
+  const failure = new Error('Cannot save policy');
+  vi.mocked(call).mockRejectedValueOnce(failure);
+  await click('동의하고 사용');
+  expect(onError).toHaveBeenCalledWith(failure);
+  expect(host.querySelector<HTMLInputElement>('[aria-label="플러그인 사용"]')!.checked).toBe(false);
+  expect(host.querySelector('[aria-label="플러그인 사용 동의"]')).not.toBeNull();
+  await click('동의하고 사용');
+  expect(host.querySelector<HTMLInputElement>('[aria-label="플러그인 사용"]')!.checked).toBe(true);
+});
+
+test('theme installation does not require plugin consent', async () => {
+  policy = { enabled: false, consentAccepted: false };
+  kind = 'theme';
+  await act(async () => render());
+  expect(host.querySelector('[aria-label="플러그인 사용"]')).toBeNull();
+  const installButton = host.querySelector<HTMLButtonElement>('.extension-card button')!;
+  await act(async () => installButton.click());
+  expect(vi.mocked(call).mock.calls[0]?.[1]).toBe('extension.install');
+});
+
+test('failed global disable preserves running plugins and enabled state', async () => {
+  installed = [extensionCatalog.find((extension) => extension.id === 'anki')!];
+  enabled = true;
+  await act(async () => render());
+  const failure = new Error('Cannot save policy');
+  vi.mocked(call).mockRejectedValueOnce(failure);
+  await act(async () => host.querySelector<HTMLInputElement>('[aria-label="플러그인 사용"]')!.click());
+  expect(onError).toHaveBeenCalledWith(failure);
+  expect(beforeDisable).not.toHaveBeenCalled();
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')!.checked).toBe(true);
 });
 
 test('bundled plugins are offered alongside local plugins', async () => {
@@ -336,7 +431,7 @@ test('already installed Anki 1.0.0 exposes settings without replacing the packag
   expect(host.querySelector('.version')?.textContent).toBe('v1.0.0');
 });
 
-test('an installed older package can update in place and requires activation again', async () => {
+test('an installed older package can update in place and retains activation', async () => {
   const latest = extensionCatalog.find((e) => e.id === 'anki')!;
   installed = [{ ...latest, version: '1.1.0' }];
   enabled = true;
@@ -354,8 +449,8 @@ test('an installed older package can update in place and requires activation aga
   expect(beforeDisable.mock.invocationCallOrder[0]).toBeLessThan(refresh.mock.invocationCallOrder[0]);
   expect(installed[0]).toEqual(latest);
   expect(button('Anki 연결 업데이트')).toBeUndefined();
-  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')?.checked).toBe(false);
-  expect(host.querySelector('[role=status]')?.textContent).toBe('업데이트 완료 · 권한 확인 후 활성화하세요');
+  expect(host.querySelector<HTMLInputElement>('[aria-label="Anki 연결 활성화"]')?.checked).toBe(true);
+  expect(host.querySelector('[role=status]')?.textContent).toBe('업데이트 완료 · 활성화 상태가 유지됩니다');
   expect(installedFilter().checked).toBe(true);
   expect(host.querySelector<HTMLInputElement>('input[type=search]')?.value).toBe('Anki');
 });

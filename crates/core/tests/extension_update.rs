@@ -16,6 +16,10 @@ impl Fixture {
             }),
         };
         result.call("vault.init", json!({"name":"Extension update test"}));
+        result.call(
+            "extension.policy.update",
+            json!({"enabled":true,"acceptConsent":true}),
+        );
         result.call("extension.install", json!({"manifest":result.manifest}));
         result.call(
             "note.create",
@@ -60,7 +64,7 @@ impl Drop for Fixture {
 }
 
 #[test]
-fn update_preserves_all_data_and_requires_new_device_approval() {
+fn update_preserves_all_data_and_device_activation() {
     let f = Fixture::new();
     let old = f.status();
     f.call(
@@ -94,17 +98,7 @@ fn update_preserves_all_data_and_requires_new_device_approval() {
     }
     let status = f.status();
     assert_ne!(status["digest"], old["digest"]);
-    assert_eq!(status["enabled"], false);
-    assert_eq!(
-        execute(
-            f.dir.path().to_str().unwrap(),
-            "plugin.update-test.status",
-            json!({})
-        )
-        .unwrap_err()
-        .code,
-        "plugin_disabled"
-    );
+    assert_eq!(status["enabled"], true);
     assert_eq!(
         execute(
             f.dir.path().to_str().unwrap(),
@@ -115,14 +109,32 @@ fn update_preserves_all_data_and_requires_new_device_approval() {
         .code,
         "plugin_changed"
     );
-    f.call(
-        "extension.enable",
-        json!({"id":"update-test","digest":status["digest"]}),
-    );
     assert_eq!(
         f.call("plugin.update-test.status", json!({}))["result"],
         json!({"version":2,"data":data})
     );
+}
+
+#[test]
+fn update_retains_disabled_state_and_activation_while_plugin_use_is_off() {
+    let f = Fixture::new();
+    f.call(
+        "extension.update",
+        json!({"manifest":f.next(),"expectedDigest":f.status()["digest"]}),
+    );
+    assert_eq!(f.status()["enabled"], false);
+    f.call(
+        "extension.enable",
+        json!({"id":"update-test","digest":f.status()["digest"]}),
+    );
+    f.call("extension.policy.update", json!({"enabled":false}));
+    f.call(
+        "extension.update",
+        json!({"manifest":f.manifest,"expectedDigest":f.status()["digest"]}),
+    );
+    assert_eq!(f.status()["enabled"], false);
+    f.call("extension.policy.update", json!({"enabled":true}));
+    assert_eq!(f.status()["enabled"], true);
 }
 
 #[test]

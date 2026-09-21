@@ -461,6 +461,8 @@ mod tests {
         );
         extensions::install(&store, &manifest).unwrap();
         let status = plugin_runtime::statuses(&store).unwrap();
+        plugin_runtime::update_policy(&store, &json!({"enabled":true,"acceptConsent":true}))
+            .unwrap();
         plugin_runtime::enable(
             &store,
             "daily-calendar",

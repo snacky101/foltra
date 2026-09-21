@@ -111,6 +111,30 @@
   font-size: 12px;
   overflow-wrap: anywhere;
 }
+.plugin-policy {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  margin-bottom: 24px;
+}
+.plugin-policy > label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.plugin-policy > p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 8px 0 0;
+}
+.plugin-policy .plugin-permissions {
+  margin-top: 16px;
+  font-size: 13px;
+}
+.plugin-permissions summary {
+  cursor: pointer;
+}
 .plugin-controls {
   display: flex;
   flex-direction: column;

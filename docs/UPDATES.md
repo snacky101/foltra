@@ -32,8 +32,14 @@ https://github.com/snacky101/foltra/releases/download/updater/latest.json
 ## 릴리스 만드는 순서
 
 1. npm의 `package.json`과 `package-lock.json`, workspace `Cargo.toml`과 `Cargo.lock`의 Foltra 패키지 세 개, `src-tauri/tauri.conf.json` 버전을 동일하게 올립니다. 프리뷰도 `preview.2` → `preview.3`처럼 증가시킵니다. `+build` 부분만 바꾸는 것은 업데이트로 인정하지 않습니다.
-2. 변경을 커밋하고 `vVERSION` 태그가 정확히 그 커밋을 가리키도록 만듭니다.
-3. 소스와 태그를 푸시합니다. 예를 들어 다음 버전이 `0.1.0-preview.3`인 경우:
+2. `docs/releases/vVERSION.md`에 사용자가 체감할 변화·업데이트 후 필요한 동작·다운로드 안내를 적습니다. 게시가 끝나면 아래 명령으로 GitHub 릴리스 본문에 반영합니다.
+
+   ```sh
+   gh release edit vVERSION --repo snacky101/foltra --notes-file docs/releases/vVERSION.md
+   ```
+
+3. 변경을 커밋하고 `vVERSION` 태그가 정확히 그 커밋을 가리키도록 만듭니다.
+4. 소스와 태그를 푸시합니다. 예를 들어 다음 버전이 `0.1.0-preview.3`인 경우:
 
 ```sh
 git tag v0.1.0-preview.3
@@ -110,7 +116,7 @@ GitHub의 동일 이름 파일 교체는 삭제 후 업로드이므로, 마지�
 
 ```sh
 foltra_feed_repair_dir=$(mktemp -d)
-gh release download v0.1.0-preview.2 --repo snacky101/foltra \
+gh release download v0.1.0-preview.9 --repo snacky101/foltra \
   --pattern latest.json --dir "$foltra_feed_repair_dir"
 gh release upload updater "$foltra_feed_repair_dir/latest.json" \
   --repo snacky101/foltra --clobber
@@ -139,3 +145,9 @@ Tauri updater 서명은 **Apple Developer ID 서명·공증과 별개**입니다
 로컬 테스트 통과가 GitHub hosted runner 실행이나 실제 사용자 앱 교체의 성공을 대신하지 않습니다. 최초 태그 배포 시 Actions 로그와 게시된 파일, 설치된 이전 버전의 업데이트 흐름을 함께 확인해야 합니다.
 
 참고: [GitHub cache 범위](https://docs.github.com/en/actions/reference/workflows-and-actions/dependency-caching), [실패한 job 재실행](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs), [Tauri updater](https://v2.tauri.app/plugin/updater/), [GitHub 릴리스 API](https://docs.github.com/en/rest/releases/releases#get-the-latest-release), [GitHub hosted runner 사양](https://docs.github.com/en/actions/reference/runners/github-hosted-runners).
+
+## 이전 릴리스 정리
+
+이전 버전의 설치 파일을 내리려면 새 버전의 다운로드·체크섬·업데이트 서명과 공개 피드를 검증한 뒤 해당 **GitHub 릴리스만** 삭제합니다. Git 태그와 커밋은 남겨 소스 이력을 유지합니다. 삭제한 릴리스의 과거 다운로드 링크와 이미 그 버전을 대상으로 시작한 다운로드는 사용할 수 없으므로, 사용자는 업데이트를 다시 확인해 새 버전을 받아야 합니다.
+
+**`updater` 릴리스는 삭제하지 않습니다.** 설치된 앱의 고정 조회 주소입니다. 예전 설치 앱은 이 피드에서 새 버전 파일을 바로 찾으므로 중간 버전의 설치 파일은 필요하지 않습니다. 업데이트 기능이 없는 preview.1은 새 DMG로 수동 설치합니다.

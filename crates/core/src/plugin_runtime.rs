@@ -18,10 +18,7 @@ fn package(store: &Store, id: &str) -> Result<(Value, RuntimeConfig, String)> {
     let digest = revision(&manifest.to_string());
     Ok((manifest, config, digest))
 }
-fn grant_path(store: &Store, id: &str) -> Result<PathBuf> {
-    if !extensions::valid_slug(id) {
-        return Err(Error::new("invalid_plugin", "Invalid plugin ID"));
-    }
+fn device_directory(store: &Store) -> Result<PathBuf> {
     #[cfg(test)]
     let root = {
         thread_local! { static ROOT: tempfile::TempDir = tempfile::tempdir().unwrap(); }
@@ -31,16 +28,64 @@ fn grant_path(store: &Store, id: &str) -> Result<PathBuf> {
     let root = dirs::data_local_dir()
         .ok_or_else(|| Error::new("plugin_trust", "Application data directory unavailable"))?
         .join("app.foltra.desktop/plugin-grants");
-    Ok(root
-        .join(revision(&store.root.to_string_lossy()))
-        .join(format!("{id}.json")))
+    Ok(root.join(revision(&store.root.to_string_lossy())))
 }
-fn approved(store: &Store, id: &str, digest: &str) -> Result<bool> {
+fn grant_path(store: &Store, id: &str) -> Result<PathBuf> {
+    if !extensions::valid_slug(id) {
+        return Err(Error::new("invalid_plugin", "Invalid plugin ID"));
+    }
+    Ok(device_directory(store)?.join(format!("{id}.json")))
+}
+
+#[derive(Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PluginPolicy {
+    consent_accepted: bool,
+    enabled: bool,
+}
+pub fn policy(store: &Store) -> Result<PluginPolicy> {
+    match std::fs::read_to_string(device_directory(store)?.join(".runtime-policy.json")) {
+        Ok(raw) => Ok(serde_json::from_str(&raw)?),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(PluginPolicy::default()),
+        Err(e) => Err(e.into()),
+    }
+}
+pub fn update_policy(store: &Store, args: &Value) -> Result<Value> {
+    let mut current = policy(store)?;
+    let enabled = args["enabled"]
+        .as_bool()
+        .ok_or_else(|| Error::new("invalid_arguments", "enabled must be a boolean"))?;
+    if enabled && !current.consent_accepted && args["acceptConsent"] != true {
+        return Err(Error::new(
+            "plugin_consent_required",
+            "플러그인 사용에 처음 한 번 동의해야 합니다.",
+        ));
+    }
+    current.consent_accepted |= enabled;
+    current.enabled = enabled;
+    crate::storage::atomic_write(
+        &device_directory(store)?.join(".runtime-policy.json"),
+        &serde_json::to_vec(&current)?,
+    )?;
+    Ok(serde_json::to_value(current)?)
+}
+fn grant_matches(store: &Store, id: &str, digest: &str) -> Result<bool> {
     match std::fs::read_to_string(grant_path(store, id)?) {
         Ok(value) => Ok(value == digest),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e.into()),
     }
+}
+fn approved(store: &Store, id: &str, digest: &str) -> Result<bool> {
+    let policy = policy(store)?;
+    Ok(policy.enabled && policy.consent_accepted && grant_matches(store, id, digest)?)
+}
+// Explicit local updates retain activation; files changed through import or sync do not.
+pub(crate) fn update_grant(store: &Store, id: &str, old: &str, new: &str) -> Result<()> {
+    if grant_matches(store, id, old)? {
+        crate::storage::atomic_write(&grant_path(store, id)?, new.as_bytes())?;
+    }
+    Ok(())
 }
 pub(crate) fn authorize_git(store: &Store, id: &str, expected_digest: &str) -> Result<()> {
     let (_, config, digest) = package(store, id)?;
@@ -58,12 +103,17 @@ pub fn enable(store: &Store, id: &str, expected_digest: &str) -> Result<Value> {
     if digest != expected_digest {
         return Err(Error::new(
             "plugin_changed",
-            "Plugin changed; review its permissions again",
+            "Plugin changed; reload before enabling it",
         ));
     }
-    let path = grant_path(store, id)?;
-    std::fs::create_dir_all(path.parent().unwrap())?;
-    std::fs::write(path, &digest)?;
+    let policy = policy(store)?;
+    if !policy.enabled || !policy.consent_accepted {
+        return Err(Error::new(
+            "plugin_disabled",
+            "설정 → 확장에서 플러그인 사용을 켜세요.",
+        ));
+    }
+    crate::storage::atomic_write(&grant_path(store, id)?, digest.as_bytes())?;
     Ok(json!({"id":id,"digest":digest,"enabled":true}))
 }
 pub fn disable(store: &Store, id: &str) -> Result<Value> {
@@ -201,7 +251,7 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
     if !approved(store, id, &digest)? {
         return Err(Error::new(
             "plugin_disabled",
-            "Review permissions and enable this plugin on this device",
+            "플러그인 사용을 켠 뒤 이 플러그인을 활성화하세요.",
         ));
     }
     let event = &args["event"];
@@ -448,6 +498,7 @@ mod tests {
         (dir, store, manifest)
     }
     fn allow(store: &Store) {
+        update_policy(store, &json!({"enabled":true,"acceptConsent":true})).unwrap();
         let status = statuses(store).unwrap();
         enable(store, "test-code", status[0]["digest"].as_str().unwrap()).unwrap();
     }
@@ -475,6 +526,77 @@ mod tests {
             &json!({"id":"test-code","event":{"type":"completion","id":"dates","args":{"query":query}}}),
             false,
         )
+    }
+
+    #[test]
+    fn plugin_use_requires_one_consent_then_only_individual_activation() {
+        let (dir, store, manifest) =
+            setup("export default {commands:{run(){return 7}}}", json!(["ui"]));
+        let digest = revision(&manifest.to_string());
+        assert!(!policy(&store).unwrap().consent_accepted);
+        assert_eq!(
+            enable(&store, "test-code", &digest).unwrap_err().code,
+            "plugin_disabled"
+        );
+        assert_eq!(
+            update_policy(&store, &json!({"enabled":true}))
+                .unwrap_err()
+                .code,
+            "plugin_consent_required"
+        );
+        // A previous version's per-package grant does not silently accept the broader policy.
+        crate::storage::atomic_write(&grant_path(&store, "test-code").unwrap(), digest.as_bytes())
+            .unwrap();
+        assert_eq!(run(&store).unwrap_err().code, "plugin_disabled");
+        update_policy(&store, &json!({"enabled":true,"acceptConsent":true})).unwrap();
+        assert_eq!(run(&store).unwrap()["result"], 7);
+        let mut second = manifest.clone();
+        second["id"] = json!("second-code");
+        extensions::install(&store, &second).unwrap();
+        assert!(!approved(&store, "second-code", &revision(&second.to_string())).unwrap());
+        enable(&store, "second-code", &revision(&second.to_string())).unwrap();
+        disable(&store, "test-code").unwrap();
+        enable(&store, "test-code", &digest).unwrap();
+        update_policy(&store, &json!({"enabled":false})).unwrap();
+        assert_eq!(run(&store).unwrap_err().code, "plugin_disabled");
+        assert!(statuses(&store)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["enabled"] == false));
+        // Reopening restores the disabled policy and remembers consent outside vault data.
+        drop(store);
+        let reopened = Store::open(dir.path().to_str().unwrap(), false).unwrap();
+        assert!(policy(&reopened).unwrap().consent_accepted);
+        assert!(!policy(&reopened).unwrap().enabled);
+        update_policy(&reopened, &json!({"enabled":true})).unwrap();
+        assert!(statuses(&reopened)
+            .unwrap()
+            .as_array()
+            .unwrap()
+            .iter()
+            .all(|s| s["enabled"] == true));
+        assert_eq!(run(&reopened).unwrap()["result"], 7);
+        let exported = crate::vault::export(&reopened).unwrap();
+        assert!(!exported.to_string().contains("consentAccepted"));
+        let (_other_dir, other, _) = setup("export default {}", json!(["ui"]));
+        assert!(!policy(&other).unwrap().consent_accepted);
+    }
+
+    #[test]
+    fn disabling_plugin_use_blocks_git_authorization() {
+        let (_dir, store, manifest) = setup("export default {}", json!(["ui", "git.sync"]));
+        allow(&store);
+        let digest = revision(&manifest.to_string());
+        authorize_git(&store, "test-code", &digest).unwrap();
+        update_policy(&store, &json!({"enabled":false})).unwrap();
+        assert_eq!(
+            authorize_git(&store, "test-code", &digest)
+                .unwrap_err()
+                .code,
+            "plugin_disabled"
+        );
     }
 
     #[test]
@@ -530,6 +652,7 @@ mod tests {
             "plugin_disabled"
         );
         let status = statuses(&store).unwrap();
+        update_policy(&store, &json!({"enabled":true,"acceptConsent":true})).unwrap();
         enable(
             &store,
             "date-mentions",
@@ -879,6 +1002,7 @@ mod tests {
         )
         .unwrap();
         let store = Store::open(dir.path().to_str().unwrap(), false).unwrap();
+        update_policy(&store, &json!({"enabled":true,"acceptConsent":true})).unwrap();
         for raw in [
             include_str!("../../../tests/fixtures/plugins/calendar.json"),
             include_str!("../../../tests/fixtures/plugins/kanban.json"),

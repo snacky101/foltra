@@ -26,6 +26,10 @@ export interface PluginRuntime {
     options?: string[];
   }[];
 }
+export interface PluginPolicy {
+  consentAccepted: boolean;
+  enabled: boolean;
+}
 export interface PluginStatus {
   id: string;
   digest: string;

@@ -1093,6 +1093,39 @@
     }
   },
   {
+    "id": "extension.policy",
+    "title": "read device plugin policy",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "extension.policy.update",
+    "title": "set device plugin policy",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "acceptConsent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "extension.enable",
     "title": "enable code plugin",
     "readOnly": false,

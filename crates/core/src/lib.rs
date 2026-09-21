@@ -266,6 +266,8 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "extension.remove" => extensions::remove(store, text(&args, "id")?),
         "extension.list" => extensions::list(store),
         "extension.status" => plugin_runtime::statuses(store),
+        "extension.policy" => Ok(serde_json::to_value(plugin_runtime::policy(store)?)?),
+        "extension.policy.update" => plugin_runtime::update_policy(store, &args),
         "extension.enable" => {
             plugin_runtime::enable(store, text(&args, "id")?, text(&args, "digest")?)
         }

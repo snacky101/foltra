@@ -37,7 +37,7 @@ macOS의 `foltra PATH`/`foltra open PATH`는 코어의 `path.resolve`로 기존 
 | `wiki.rs` | 제목/UUID 대상 해석, alias 보존, Markdown 소스 범위 기반 참조 갱신 | UI별 링크 저장 규칙 |
 | `topics.rs`, `topic_order.rs` | Markdown 문단·목록 경계·주제 식별·카드 조회·revision 기반 표시 순서와 내용 대응 | 원문 복제·UI 상태·임의 코드 실행 |
 | `extensions.rs`, `plugin_manifest.rs` | 선언형/코드 manifest·SDK 버전·뷰 스키마 검증, 설치·공통 명령 | 앱 DOM에 커뮤니티 코드 주입 |
-| `plugin_runtime.rs`, `plugin_sdk.js` | 제한된 QuickJS 실행, 권한·기기별 승인, 코어 API, 전용 데이터 revision | 임의 파일/네트워크/시스템 API·UI thread 실행 |
+| `plugin_runtime.rs`, `plugin_sdk.js` | 제한된 QuickJS 실행, 선언 권한·기기별 최초 동의와 실행 상태, 코어 API, 전용 데이터 revision | 임의 파일/네트워크/시스템 API·UI thread 실행 |
 | `usePlugins`, `pluginSession`, `PluginView`, `pluginEditor` | 플러그인 세션·이벤트·뷰 렌더링·늦은 편집 결과 검사 | 독자 노트/DB 저장 규칙 |
 | `PluginSettingsForm`, `PluginSettingsView`, `ExtensionsView` | 확장별 설정 페이지, 선언형 입력·revision 저장, 같은 세션의 동적 설정 뷰 | 별도 플러그인 실행 엔진·권한 우회·동기화 데이터 복제 |
 | `anki_bridge.rs`, `examples/code/anki` | 제한된 로컬 AnkiConnect 전송 / 별도 코드 패키지의 원본 매핑·충돌·동기화 화면 | 일반 네트워크 접근·카드 삭제·개인 덱 자동 선택 |
@@ -253,3 +253,7 @@ Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출�
 Cmd+W(macOS)/Ctrl+W(그 외)는 공통 `note.close` 명령으로 현재 노트를 저장한 뒤 닫고 사이드바와 앱 창을 유지합니다. 열린 노트가 없거나 다른 뷰·설정·대화상자를 사용 중이면 노트를 닫지 않습니다. 저장 실패 시 노트를 열어 두며, 단축키는 기존 설정에서 변경·해제할 수 있습니다. Vim `:q`의 미저장 변경 거절 규칙은 유지합니다. macOS의 `src-tauri/src/menu.rs`는 기본 메뉴의 Cmd+W 창 닫기 예약을 제거하고 편집기 명령 라우터가 키를 받게 합니다. File → Close Window 메뉴와 빨간 닫기 버튼은 네이티브 창을 닫습니다. `useCloseGuard`의 초안 저장/실패 시 닫기 중단 흐름을 거친 후, Rust event loop는 마지막 창 닫기로 발생하는 `ExitRequested { code: None }`의 앱 종료만 막습니다. Dock/Finder의 `Reopen`은 기존 main 창을 복원·포커스하거나 동일한 설정으로 다시 만들고 window-state 플러그인으로 크기/위치를 복원합니다. 네이티브 Cmd+Q 및 명시적 종료 코드는 그대로 종료하며, 이 정책은 macOS에서만 적용합니다.
 
 노트 탐색 기록은 `noteHistory.ts`에서 출발 노트 ID와 선택·스크롤의 snapshot을 최대 50개 메모리에 보관합니다. `note.back`(기본 `Ctrl+o`), `note.forward`(기본 `Ctrl+i`), 상단 이전 버튼이 같은 기록을 사용합니다. 뒤로·앞으로 이동할 때 현재 위치를 반대 방향 기록에 보관하며, 뒤로 간 후 새 노트를 열면 기존 앞으로 기록을 비웁니다. 현재 초안 저장에 성공한 뒤 목적 위치를 편집기 준비 경계에서 복원하므로 저장 실패 시 양쪽 기록을 소비하지 않습니다. 같은 노트 재방문으로 기기 저장소의 최신 위치가 바뀌어도 각 출발 위치는 유지됩니다. 삭제된 노트는 양방향으로 건너뛰고 Vault 전환 시 양쪽 기록을 비웁니다. 노트 안의 모든 Vim 이동을 추적하는 jumplist는 아닙니다.
+
+### 플러그인 사용 동의
+
+`extension.policy`와 `extension.policy.update`는 기기의 앱 데이터에 vault 경로별 최초 동의·전체 사용 여부를 저장합니다. vault 원본·Git·백업으로 전파하지 않습니다. 전체 사용을 꺼도 개별 digest 활성화 기록은 보존하고 `pluginStates.enabled`를 false로 반환하므로 UI 세션·명령·자동완성·백그라운드 실행이 함께 중단됩니다. 코어 invoke와 Git 재검증도 같은 정책을 확인합니다. `extension.update`를 통한 명시적 로컬 업데이트만 기존 활성화 digest를 갱신하며 외부 파일 변경은 자동 활성화하지 않습니다. 기존 사용자는 첫 전체 동의 후 보존된 개별 상태로 복귀합니다.

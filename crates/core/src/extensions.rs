@@ -203,8 +203,14 @@ pub fn update(store: &Store, value: &Value, expected_digest: &str) -> Result<Val
             "Installed extension changed; review the update again",
         ));
     }
-    // Plugin data and device grants stay intact. A different digest requires fresh approval.
+    // Preserve plugin data and activation for this explicit local update.
     store.commit(vec![(path, Some(pretty(value)?))])?;
+    crate::plugin_runtime::update_grant(
+        store,
+        &manifest.id,
+        expected_digest,
+        &revision(&value.to_string()),
+    )?;
     Ok(value.clone())
 }
 pub(crate) fn validate_manifest(value: &Value) -> Result<()> {

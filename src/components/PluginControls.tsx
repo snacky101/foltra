@@ -10,7 +10,9 @@ export function PluginControls({
   error,
   onError,
   beforeDisable,
+  pluginsEnabled,
 }: {
+  pluginsEnabled: boolean;
   beforeDisable?: (id: string) => Promise<void>;
   extension: Extension;
   status?: PluginStatus;
@@ -19,7 +21,6 @@ export function PluginControls({
   refresh: () => Promise<void>;
   onError: (error: unknown) => void;
 }) {
-  const [review, setReview] = useState(false);
   const [busy, setBusy] = useState(false);
   const runtime = extension.runtime!;
   const run = async (action: () => Promise<void>) => {
@@ -36,7 +37,6 @@ export function PluginControls({
   const enable = () =>
     run(async () => {
       await call(vault, 'extension.enable', { id: extension.id, digest: status!.digest });
-      setReview(false);
       await refresh();
     });
   const disable = () =>
@@ -55,34 +55,24 @@ export function PluginControls({
           type="checkbox"
           aria-label={`${extension.name} 활성화`}
           checked={status?.enabled ?? false}
-          disabled={busy || !status}
+          disabled={busy || !status || !pluginsEnabled}
           onChange={(e) => {
-            if (e.target.checked) setReview(true);
+            if (e.target.checked) void enable();
             else void disable();
           }}
         />
       </label>
-      {review && !status?.enabled && (
-        <div className="plugin-permissions" role="group" aria-label={`${extension.name} 권한 확인`}>
-          <strong>이 플러그인에 허용할 기능</strong>
-          <ul>
-            {runtime.permissions.length ? (
-              runtime.permissions.map((p) => <li key={p}>{pluginPermissionLabels[p]}</li>)
-            ) : (
-              <li>플러그인 전용 데이터 저장</li>
-            )}
-          </ul>
-          <p>이 기기의 현재 vault에서 실행합니다. 코드나 권한이 바뀌면 다시 확인합니다.</p>
-          <div className="plugin-row">
-            <button className="secondary-button" disabled={busy} onClick={() => void enable()}>
-              허용하고 활성화
-            </button>
-            <button className="text-button" disabled={busy} onClick={() => setReview(false)}>
-              취소
-            </button>
-          </div>
-        </div>
-      )}
+      {!pluginsEnabled && <p className="extension-settings-hint">확장 목록에서 플러그인 사용을 켜세요.</p>}
+      <details className="plugin-permissions">
+        <summary>사용하는 권한</summary>
+        <ul>
+          {runtime.permissions.length ? (
+            runtime.permissions.map((p) => <li key={p}>{pluginPermissionLabels[p]}</li>)
+          ) : (
+            <li>플러그인 전용 데이터 저장</li>
+          )}
+        </ul>
+      </details>
       {error && (
         <p className="plugin-error" role="alert">
           실행 중지 · {error}
