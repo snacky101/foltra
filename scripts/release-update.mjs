@@ -222,12 +222,16 @@ export function validateArchiveEntries(entries) {
     names.add(name);
   }
   requireValue(totalSize <= 1024 * 1024 * 1024, 'Updater archive is too large');
-  for (const path of ['Foltra.app/Contents/Info.plist', 'Foltra.app/Contents/MacOS/foltra-desktop']) {
+  for (const path of [
+    'Foltra.app/Contents/Info.plist',
+    'Foltra.app/Contents/MacOS/foltra-desktop',
+    'Foltra.app/Contents/MacOS/foltra',
+  ]) {
     requireValue(
       entries.some(
         (entry) => entry.name.replace(/^\.\//, '') === path && entry.kind === 'file' && entry.size > 0,
       ),
-      'Updater archive is missing the app metadata or executable',
+      'Updater archive is missing the app metadata, executable, or CLI',
     );
   }
 }
@@ -336,9 +340,14 @@ function verifyMacApp(bundle, version) {
       `Built app ${key} does not match release`,
     );
   }
+  for (const binary of ['foltra-desktop', 'foltra'])
+    requireValue(
+      run('/usr/bin/lipo', ['-archs', `${bundle}/Contents/MacOS/${binary}`]) === 'arm64',
+      `Release ${binary} is not arm64`,
+    );
   requireValue(
-    run('/usr/bin/lipo', ['-archs', `${bundle}/Contents/MacOS/foltra-desktop`]) === 'arm64',
-    'Release app is not arm64',
+    run(`${bundle}/Contents/MacOS/foltra`, ['--version']) === `foltra ${version}`,
+    'Bundled CLI version does not match release',
   );
   run('/usr/bin/codesign', ['--verify', '--deep', '--strict', bundle]);
 }

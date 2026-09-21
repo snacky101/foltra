@@ -475,6 +475,7 @@ export default function App() {
     'command.palette': () => setPalette(true),
     'vault.switch': () => setVaultPicker(true),
     'app.update': updates.open,
+    'app.cli': () => openSettings('cli'),
     'note.create': () => setDialog({ kind: 'new-note' }),
     'note.find': () => setPalette(true),
     search: () => setDialog({ kind: 'search' }),

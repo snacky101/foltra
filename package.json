@@ -1,6 +1,6 @@
 {
   "name": "foltra-desktop",
-  "version": "0.1.0-preview.5",
+  "version": "0.1.0-preview.6",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "release:mac": "tauri build --config src-tauri/tauri.release.conf.json --bundles app,dmg --ci",
     "tauri": "tauri",
     "core:build": "cargo build --locked -p foltra-cli",
-    "test": "cargo test -p foltra-core -p foltra-cli && vitest run && node --test scripts/release-update.test.mjs scripts/build-storage.test.mjs scripts/clean-build-cache.test.mjs",
+    "test": "cargo test --locked --workspace && vitest run && node --test scripts/release-update.test.mjs scripts/build-storage.test.mjs scripts/clean-build-cache.test.mjs scripts/run-task.test.mjs scripts/bundle-cli.test.mjs",
     "check": "npm run plugins:check && npm run build && cargo fmt --all -- --check && cargo clippy --workspace --all-targets -- -D warnings",
     "format": "prettier --write src vite.config.ts && cargo fmt --all",
     "plugin:pack": "node scripts/pack-plugin.mjs",

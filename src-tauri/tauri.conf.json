@@ -1,12 +1,13 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Foltra",
-  "version": "0.1.0-preview.5",
+  "version": "0.1.0-preview.6",
   "identifier": "app.foltra.desktop",
   "build": {
     "beforeDevCommand": "npm run dev",
     "devUrl": "http://localhost:1420",
     "beforeBuildCommand": "npm run build",
+    "beforeBundleCommand": "node scripts/bundle-cli.mjs",
     "frontendDist": "../dist"
   },
   "app": {
@@ -33,6 +34,9 @@
   "bundle": {
     "active": true,
     "macOS": {
+      "files": {
+        "MacOS/foltra": "../target/bundle-cli/foltra"
+      },
       "minimumSystemVersion": "11.0",
       "signingIdentity": "-"
     },

@@ -1,5 +1,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod cli_install;
 #[cfg(target_os = "macos")]
 mod menu;
 mod open_paths;
@@ -75,7 +76,9 @@ fn main() {
             execute,
             open_paths::take_open_paths,
             updates::set_update_in_progress,
-            updates::take_update_check_request
+            updates::take_update_check_request,
+            cli_install::cli_status,
+            cli_install::install_cli
         ]);
     #[cfg(target_os = "macos")]
     let builder = builder.menu(menu::create).on_menu_event(menu::handle);

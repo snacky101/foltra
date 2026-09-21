@@ -1,5 +1,6 @@
 import { settingsGroups, type SettingsGroup } from '../lib/settingsNavigation';
 import { AppUpdatesPanel } from './AppUpdatesPanel';
+import { CliSettings } from './CliSettings';
 import type { AppUpdates } from '../lib/useAppUpdates';
 import { CursorSettings } from './CursorSettings';
 import { TaskMarkerHelp } from './TaskMarkerHelp';
@@ -188,6 +189,11 @@ export const SettingsView = memo(
         <div className="eyebrow">PREFERENCES</div>
         <h1>{currentGroup.title}</h1>
         <p className="page-description">{currentGroup.description}</p>
+        {active && group === 'cli' && (
+          <div className="settings-group">
+            <CliSettings />
+          </div>
+        )}
         <div className="settings-group" hidden={group !== 'updates'}>
           {updates && <AppUpdatesPanel updates={updates} />}
         </div>

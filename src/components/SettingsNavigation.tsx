@@ -1,4 +1,14 @@
-import { ArrowLeft, Keyboard, MousePointer2, Palette, Puzzle, RefreshCw, Table2, Type } from 'lucide-react';
+import {
+  ArrowLeft,
+  Keyboard,
+  MousePointer2,
+  Palette,
+  Puzzle,
+  RefreshCw,
+  Table2,
+  Terminal,
+  Type,
+} from 'lucide-react';
 import { settingsGroups, type SettingsGroup } from '../lib/settingsNavigation';
 
 const icons = {
@@ -9,6 +19,7 @@ const icons = {
   theme: Palette,
   extensions: Puzzle,
   updates: RefreshCw,
+  cli: Terminal,
 };
 
 export function SettingsNavigation({

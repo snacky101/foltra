@@ -10,6 +10,7 @@ const definitions = [
   },
   { id: 'vault.switch', title: 'Vault 선택', group: '앱', bindings: [{ keys: 'vv', leader: true }] },
   { id: 'app.update', title: '앱 업데이트 확인', group: '앱' },
+  { id: 'app.cli', title: '터미널 명령 · CLI 설치', group: '앱' },
   {
     id: 'note.create',
     title: '새 노트',

@@ -72,10 +72,8 @@ jobs:
           env-vars: MACOSX_DEPLOYMENT_TARGET
       - run: npm ci
       - name: Test the app
-        run: |
-          npm test
-          cargo test --locked -p foltra-desktop
-          node scripts/build-storage.mjs check
+        # Test native crates together so their shared dependencies compile once.
+        run: npm test
       - name: Check the app
         run: npm run check
 

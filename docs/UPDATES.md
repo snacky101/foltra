@@ -27,7 +27,7 @@ https://github.com/snacky101/foltra/releases/download/updater/latest.json
 | `latest.json` | 이 버전의 업데이트 정보와 서명 |
 | `SHA256SUMS.txt` | 위 다섯 파일의 SHA-256 |
 
-CLI는 앱 업데이트에 의해 별도로 교체되지 않습니다. CLI를 사용한다면 해당 릴리스의 CLI 파일을 내려받습니다.
+앱에는 `Contents/MacOS/foltra` CLI가 포함됩니다. **설정 → CLI → CLI 설치**가 `/usr/local/bin/foltra`를 이 파일로 연결하므로, 이후 앱 업데이트에 CLI도 함께 갱신됩니다. 앱을 이동하거나 제거하면 연결이 더 이상 유효하지 않을 수 있습니다. 독립 실행 CLI 압축 파일도 계속 제공하며 이를 직접 설치한 경우에는 별도로 갱신해야 합니다. CLI가 포함되지 않았던 preview.5까지의 배포 앱에는 다음 앱 업데이트부터 적용됩니다.
 
 ## 릴리스 만드는 순서
 
@@ -47,7 +47,7 @@ GitHub cache는 워크플로 실행 ref에 묶여 있으므로 태그마다 직�
 워크플로는 사전 검사 → 병렬 검사·빌드 → 게시의 독립 job으로 구성합니다.
 
 - 사전 검사: 버전·원격 태그·소스 커밋과 현재 피드보다 높은 버전인지 확인합니다.
-- 검사: macOS 15 arm64에서 `npm ci`, `npm test`(core·CLI·프론트엔드·배포 스크립트), `cargo test --locked -p foltra-desktop`, `npm run check`를 실행합니다.
+- 검사: macOS 15 arm64에서 `npm ci`, `npm test`(core·CLI·desktop native·프론트엔드·배포 스크립트), `npm run check`를 실행합니다. native 테스트는 Cargo workspace 한 번의 호출로 검사합니다.
 - 빌드: 별도 macOS 15 arm64 runner에서 `npm run release:mac -- -- --locked --workspace`를 실행합니다. 앱과 CLI를 같은 Cargo 명령으로 빌드해 공통 의존성의 feature 구성을 통일하며 DuckDB를 두 번 컴파일하지 않습니다. 서명된 업데이트 번들·DMG·CLI를 검증하고 소스 SHA·태그·workflow run ID·체크섬 목록의 해시와 함께 7일간 Actions artifact에 보관합니다.
 - 게시: 검사와 빌드가 모두 성공해야 실행합니다. 같은 run의 정확한 artifact ID로 파일을 받아 소스 기록·체크섬·업데이트 서명·앱을 재검증한 뒤 게시합니다. 검사 또는 빌드 하나라도 실패하면 게시하지 않습니다.
 
@@ -58,7 +58,7 @@ Node.js 24와 Rust stable을 사용합니다. 개발용 검사 cache와 release 
 make verify release
 ```
 
-`make release`는 Apple Silicon Mac에서 로컬 파일만 생성합니다. CI와 같은 workspace Cargo 명령 하나로 앱과 CLI를 함께 빌드합니다. 앱과 업데이트 파일은 `target/release/bundle/macos/`, DMG는 `target/release/bundle/dmg/`, CLI는 `target/release/foltra`에 생성됩니다. `make build`는 서명 키가 필요 없는 개발용 앱을 `target/debug/bundle/macos/`에 만듭니다.
+`make release`는 Apple Silicon Mac에서 로컬 파일만 생성합니다. CI와 같은 workspace Cargo 명령 하나로 앱과 CLI를 함께 빌드합니다. 앱과 업데이트 파일은 `target/release/bundle/macos/`, DMG는 `target/release/bundle/dmg/`, CLI는 `target/release/foltra`에 생성됩니다. `make build`도 workspace로 빌드하고 서명 키가 필요 없는 개발용 앱을 `target/debug/bundle/macos/`에 만듭니다. Tauri의 `beforeBundleCommand`는 이미 빌드한 CLI를 `target/bundle-cli/foltra`에 준비해 앱에 넣으며 Cargo를 다시 실행하지 않습니다. 업데이트 압축 검사도 동봉된 CLI의 버전·arm64 아키텍처와 앱 서명을 확인합니다.
 
 서명 키를 지정하지 않으면 `~/.config/foltra/release/updater.key`를 사용합니다. 다른 키 파일이나 CI의 키 본문은 `TAURI_SIGNING_PRIVATE_KEY`, 키 암호는 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 환경변수로 전달합니다. Makefile은 키 값을 명령에 출력하지 않으며 파일이 없다고 새 키를 생성하지 않습니다.
 
@@ -76,6 +76,16 @@ make release-publish TAG=v0.1.0-preview.2 # 실제 GitHub 게시 및 피드 갱�
 릴리스는 먼저 **draft**로 만들고 파일 여섯 개를 올립니다. GitHub에서 파일을 다시 받아 체크섬·업데이트 서명·추출한 앱을 검증한 다음 게시합니다. 마지막에만 `updater/latest.json`을 새 버전으로 교체합니다. 그 전까지 기존 피드는 유지됩니다. 워크플로를 직렬 실행하고, 피드가 가리키는 버전보다 낮거나 같은 버전으로 교체하지 않습니다.
 
 ## 실패와 재실행
+
+상태 확인과 대기는 아래 명령으로 처리합니다. `RUN`은 **Release macOS update** 실행 URL 끝의 숫자이며, 이 명령들은 배포를 새로 시작하거나 재빌드하지 않습니다.
+
+```sh
+make release-status RUN=35573070256 # 상태·job 결과·링크만 조회
+make release-wait RUN=35573070256   # 60초 간격으로 대기, 실패 시 nonzero 종료
+make release-logs RUN=35573070256   # 실패한 단계 로그를 test-results/tasks/release-failed.log에 저장
+```
+
+검사·빌드·게시의 로컬 실행은 `make verify`, `make release`, `make release-publish TAG=…`를 사용합니다. 성공 시 결과·소요 시간·로그 경로만 출력하고, 실패하면 마지막 40줄을 표시합니다. `test-results/tasks/`의 명령별 최근 로그만 교체하며 별도 배포 증거·백업은 유지합니다. 로그가 필요하면 안내된 파일의 해당 구간을 확인합니다. 같은 소스로 통과한 로컬 전체 검사를 배포 준비만을 이유로 반복하지 않으며, CI는 여전히 정확한 배포 커밋을 검사합니다.
 
 검사·빌드·게시 job 중 일부만 실패했다면 **Release macOS update** 실행에서 **Re-run failed jobs**를 선택합니다. CLI에서는 다음과 같습니다.
 

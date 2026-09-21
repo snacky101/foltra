@@ -143,9 +143,11 @@ test('updater archives require the app and reject traversal, symlinks, duplicate
     { name: './Foltra.app/', kind: 'directory', size: 0 },
     { name: 'Foltra.app/Contents/Info.plist', kind: 'file', size: 200 },
     { name: 'Foltra.app/Contents/MacOS/foltra-desktop', kind: 'file', size: 500 },
+    { name: 'Foltra.app/Contents/MacOS/foltra', kind: 'file', size: 400 },
   ];
   validateArchiveEntries(entries);
   assert.throws(() => validateArchiveEntries(entries.slice(0, 2)), /missing/);
+  assert.throws(() => validateArchiveEntries(entries.slice(0, 3)), /missing.*CLI/);
   for (const entry of [
     { name: '/Foltra.app/outside', kind: 'file', size: 1 },
     { name: 'Foltra.app/../outside', kind: 'file', size: 1 },

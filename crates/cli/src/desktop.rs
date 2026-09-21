@@ -21,6 +21,15 @@ fn open_args(
         Some(std::fs::canonicalize(path)?)
     } else {
         executable.parent().and_then(|parent| {
+            if parent.file_name().is_some_and(|name| name == "MacOS") {
+                let contents = parent.parent()?;
+                let bundle = contents.parent()?;
+                if contents.file_name().is_some_and(|name| name == "Contents")
+                    && bundle.extension().is_some_and(|name| name == "app")
+                {
+                    return Some(bundle.to_path_buf());
+                }
+            }
             if !parent
                 .file_name()
                 .is_some_and(|name| name == "debug" || name == "release")
@@ -86,6 +95,19 @@ mod tests {
                 OsString::from("-b"),
                 OsString::from("app.foltra.desktop"),
                 OsString::from(target)
+            ]
+        );
+    }
+
+    #[test]
+    fn bundled_cli_opens_its_own_app_after_symlink_resolution() {
+        let executable = Path::new("/Applications/My Foltra.app/Contents/MacOS/foltra");
+        assert_eq!(
+            open_args("/vault", executable, None).unwrap(),
+            vec![
+                OsString::from("-a"),
+                OsString::from("/Applications/My Foltra.app"),
+                OsString::from("/vault")
             ]
         );
     }

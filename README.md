@@ -10,7 +10,7 @@
 
 ## macOS 설치
 
-[v0.1.0-preview.2 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.2)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
+[v0.1.0-preview.6 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.6)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
 
 앱 업데이트를 탑재한 버전부터 설정 → **앱 업데이트**에서 새 버전을 확인·다운로드·설치합니다. 기존 `preview.1`은 최초 한 번 새 DMG 설치가 필요합니다. 개발자의 버전 태그 배포와 서명 키 관리는 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
 
@@ -42,6 +42,8 @@ make dev-web
 ```
 
 `make` 또는 `make help`로 전체 명령을 봅니다. `make build-web`은 프론트엔드 번들, `make build-cli`는 개발용 CLI만 빌드합니다. `make release`는 로컬 파일을 만들며 서명 키 설정은 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
+
+검사·빌드·로컬 게시 명령은 성공 여부·소요 시간·로그 경로만 출력합니다. 전체 로그는 `test-results/tasks/명령.log`에 최근 실행 하나를 보관하며, 실패하면 마지막 40줄을 함께 표시합니다. 기존 배포 검증 자료는 덮어쓰지 않습니다.
 
 macOS 기본 Make 3.81을 지원합니다. 빌드 작업 수는 `CARGO_BUILD_JOBS=4`, macOS 최소 버전은 `11.0`을 기본값으로 사용합니다. standalone Command Line Tools가 있으면 이를 사용하며, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make build`처럼 개발 도구를 직접 지정할 수 있습니다. 시스템의 Xcode 선택 설정은 바꾸지 않습니다. 한 번의 `make -j` 호출 안에서도 타깃은 순서대로 실행합니다.
 
@@ -100,7 +102,7 @@ Vim 명령 입력줄은 화면 하단에 표시합니다. `:q`는 현재 노트�
 
 ## CLI와 agent 연동
 
-macOS에서는 CLI를 PATH에 설치한 뒤 기존 볼트나 볼트 안의 노트를 앱에서 바로 열 수 있습니다.
+macOS 앱에 CLI가 포함됩니다. Foltra.app을 응용 프로그램 폴더로 옮겨 실행한 뒤 **설정 → CLI → CLI 설치**를 한 번 누르면 `/usr/local/bin/foltra`가 앱 내부 실행 파일에 연결됩니다. 필요한 경우 macOS가 관리자 인증을 요청하며, 기존의 다른 `foltra` 파일이나 링크는 덮어쓰지 않습니다. 명령 팔레트의 **터미널 명령 · CLI 설치**에서도 설정을 열 수 있습니다. 이후 앱 업데이트에 CLI도 포함되어 별도 다운로드가 필요 없습니다. PATH에 `/usr/local/bin`이 포함된 터미널에서 기존 볼트나 볼트 안의 노트를 바로 열 수 있습니다.
 
 ```sh
 foltra ~/Foltra/Personal
@@ -155,6 +157,8 @@ make check  # TS/프로덕션 번들, Rust 포맷, 전체 workspace Clippy
 make verify # test → check
 make format
 ```
+
+`npm test`도 desktop native를 포함합니다. core·CLI·desktop은 Cargo workspace 한 번의 호출로 검사하여 공유 의존성의 중복 컴파일을 피합니다.
 
 - [구조와 실행 흐름](docs/ARCHITECTURE.md): 모듈 책임, 저장 계약, 기능 추가 위치.
 - [개발 현황과 남은 작업](docs/STATUS.md): 원래 요구사항별 구현·검증 구분.

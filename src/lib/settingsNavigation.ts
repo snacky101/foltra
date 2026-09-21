@@ -8,6 +8,7 @@ export const settingsGroups = [
   { id: 'theme', title: '테마', description: '오래 머물기 편안한 색을 선택하세요.' },
   { id: 'extensions', title: '확장', description: '작업 방식에 맞는 도구와 명령을 더하세요.' },
   { id: 'updates', title: '앱 업데이트', description: '새로운 Foltra 버전을 확인하고 설치합니다.' },
+  { id: 'cli', title: 'CLI', description: '터미널과 에이전트에서 Foltra를 사용합니다.' },
 ] as const;
 export type SettingsGroup = (typeof settingsGroups)[number]['id'];
 
