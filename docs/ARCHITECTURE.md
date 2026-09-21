@@ -2,6 +2,8 @@
 
 이 문서는 0.1 프리뷰의 **실제 코드**를 설명합니다. 전체 제품의 목표는 DESIGN.md, 진행 상황은 STATUS.md에 있습니다. 현재 선택은 Rust + Tauri 2 + React/TypeScript + CodeMirror 6입니다. Tauri와 Electron의 성능 비교 실험을 완료한 선택은 아닙니다.
 
+CLI의 사용 계약은 [CLI.md](CLI.md)에 있습니다. `crates/cli/src/catalog.rs`는 코어 스키마 기반 도움말·별칭·쉘 자동완성, `arguments.rs`는 타입별 옵션·파일 입력, `output.rs`는 출력 형식을 담당합니다. 저장 변환은 `core/src/note_actions.rs`(본문 추가·일지), `markdown_query.rs`(할 일·아웃라인·문맥 검색), `frontmatter.rs`(속성 소스 편집)에 두며 어댑터에 별도 저장 규칙을 만들지 않습니다.
+
 ## 모듈 경계
 
 ```text

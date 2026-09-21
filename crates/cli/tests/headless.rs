@@ -397,3 +397,399 @@ fn direct_and_explicit_open_validate_the_app_override_without_launching_ui() {
         );
     }
 }
+
+fn invoke(vault: Option<&str>, args: &[&str], input: Option<&str>) -> std::process::Output {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut command = Command::new(env!("CARGO_BIN_EXE_foltra"));
+    command.env_remove("FOLTRA_VAULT").args(args);
+    if let Some(vault) = vault {
+        command.env("FOLTRA_VAULT", vault);
+    }
+    let mut process = command
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    if let Some(input) = input {
+        process
+            .stdin
+            .take()
+            .unwrap()
+            .write_all(input.as_bytes())
+            .unwrap();
+    }
+    process.wait_with_output().unwrap()
+}
+fn success(output: std::process::Output) -> String {
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    String::from_utf8(output.stdout).unwrap()
+}
+fn json_output(output: std::process::Output) -> Value {
+    serde_json::from_str(&success(output)).unwrap()
+}
+fn new_vault() -> tempfile::TempDir {
+    let v = tempfile::tempdir().unwrap();
+    cli(
+        v.path().to_str().unwrap(),
+        &["vault.init", "--name", "New CLI"],
+    );
+    v
+}
+
+#[test]
+fn help_is_discoverable_per_command_and_alias_without_a_vault() {
+    for args in [
+        vec![],
+        vec!["--help"],
+        vec!["help"],
+        vec!["help", "all"],
+        vec!["note", "--help"],
+        vec!["read", "--help"],
+        vec!["open", "--help"],
+        vec!["rpc", "--help"],
+        vec!["completions", "--help"],
+        vec!["help", "open"],
+        vec!["help", "database", "property", "update"],
+    ] {
+        let output = success(invoke(None, &args, None));
+        assert!(!output.is_empty());
+    }
+    let help = success(invoke(None, &["property", "set", "--help"], None));
+    assert!(help.contains("--expected-revision"));
+    assert!(help.contains("--note"));
+    assert!(success(invoke(None, &["task", "--help"], None)).contains("bookmark [b]"));
+    assert!(!invoke(None, &["help", "nonesuch"], None).status.success());
+    for shell in ["bash", "zsh", "fish"] {
+        let script = success(invoke(None, &["completions", shell], None));
+        assert!(script.contains("note.append") && script.contains("foltra"));
+    }
+}
+
+#[test]
+fn title_selectors_stdin_and_output_formats_work_with_legacy_json() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    let source = json_output(invoke(
+        Some(path),
+        &["create", "--title", "한글 메모", "--content-file", "-"],
+        Some("---\nstatus: draft\n---\n원본\n"),
+    ));
+    assert_eq!(
+        success(invoke(Some(path), &["read", "--note", "한글 메모"], None)),
+        source["body"].as_str().unwrap()
+    );
+    assert_eq!(
+        json_output(invoke(
+            Some(path),
+            &["read", "--note", "한글 메모", "--json"],
+            None
+        )),
+        source
+    );
+    let updated = json_output(invoke(
+        Some(path),
+        &[
+            "append",
+            "--note",
+            "한글 메모",
+            "--content",
+            "추가",
+            "--inline=false",
+        ],
+        None,
+    ));
+    assert!(updated["body"].as_str().unwrap().ends_with("원본\n추가"));
+    let raw = cli(path, &["note:read", "--id", source["id"].as_str().unwrap()]);
+    assert_eq!(raw, updated);
+    let request = json!({"command":"note.read","args":{"id":source["id"]}}).to_string();
+    assert_eq!(
+        json_output(invoke(Some(path), &["rpc"], Some(&request))),
+        updated
+    );
+    assert_eq!(
+        json_output(invoke(Some(path), &["rpc", "--json"], Some(&request))),
+        updated
+    );
+    let jsonl = success(invoke(Some(path), &["files", "--format", "jsonl"], None));
+    assert_eq!(jsonl.lines().count(), 1);
+    assert_eq!(
+        serde_json::from_str::<Value>(jsonl.trim()).unwrap()["title"],
+        "한글 메모"
+    );
+    for format in ["csv", "tsv"] {
+        assert!(
+            success(invoke(Some(path), &["files", "--format", format], None)).contains("한글 메모")
+        );
+    }
+}
+
+#[test]
+fn schema_options_cover_sql_and_boolean_flags() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    let database = cli(path, &["database.create", "--name", "Tasks"]);
+    let record = cli(
+        path,
+        &[
+            "record.create",
+            "--database",
+            "Tasks",
+            "--values",
+            "{\"title\":\"Review\"}",
+        ],
+    );
+    assert_eq!(record["databaseId"], database["id"]);
+    let result = json_output(invoke(
+        Some(path),
+        &["sql", "--sql-file", "-"],
+        Some("SELECT COUNT(*) AS total FROM \"Tasks\""),
+    ));
+    assert_eq!(result["rows"][0][0], "1");
+    let note = cli(
+        path,
+        &["create", "--title", "Task", "--body", "- [ ] Check"],
+    );
+    let updated = cli(path, &["task", "--note", "Task", "--line", "1", "--toggle"]);
+    assert_eq!(updated["body"], "- [x] Check");
+    let failed = invoke(
+        Some(path),
+        &["task", "--note", "Task", "--line", "-1", "--toggle"],
+        None,
+    );
+    assert!(!failed.status.success());
+    assert_eq!(
+        cli(path, &["note.read", "--id", note["id"].as_str().unwrap()]),
+        updated
+    );
+}
+
+#[test]
+fn friendly_selectors_rename_move_and_property_edit_preserve_cas() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    cli(path, &["folder.create", "--name", "Projects"]);
+    let source = cli(path, &["create", "--title", "Before", "--body", "Text"]);
+    let moved = cli(path, &["move", "--note", "Before", "--folder", "Projects"]);
+    assert!(moved["folderId"].is_string());
+    let renamed = cli(path, &["rename", "--note", "Before", "--title", "After"]);
+    assert_eq!(renamed["id"], source["id"]);
+    cli(
+        path,
+        &[
+            "property", "set", "--note", "After", "--name", "progress", "--value", "2", "--type",
+            "number",
+        ],
+    );
+    assert_eq!(
+        cli(path, &["properties", "--note", "After"])["properties"]["progress"],
+        2
+    );
+    let stale = invoke(
+        Some(path),
+        &[
+            "rename",
+            "--note",
+            "After",
+            "--title",
+            "Lost",
+            "--expected-revision",
+            source["revision"].as_str().unwrap(),
+        ],
+        None,
+    );
+    assert_eq!(stale.status.code(), Some(3));
+    assert_eq!(
+        cli(path, &["note.read", "--id", source["id"].as_str().unwrap()])["title"],
+        "After"
+    );
+    cli(
+        path,
+        &["property.remove", "--note", "After", "--name", "progress"],
+    );
+    assert_eq!(
+        cli(path, &["properties", "--note", "After"])["properties"],
+        json!({})
+    );
+    cli(path, &["delete", "--note", "After"]);
+    assert_eq!(cli(path, &["files"]), json!([]));
+    assert_eq!(cli(path, &["trash.list"])[0]["title"], "After");
+}
+
+#[test]
+fn ambiguous_names_and_invalid_formats_do_not_mutate_data() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    cli(path, &["create", "--title", "Duplicate", "--body", "A"]);
+    cli(path, &["create", "--title", "Duplicate", "--body", "B"]);
+    let before = cli(path, &["vault.export"]);
+    for args in [
+        vec!["append", "--note", "Duplicate", "--content", "X"],
+        vec!["create", "--title", "No", "--format", "bogus"],
+        vec!["rename", "--note", "Missing", "--title", "No"],
+        vec!["read", "--note", "Missing"],
+    ] {
+        assert!(!invoke(Some(path), &args, None).status.success());
+    }
+    assert_eq!(cli(path, &["vault.export"])["files"], before["files"]);
+}
+
+#[test]
+fn vault_inference_from_cwd_note_path_and_global_option_is_explicit() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    let source = cli(path, &["create", "--title", "From cwd", "--body", "Body"]);
+    let result = Command::new(env!("CARGO_BIN_EXE_foltra"))
+        .current_dir(v.path().join("notes"))
+        .env_remove("FOLTRA_VAULT")
+        .args(["read", "--note", "From cwd"])
+        .output()
+        .unwrap();
+    assert_eq!(success(result), "Body");
+    assert_eq!(
+        success(invoke(
+            None,
+            &["read", "--note", "From cwd", "--vault", path],
+            None
+        )),
+        "Body"
+    );
+    let file = v
+        .path()
+        .join(format!("notes/{}.md", source["id"].as_str().unwrap()));
+    assert_eq!(
+        success(invoke(
+            None,
+            &["read", "--note-path", file.to_str().unwrap()],
+            None
+        )),
+        "Body"
+    );
+    let other = new_vault();
+    assert!(!invoke(
+        Some(other.path().to_str().unwrap()),
+        &["read", "--note-path", file.to_str().unwrap()],
+        None
+    )
+    .status
+    .success());
+}
+
+#[test]
+fn daily_and_task_workflow_runs_without_the_desktop() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    assert!(
+        !invoke(Some(path), &["daily.read", "--date", "2026-09-01"], None)
+            .status
+            .success()
+    );
+    cli(
+        path,
+        &[
+            "daily",
+            "append",
+            "--date",
+            "2026-09-01",
+            "--content",
+            "- [ ] Review\n- [b] Keep",
+        ],
+    );
+    assert_eq!(
+        cli(path, &["tasks", "--status", "todo"])
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    cli(
+        path,
+        &[
+            "task",
+            "--note",
+            "2026-09-01",
+            "--line",
+            "1",
+            "--status",
+            "done",
+        ],
+    );
+    assert_eq!(
+        cli(path, &["tasks", "--status", "done"])[0]["text"],
+        "Review"
+    );
+    assert_eq!(
+        cli(path, &["tasks", "--status", "bookmark"])[0]["text"],
+        "Keep"
+    );
+}
+
+#[test]
+fn search_context_reports_matching_lines_and_schema_boolean_switches_work() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    cli(
+        path,
+        &[
+            "create",
+            "--title",
+            "Search",
+            "--body",
+            "before\nHello 한글\nafter\nhello",
+        ],
+    );
+    let hits = cli(
+        path,
+        &[
+            "find",
+            "--query",
+            "hello",
+            "--note",
+            "Search",
+            "--no-case-sensitive",
+            "--limit",
+            "1",
+        ],
+    );
+    assert_eq!(hits.as_array().unwrap().len(), 1);
+    assert_eq!(hits[0]["line"], 2);
+    assert_eq!(hits[0]["before"], "before");
+    assert_eq!(hits[0]["after"], "after");
+    assert!(success(invoke(
+        Some(path),
+        &["find", "--query", "한글", "--format", "text"],
+        None
+    ))
+    .contains("Search:2\tHello 한글"));
+    let exact = cli(path, &["find", "--query", "hello", "--case-sensitive"]);
+    assert_eq!(exact.as_array().unwrap().len(), 1);
+    assert_eq!(exact[0]["line"], 4);
+    assert_eq!(cli(path, &["find", "--query", "한글"])[0]["line"], 2);
+}
+
+#[test]
+fn sql_csv_uses_column_labels_in_order_and_quotes_multiline_cells() {
+    let v = new_vault();
+    let path = v.path().to_str().unwrap();
+    let sql = "SELECT 'a,b' AS z, 'line1\nline2' AS a, 'quote\"value' AS q";
+    let csv = success(invoke(
+        Some(path),
+        &["sql", "--sql", sql, "--format", "csv"],
+        None,
+    ));
+    assert_eq!(
+        csv,
+        "\"z\",\"a\",\"q\"\n\"a,b\",\"line1\nline2\",\"quote\"\"value\"\n"
+    );
+    let tsv = success(invoke(
+        Some(path),
+        &["sql", "--sql", sql, "--format", "tsv"],
+        None,
+    ));
+    assert_eq!(tsv, "z\ta\tq\na,b\tline1\\nline2\tquote\"value\n");
+}

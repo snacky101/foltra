@@ -1374,5 +1374,414 @@
       "required": ["jobId"],
       "additionalProperties": false
     }
+  },
+  {
+    "id": "note.resolve",
+    "title": "Resolve a note title or ID without creating it",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "target": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.append",
+    "title": "Append content atomically",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "inline": {
+          "type": "boolean"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "content"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.prepend",
+    "title": "Prepend content atomically",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "inline": {
+          "type": "boolean"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "content"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.outline",
+    "title": "Read note outline",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "note.stats",
+    "title": "Read note stats",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "daily.read",
+    "title": "Read YYYY-MM-DD daily note (local today by default)",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "daily.create",
+    "title": "Create YYYY-MM-DD daily note (local today by default)",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "folderId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "daily.append",
+    "title": "Append YYYY-MM-DD daily note (local today by default)",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "folderId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "inline": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "daily.prepend",
+    "title": "Prepend YYYY-MM-DD daily note (local today by default)",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "folderId": {
+          "type": "string"
+        },
+        "content": {
+          "type": "string"
+        },
+        "inline": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "content"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "tasks.list",
+    "title": "List Markdown tasks, including custom statuses",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "task.update",
+    "title": "Change one Markdown task at a body line",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "line": {
+          "type": "integer"
+        },
+        "status": {
+          "type": "string"
+        },
+        "toggle": {
+          "type": "boolean"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "line",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "property.set",
+    "title": "Set a user frontmatter property",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "expectedRevision",
+        "value"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "property.remove",
+    "title": "Remove a user frontmatter property",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "links.outgoing",
+    "title": "Outgoing wiki links",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "links.unresolved",
+    "title": "Unresolved wiki links",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "notes.orphans",
+    "title": "Notes without incoming links from other objects",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "notes.deadends",
+    "title": "Notes without outgoing wiki links",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {},
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "vault.locate",
+    "title": "Find the enclosing vault from a directory or note path",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        }
+      },
+      "required": [],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "search.context",
+    "title": "Search body lines with surrounding context",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "limit": {
+          "type": "integer"
+        },
+        "caseSensitive": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

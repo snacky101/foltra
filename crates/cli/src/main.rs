@@ -1,16 +1,15 @@
 use clap::Parser;
 use foltra_core::{Error, Result};
-use serde_json::{json, Map, Value};
-use std::{io::Read, path::PathBuf};
+use serde_json::{json, Value};
+use std::io::{Read, Write};
 
+mod arguments;
+mod catalog;
 mod desktop;
+mod output;
 
 #[derive(Parser)]
-#[command(
-    name = "foltra",
-    version,
-    about = "Open a Foltra vault/note: foltra PATH or foltra open PATH. Headless example: foltra --vault ./vault note create --title Hello --json"
-)]
+#[command(name = "foltra", version, disable_help_flag = true)]
 struct Cli {
     #[arg(long)]
     vault: Option<String>,
@@ -18,21 +17,33 @@ struct Cli {
     command: Vec<String>,
 }
 
-fn read_file(path: &str) -> Result<String> {
-    let file = std::fs::File::open(PathBuf::from(path))?;
-    if file.metadata()?.len() > 16 * 1024 * 1024 {
-        return Err(Error::new("file_too_large", "Input exceeds 16 MiB"));
+fn read_input(reader: impl Read, limit: u64) -> Result<String> {
+    let mut bytes = vec![];
+    reader.take(limit + 1).read_to_end(&mut bytes)?;
+    if bytes.len() as u64 > limit {
+        return Err(Error::new("file_too_large", "Input exceeds the size limit"));
     }
-    let mut text = String::new();
-    file.take(16 * 1024 * 1024 + 1).read_to_string(&mut text)?;
-    Ok(text)
+    String::from_utf8(bytes).map_err(|_| Error::new("invalid_arguments", "Input must be UTF-8"))
+}
+
+fn read_file(path: &str) -> Result<String> {
+    if path == "-" {
+        read_input(std::io::stdin().lock(), 16 * 1024 * 1024)
+    } else {
+        read_input(std::fs::File::open(path)?, 16 * 1024 * 1024)
+    }
 }
 
 fn normalize_command(command: &str) -> String {
-    command
-        .replace("db.record.", "record.")
-        .replace("database.record.", "record.")
-        .replace("db.", "database.")
+    catalog::normalize(command)
+}
+
+fn specifications(vault: &str) -> Result<Vec<Value>> {
+    Ok(serde_json::from_value(foltra_core::execute(
+        vault,
+        "commands.list",
+        json!({}),
+    )?)?)
 }
 
 fn open_target(cli: &Cli) -> Result<Option<&str>> {
@@ -50,126 +61,268 @@ fn open_target(cli: &Cli) -> Result<Option<&str>> {
     }
     let target = &cli.command[0];
     let command = normalize_command(target);
-    if target.starts_with('-') || command == "rpc" || command.starts_with("plugin.") {
+    if target.starts_with('-')
+        || matches!(command.as_str(), "rpc" | "help" | "completions")
+        || command.starts_with("plugin.")
+    {
         return Ok(None);
     }
-    let specs = foltra_core::execute("", "commands.list", json!({}))?;
     let known = command == "db"
-        || specs.as_array().unwrap().iter().any(|spec| {
+        || specifications("")?.iter().any(|spec| {
             let id = spec["id"].as_str().unwrap();
             id == command || id.split('.').next() == Some(command.as_str())
         });
     Ok((!known).then_some(target.as_str()))
 }
 
-fn run(cli: Cli) -> Result<Value> {
+fn run(cli: Cli) -> Result<String> {
+    let mut specs = specifications("")?;
+    if cli.command.is_empty() || cli.command == ["--help"] || cli.command == ["-h"] {
+        return catalog::help(&specs, "");
+    }
+    if cli.command == ["open", "--help"] || cli.command == ["open", "-h"] {
+        return catalog::help(&specs, "open");
+    }
     if let Some(path) = open_target(&cli)? {
-        return desktop::open(path);
+        return output::render(&desktop::open(path)?, "json");
     }
     let split = cli
         .command
         .iter()
-        .position(|s| s.starts_with("--"))
+        .position(|s| s.starts_with('-'))
         .unwrap_or(cli.command.len());
-    let mut command = normalize_command(&cli.command[..split].join("."));
-    let mut args = Map::new();
-    let mut index = split;
-    while index < cli.command.len() {
-        let flag = &cli.command[index];
-        if flag == "--json" {
-            index += 1;
-            continue;
+    let words = &cli.command[..split];
+    let mut options = arguments::scan(&cli.command[split..], &specs)?;
+    let vault_option = arguments::take(&mut options, "--vault")?;
+    if vault_option.is_some() && cli.vault.is_some() {
+        return Err(Error::new("invalid_arguments", "Specify --vault only once"));
+    }
+    let explicit_vault = cli
+        .vault
+        .or(vault_option)
+        .or_else(|| std::env::var("FOLTRA_VAULT").ok());
+    let mut vault = explicit_vault.clone().unwrap_or_else(|| {
+        foltra_core::execute("", "vault.locate", json!({}))
+            .ok()
+            .and_then(|v| v["vaultPath"].as_str().map(str::to_string))
+            .unwrap_or_default()
+    });
+    let help = words.first().is_some_and(|word| word == "help")
+        || options
+            .iter()
+            .any(|(flag, _)| matches!(flag.as_str(), "--help" | "-h"));
+    options.retain(|(flag, _)| !matches!(flag.as_str(), "--help" | "-h"));
+    let topic = if words.first().is_some_and(|word| word == "help") {
+        words[1..].join(".")
+    } else {
+        words.join(".")
+    };
+    let command = normalize_command(&topic);
+    if (help || command.starts_with("plugin.") || words.first().is_some_and(|s| s == "completions"))
+        && !vault.is_empty()
+    {
+        specs = specifications(&vault)?;
+    }
+    if help {
+        return catalog::help(&specs, &topic);
+    }
+    if words.first().is_some_and(|s| s == "completions") {
+        if words.len() != 2 || !options.is_empty() {
+            return Err(Error::new(
+                "invalid_arguments",
+                "Usage: foltra completions bash|zsh|fish",
+            ));
         }
-        let value = cli
-            .command
-            .get(index + 1)
-            .ok_or_else(|| Error::new("invalid_arguments", format!("Missing value for {flag}")))?;
-        match flag.as_str() {
-            "--args" => args.extend(serde_json::from_str::<Map<String, Value>>(value)?),
-            "--file" => args.extend(serde_json::from_str::<Map<String, Value>>(&read_file(
-                value,
-            )?)?),
-            "--body-file" => {
-                args.insert("body".into(), json!(read_file(value)?));
-            }
-            "--data-file" => {
-                args.insert("values".into(), serde_json::from_str(&read_file(value)?)?);
-            }
-            "--snapshot-file" => {
-                args.insert("snapshot".into(), serde_json::from_str(&read_file(value)?)?);
-            }
-            "--manifest-file" => {
-                args.insert("manifest".into(), serde_json::from_str(&read_file(value)?)?);
-            }
-            "--values" | "--properties" | "--filters" | "--property" => {
-                args.insert(flag[2..].into(), serde_json::from_str(value)?);
-            }
-            "--limit" | "--offset" => {
-                args.insert(
-                    flag[2..].into(),
-                    json!(value.parse::<usize>().map_err(|_| Error::new(
-                        "invalid_arguments",
-                        "Expected a positive integer"
-                    ))?),
-                );
-            }
-            "--database" => {
-                args.insert("databaseId".into(), json!(value));
-            }
-            "--expected-revision" => {
-                args.insert("expectedRevision".into(), json!(value));
-            }
-            "--folder-id" => {
-                args.insert("folderId".into(), json!(value));
-            }
-            "--parent-id" => {
-                args.insert("parentId".into(), json!(value));
-            }
-            "--note-id" => {
-                args.insert("noteId".into(), json!(value));
-            }
-            "--id" | "--title" | "--body" | "--name" | "--target" | "--query" | "--sort"
-            | "--path" => {
-                args.insert(flag[2..].into(), json!(value));
-            }
-            _ => {
-                return Err(Error::new(
-                    "invalid_arguments",
-                    format!("Unknown flag {flag}. Use --args for a JSON argument object."),
-                ))
-            }
-        }
-        index += 2;
+        return catalog::completions(&specs, &words[1]);
     }
     if command == "rpc" {
-        let mut request = String::new();
-        std::io::stdin()
-            .take(18 * 1024 * 1024)
-            .read_to_string(&mut request)?;
-        let value: Value = serde_json::from_str(&request)?;
-        command = value["command"]
+        options.retain(|(flag, value)| !(flag == "--json" && value.is_none()));
+        if !options.is_empty() {
+            return Err(Error::new(
+                "invalid_arguments",
+                "rpc takes a JSON request on stdin",
+            ));
+        }
+        let value: Value =
+            serde_json::from_str(&read_input(std::io::stdin().lock(), 18 * 1024 * 1024)?)?;
+        let command = value["command"]
             .as_str()
-            .ok_or_else(|| Error::new("invalid_arguments", "command is required"))?
-            .into();
-        args = serde_json::from_value(value.get("args").cloned().unwrap_or(json!({})))?;
+            .ok_or_else(|| Error::new("invalid_arguments", "command is required"))?;
+        return output::render(
+            &foltra_core::execute(
+                &vault,
+                command,
+                value.get("args").cloned().unwrap_or(json!({})),
+            )?,
+            "json",
+        );
     }
-    let vault = cli
-        .vault
-        .or_else(|| std::env::var("FOLTRA_VAULT").ok())
-        .unwrap_or_default();
-    foltra_core::execute(&vault, &command, Value::Object(args))
+    let Some(spec) = specs.iter().find(|spec| spec["id"] == command) else {
+        if !options.is_empty() {
+            return Err(Error::new(
+                "unknown_command",
+                format!("Choose a complete command; run foltra help {topic}"),
+            ));
+        }
+        return catalog::help(&specs, &topic);
+    };
+    if options.iter().any(|(flag, value)| {
+        flag == "--json"
+            && value
+                .as_deref()
+                .is_some_and(|v| !matches!(v, "true" | "false"))
+    }) {
+        return Err(Error::new(
+            "invalid_arguments",
+            "--json accepts only true or false",
+        ));
+    }
+    let json_flag = options
+        .iter()
+        .any(|(flag, value)| flag == "--json" && value.as_deref().is_none_or(|v| v == "true"));
+    options.retain(|(flag, _)| flag != "--json");
+    let format = arguments::take(&mut options, "--format")?.unwrap_or_else(|| {
+        if !json_flag && matches!(topic.as_str(), "read" | "daily") {
+            "text"
+        } else {
+            "json"
+        }
+        .into()
+    });
+    if json_flag && format != "json" {
+        return Err(Error::new(
+            "invalid_arguments",
+            "--json conflicts with --format",
+        ));
+    }
+    output::validate(&format)?;
+    let note = arguments::take(&mut options, "--note")?;
+    let note_path = arguments::take(&mut options, "--note-path")?;
+    let folder = arguments::take(&mut options, "--folder")?;
+    let database = arguments::take(&mut options, "--database")?;
+    let mut args = arguments::parse(options, spec)?;
+    let resolved_path = note_path
+        .as_ref()
+        .map(|path| foltra_core::execute("", "path.resolve", json!({"path":path})))
+        .transpose()?;
+    if let Some(path) = &resolved_path {
+        if path.get("noteId").is_none() {
+            return Err(Error::new(
+                "invalid_arguments",
+                "--note-path requires a managed note file",
+            ));
+        }
+        if explicit_vault.is_some() {
+            let selected = foltra_core::execute("", "path.resolve", json!({"path":vault}))?;
+            if selected["vaultPath"] != path["vaultPath"] {
+                return Err(Error::new(
+                    "invalid_arguments",
+                    "Note path belongs to a different vault",
+                ));
+            }
+        }
+        vault = path["vaultPath"].as_str().unwrap().into();
+    }
+    if note.is_some() && resolved_path.is_some() {
+        return Err(Error::new(
+            "invalid_arguments",
+            "Use --note or --note-path, not both",
+        ));
+    }
+    if let Some(target) = note
+        .as_deref()
+        .or_else(|| resolved_path.as_ref().and_then(|v| v["noteId"].as_str()))
+    {
+        let key = catalog::note_key(&command).ok_or_else(|| {
+            Error::new("invalid_arguments", "This command does not accept --note")
+        })?;
+        if args.get(key).is_some() {
+            return Err(Error::new(
+                "invalid_arguments",
+                "Do not combine a note selector with its raw ID argument",
+            ));
+        }
+        let note = foltra_core::execute(&vault, "note.resolve", json!({"target":target}))?;
+        args[key] = note["id"].clone();
+        if spec["argsSchema"]["required"]
+            .as_array()
+            .unwrap()
+            .contains(&json!("expectedRevision"))
+            && args.get("expectedRevision").is_none()
+        {
+            args["expectedRevision"] = note["revision"].clone();
+        }
+    }
+    if let Some(name) = database {
+        insert_selector(
+            &mut args,
+            spec,
+            "databaseId",
+            arguments::resolve_named(&vault, "database.list", &name)?["id"].clone(),
+        )?;
+    }
+    if let Some(name) = folder {
+        let id = if name == "/" {
+            json!("")
+        } else {
+            arguments::resolve_named(&vault, "folder.list", &name)?["id"].clone()
+        };
+        let key = if spec["argsSchema"]["properties"].get("folderId").is_some() {
+            "folderId"
+        } else {
+            "parentId"
+        };
+        insert_selector(&mut args, spec, key, id)?;
+    }
+    for (alias, required) in [("rename", "title"), ("move", "folderId")] {
+        if topic == alias && args.get(required).is_none() {
+            return Err(Error::new(
+                "invalid_arguments",
+                format!("{alias} requires {required}"),
+            ));
+        }
+    }
+    if vault.is_empty()
+        && !matches!(
+            command.as_str(),
+            "commands.list" | "path.resolve" | "vault.default" | "vault.locate"
+        )
+    {
+        return Err(Error::new(
+            "vault_required",
+            "Use --vault PATH, FOLTRA_VAULT, or run inside a vault",
+        ));
+    }
+    output::render(&foltra_core::execute(&vault, &command, args)?, &format)
+}
+
+fn insert_selector(args: &mut Value, spec: &Value, key: &str, value: Value) -> Result<()> {
+    if spec["argsSchema"]["properties"].get(key).is_none() || args.get(key).is_some() {
+        return Err(Error::new(
+            "invalid_arguments",
+            format!("Unsupported or repeated selector: {key}"),
+        ));
+    }
+    args[key] = value;
+    Ok(())
 }
 
 fn main() {
     match run(Cli::parse()) {
-        Ok(result) => println!("{}", serde_json::to_string_pretty(&result).unwrap()),
+        Ok(result) => {
+            if let Err(error) = std::io::stdout().lock().write_all(result.as_bytes()) {
+                if error.kind() != std::io::ErrorKind::BrokenPipe {
+                    eprintln!("{error}");
+                    std::process::exit(1);
+                }
+            }
+        }
         Err(error) => {
             eprintln!("{}", json!({"error":error}));
             std::process::exit(if error.code == "conflict" { 3 } else { 1 });
         }
     }
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;

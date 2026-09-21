@@ -249,3 +249,191 @@ pub fn inspect(store: &Store, args: &Value) -> Result<Value> {
         Err(error) => json!({"properties":null,"error":error}),
     })
 }
+
+// Patch the requested top-level entry, preserving the other YAML source and Markdown verbatim.
+// Flow mappings and explicit complex keys need a CST editor; refuse those instead of losing comments.
+fn patch_property(source: &str, name: &str, replacement: Option<&Value>) -> Result<String> {
+    use crate::Error;
+    let invalid = |message| Error::new("invalid_frontmatter", message);
+    let mut expected = parse(source).map_err(invalid)?;
+    if replacement.is_none() && !expected.contains_key(name) {
+        return Ok(source.into());
+    }
+    let mut depth = 0;
+    let mut key: Option<(String, usize, usize)> = None;
+    let mut selected = None;
+    // Saphyr string-parser markers count Unicode scalar values, not UTF-8 bytes.
+    let offsets: Vec<_> = source
+        .char_indices()
+        .map(|(offset, _)| offset)
+        .chain(std::iter::once(source.len()))
+        .collect();
+    for event in Parser::new_from_str(source) {
+        let (event, span) = event.map_err(|e| invalid(e.to_string()))?;
+        let start = *offsets
+            .get(span.start.index())
+            .ok_or_else(|| invalid("Invalid YAML source span".into()))?;
+        let end = *offsets
+            .get(span.end.index())
+            .ok_or_else(|| invalid("Invalid YAML source span".into()))?;
+        match event {
+            Event::MappingStart(..) | Event::SequenceStart(..) => {
+                if depth == 0 && source[start..].starts_with('{') {
+                    return Err(invalid("Edit flow-style frontmatter in the note source; property commands require a block mapping".into()));
+                }
+                depth += 1;
+            }
+            Event::MappingEnd | Event::SequenceEnd => {
+                depth -= 1;
+                if depth == 1 {
+                    if let Some((key_name, key_start, key_end)) = key.take() {
+                        if key_name == name {
+                            selected = Some((key_start, key_end, end));
+                        }
+                    }
+                }
+            }
+            Event::Scalar(value, ..) if depth == 1 => {
+                if let Some((key_name, key_start, key_end)) = key.take() {
+                    if key_name == name {
+                        selected = Some((key_start, key_end, end));
+                    }
+                } else {
+                    key = Some((value.into_owned(), start, end));
+                }
+            }
+            _ => {}
+        }
+    }
+    let newline = if source.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
+    let mut updated = source.to_string();
+    if let Some((key_start, key_end, value_end)) = selected {
+        let line_start = source[..key_start].rfind('\n').map_or(0, |p| p + 1);
+        let tail = source[key_end..].split('\n').next().unwrap();
+        let colon_offset = tail
+            .find(':')
+            .ok_or_else(|| invalid("Edit complex property keys in the note source".into()))?;
+        if !source[line_start..key_start].trim().is_empty()
+            || !tail[..colon_offset].trim().is_empty()
+        {
+            return Err(invalid(
+                "Edit complex property keys in the note source".into(),
+            ));
+        }
+        let colon = key_end + colon_offset + 1;
+        // An implicit empty scalar is marked at its colon, before the insertion point.
+        let mut value_end = value_end.max(colon);
+        // Block collection end markers may include comments preceding the next property.
+        // Keep those comments (and surrounding empty lines) outside this edit.
+        while value_end > colon {
+            let before_newline = value_end - usize::from(source[..value_end].ends_with('\n'));
+            let start = source[..before_newline].rfind('\n').map_or(0, |p| p + 1);
+            if start < colon {
+                break;
+            }
+            let line = &source[start..value_end];
+            let indent = line.len() - line.trim_start_matches([' ', '\t']).len();
+            if line.trim().is_empty()
+                || (indent <= key_start - line_start && line.trim_start().starts_with('#'))
+            {
+                value_end = start;
+            } else {
+                break;
+            }
+        }
+        if let Some(value) = replacement {
+            let ended_line = source[colon..value_end].ends_with('\n');
+            let next = format!(
+                " {}{}",
+                serde_json::to_string(value)?,
+                if ended_line { newline } else { "" }
+            );
+            updated.replace_range(colon..value_end, &next);
+        } else {
+            let end = if source[..value_end].ends_with('\n') {
+                value_end
+            } else {
+                source[value_end..]
+                    .find('\n')
+                    .map_or(source.len(), |p| value_end + p + 1)
+            };
+            updated.replace_range(line_start..end, "");
+        }
+    } else if let Some(value) = replacement {
+        if !updated.is_empty() && !updated.ends_with('\n') {
+            updated.push_str(newline);
+        }
+        updated.push_str(&format!(
+            "{}: {}{newline}",
+            serde_json::to_string(name)?,
+            serde_json::to_string(value)?
+        ));
+    }
+    if let Some(value) = replacement {
+        expected.insert(name.into(), value.clone());
+    } else {
+        expected.remove(name);
+    }
+    // A parser span must never let an edit silently change another property.
+    if parse(&updated).map_err(invalid)? != expected {
+        return Err(invalid(
+            "This YAML layout requires editing the note source".into(),
+        ));
+    }
+    Ok(updated)
+}
+
+pub fn edit_property(store: &Store, args: &Value, remove: bool) -> Result<Value> {
+    use crate::{validation::check_revision, Error};
+    let mut note = read_note(store, text(args, "id")?)?;
+    check_revision(text(args, "expectedRevision")?, &note.revision)?;
+    let name = text(args, "name")?;
+    if name.trim().is_empty() || name.contains(['\r', '\n']) {
+        return Err(Error::new(
+            "invalid_arguments",
+            "Use a nonempty property name on one line",
+        ));
+    }
+    let value = if remove {
+        None
+    } else {
+        let raw = text(args, "value")?;
+        let kind = args["type"].as_str().unwrap_or("string");
+        let value = if kind == "string" {
+            Value::String(raw.into())
+        } else {
+            serde_json::from_str(raw)?
+        };
+        if !match kind {
+            "string" => value.is_string(),
+            "number" => value.is_number(),
+            "boolean" => value.is_boolean(),
+            "json" => true,
+            _ => false,
+        } {
+            return Err(Error::new(
+                "invalid_arguments",
+                "Property type must be string, number, boolean or json, matching the value",
+            ));
+        }
+        Some(value)
+    };
+    if let Some(frontmatter) = range(&note.body) {
+        let yaml = &note.body[frontmatter.yaml.clone()];
+        let next = patch_property(yaml, name, value.as_ref())?;
+        if next == yaml {
+            return Ok(serde_json::to_value(note)?);
+        }
+        note.body.replace_range(frontmatter.yaml, &next);
+    } else if let Some(value) = value {
+        let yaml = patch_property("", name, Some(&value))?;
+        note.body = format!("---\n{yaml}---\n{}", note.body);
+    } else {
+        return Ok(serde_json::to_value(note)?);
+    }
+    crate::note_actions::save_body(store, note)
+}

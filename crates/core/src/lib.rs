@@ -12,7 +12,9 @@ mod git_sync;
 #[cfg(test)]
 mod git_sync_tests;
 mod git_transport;
+mod markdown_query;
 mod model;
+mod note_actions;
 mod notes;
 mod open_path;
 mod plugin_manifest;
@@ -124,6 +126,9 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
     if command == "path.resolve" {
         return open_path::resolve(text(&args, "path")?);
     }
+    if command == "vault.locate" {
+        return open_path::locate(args["path"].as_str());
+    }
     if matches!(command, "git.sync" | "git.resolve") {
         return git_sync::run(path, command, &args);
     }
@@ -175,6 +180,26 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
             Ok(json!(wiki::note_link(&note, &notes)))
         }
         "note.frontmatter" => frontmatter::inspect(store, &args),
+        "note.resolve" => Ok(serde_json::to_value(note_actions::resolve(
+            store,
+            text(&args, "target")?,
+        )?)?),
+        "note.append" | "note.prepend" => {
+            note_actions::append(store, &args, command == "note.prepend")
+        }
+        "note.outline" => markdown_query::outline(store, &args),
+        "note.stats" => markdown_query::stats(store, &args),
+        "daily.read" | "daily.create" | "daily.append" | "daily.prepend" => {
+            note_actions::daily(store, command, &args)
+        }
+        "tasks.list" => markdown_query::list_tasks(store, &args),
+        "task.update" => markdown_query::update_task(store, &args),
+        "property.set" | "property.remove" => {
+            frontmatter::edit_property(store, &args, command == "property.remove")
+        }
+        "links.outgoing" | "links.unresolved" | "notes.orphans" | "notes.deadends" => {
+            note_actions::link_audit(store, command, &args)
+        }
         "note.create" => notes::create_note(store, &args),
         "note.open-link" => notes::open_link(store, &args),
         "note.update" => notes::update_note(store, &args),
@@ -219,6 +244,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
             )?)
         }
         "search" => query::search(store, text(&args, "query")?),
+        "search.context" => markdown_query::search_context(store, &args),
         "tags.list" => tags::list(store),
         "tags.blocks" => tags::blocks(store, &args),
         "topics.list" => topics::list(store, &args),

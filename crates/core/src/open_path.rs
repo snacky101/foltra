@@ -2,6 +2,27 @@ use crate::{notes, storage::Store, Error, Result, VaultInfo};
 use serde_json::{json, Value};
 use std::{fs, path::PathBuf};
 
+pub fn locate(path: Option<&str>) -> Result<Value> {
+    let start = match path {
+        Some(path) => PathBuf::from(path),
+        None => std::env::current_dir()?,
+    };
+    let start = fs::canonicalize(start)?;
+    for parent in start.ancestors() {
+        if parent.join(".foltra/vault.json").exists() {
+            return resolve(
+                parent
+                    .to_str()
+                    .ok_or_else(|| Error::new("invalid_path", "Vault path must be UTF-8"))?,
+            );
+        }
+    }
+    Err(Error::new(
+        "vault_required",
+        "Use --vault PATH, set FOLTRA_VAULT, or run inside a Foltra vault",
+    ))
+}
+
 pub fn resolve(path: &str) -> Result<Value> {
     if path.trim().is_empty() {
         return Err(Error::new(

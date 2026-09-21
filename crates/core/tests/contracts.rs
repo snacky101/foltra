@@ -1,3 +1,5 @@
+mod automation;
+
 use foltra_core::execute;
 use serde_json::{json, Value};
 use tempfile::TempDir;

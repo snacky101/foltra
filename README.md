@@ -102,6 +102,8 @@ Vim 명령 입력줄은 화면 하단에 표시합니다. `:q`는 현재 노트�
 
 ## CLI와 agent 연동
 
+전체 사용법은 [CLI 안내](docs/CLI.md)를 참고하세요. 명령별 도움말, 노트 이름 선택, 본문 추가, 일지·할 일·속성, 문맥 검색, DB/SQL, 쉘 자동완성과 출력 형식을 제공합니다.
+
 macOS 앱에 CLI가 포함됩니다. Foltra.app을 응용 프로그램 폴더로 옮겨 실행한 뒤 **설정 → CLI → CLI 설치**를 한 번 누르면 `/usr/local/bin/foltra`가 앱 내부 실행 파일에 연결됩니다. 필요한 경우 macOS가 관리자 인증을 요청하며, 기존의 다른 `foltra` 파일이나 링크는 덮어쓰지 않습니다. 명령 팔레트의 **터미널 명령 · CLI 설치**에서도 설정을 열 수 있습니다. 이후 앱 업데이트에 CLI도 포함되어 별도 다운로드가 필요 없습니다. PATH에 `/usr/local/bin`이 포함된 터미널에서 기존 볼트나 볼트 안의 노트를 바로 열 수 있습니다.
 
 ```sh
@@ -140,7 +142,7 @@ make build-cli
 
 `DATABASE_UUID`, `NOTE_UUID`, `REVISION_FROM_READ`를 이전 명령의 실제 반환값으로 대체합니다. 코드 확장은 설치 후 앱에서 권한을 확인하고 활성화합니다. 수정과 삭제는 읽을 때 받은 revision을 사용합니다. 충돌이 나면 최신 내용을 읽고 병합한 뒤 다시 요청해야 합니다.
 
-출력은 JSON입니다. 결과는 stdout, 오류는 stderr에 기록합니다. 성공은 exit 0, revision 충돌은 exit 3, 나머지 실패는 exit 1입니다. `FOLTRA_VAULT` 환경변수로 기본 vault를 지정할 수도 있습니다. `--args`는 전체 인자 객체, `--body-file`은 본문 파일, `query run --file`은 쿼리 JSON 파일을 받습니다.
+기존 데이터 명령과 RPC의 기본 출력은 JSON입니다. 단축 명령 `read`·`daily`는 Markdown 본문을 출력하며 `--json`으로 전체 데이터를 받을 수 있습니다. `--format jsonl|text|csv|tsv`도 지원합니다. 결과는 stdout, 오류는 stderr에 기록합니다. 성공은 exit 0, revision 충돌은 exit 3, 나머지 실패는 exit 1입니다. `FOLTRA_VAULT` 환경변수로 기본 vault를 지정할 수도 있습니다. `--args`는 전체 인자 객체, `--body-file`은 본문 파일, `query run --file`은 쿼리 JSON 파일을 받습니다.
 
 ```sh
 ./target/debug/foltra --vault /absolute/path/to/vault vault export > snapshot.json
