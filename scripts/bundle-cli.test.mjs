@@ -12,11 +12,11 @@ test('bundling stages the selected workspace CLI and signs only its copy', async
       await mkdir(join(root, 'target', profile), { recursive: true });
       await writeFile(join(root, 'target', profile, 'foltra'), profile, { mode: 0o755 });
     }
-    for (const profile of ['debug', 'release']) {
+    for (const [debug, profile] of [['true', 'debug'], ['false', 'release'], [undefined, 'release']]) {
       const calls = [];
       const destination = await stageCli({
         root,
-        env: { TAURI_ENV_PLATFORM: 'darwin', TAURI_ENV_DEBUG: String(profile === 'debug') },
+        env: { TAURI_ENV_PLATFORM: 'darwin', TAURI_ENV_DEBUG: debug },
         execute: (...args) => calls.push(args),
       });
       assert.equal(destination, join(root, 'target/bundle-cli/foltra'));
@@ -46,7 +46,7 @@ test('bundling rejects missing or nonexecutable CLI and propagates signing failu
     await assert.rejects(stageCli(options), /not a nonempty executable/);
     await chmod(join(root, 'target/debug/foltra'), 0o755);
     await assert.rejects(stageCli(options), /signing failed/);
-    await assert.rejects(stageCli({ ...options, env: { TAURI_ENV_PLATFORM: 'darwin' } }), /Tauri/);
+    await assert.rejects(stageCli({ ...options, env: { TAURI_ENV_PLATFORM: 'darwin', TAURI_ENV_DEBUG: 'invalid' } }), /Tauri/);
     await stageCli({ ...options, env: { TAURI_ENV_PLATFORM: 'linux' } });
   } finally {
     await rm(root, { recursive: true, force: true });

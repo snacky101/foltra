@@ -10,7 +10,7 @@
 
 ## macOS 설치
 
-[v0.1.0-preview.6 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.6)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
+[v0.1.0-preview.7 프리릴리스](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.7)에서 Apple Silicon용 `.dmg`를 다운로드해 엽니다. `Foltra.app`을 `Applications`로 옮긴 후 응용 프로그램에서 실행합니다. 앱 실행에는 Node.js·Rust·개발 서버가 필요하지 않습니다. 저장소와 배포 파일은 공개되어 있습니다.
 
 앱 업데이트를 탑재한 버전부터 설정 → **앱 업데이트**에서 새 버전을 확인·다운로드·설치합니다. 기존 `preview.1`은 최초 한 번 새 DMG 설치가 필요합니다. 개발자의 버전 태그 배포와 서명 키 관리는 [업데이트 안내](docs/UPDATES.md)를 참고하세요.
 

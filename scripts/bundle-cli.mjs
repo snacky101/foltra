@@ -8,7 +8,8 @@ const ROOT = fileURLToPath(new URL('../', import.meta.url));
 // Runs after the single workspace build, before Tauri copies and signs the app.
 export async function stageCli({ root = ROOT, env = process.env, execute = execFileSync } = {}) {
   if (env.TAURI_ENV_PLATFORM !== 'darwin') return;
-  if (!['true', 'false'].includes(env.TAURI_ENV_DEBUG))
+  // Tauri omits this variable for release bundles; debug bundles set "true".
+  if (env.TAURI_ENV_DEBUG !== undefined && !['true', 'false'].includes(env.TAURI_ENV_DEBUG))
     throw new Error('Run CLI packaging through Tauri beforeBundleCommand.');
   const profile = env.TAURI_ENV_DEBUG === 'true' ? 'debug' : 'release';
   const source = resolve(root, env.CARGO_TARGET_DIR ?? 'target', profile, 'foltra');
