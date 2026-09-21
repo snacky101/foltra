@@ -13,6 +13,7 @@ import {
   parseVersion,
   sha256,
   validateArchiveEntries,
+  validateBuildSource,
   validateChecksums,
   validateManifest,
   verifyUpdaterSignature,
@@ -293,4 +294,42 @@ test('visibility retries are bounded and do not hide API errors', async () => {
     ),
     /HTTP 403/,
   );
+});
+
+test('prepared releases require the exact source, tag, run and sealed checksum list', () => {
+  const expected = {
+    tag: 'v0.1.0-preview.5',
+    head: 'a'.repeat(40),
+    checksums: Buffer.from('verified checksums\n'),
+    runId: '123456',
+  };
+  const record = {
+    repository: 'snacky101/foltra',
+    tag: expected.tag,
+    head: expected.head,
+    checksumsSha256: sha256(expected.checksums),
+    runId: expected.runId,
+  };
+  validateBuildSource(record, expected);
+  for (const changed of [
+    { repository: 'someone/foltra' },
+    { tag: 'v0.1.0-preview.4' },
+    { head: 'b'.repeat(40) },
+    { head: undefined },
+  ])
+    assert.throws(() => validateBuildSource({ ...record, ...changed }, expected), /source commit and tag/);
+  assert.throws(() => validateBuildSource(null, expected), /source commit and tag/);
+  assert.throws(
+    () => validateBuildSource(record, { ...expected, checksums: Buffer.from('changed checksums') }),
+    /checksum list was changed/,
+  );
+  assert.throws(
+    () => validateBuildSource({ ...record, runId: 'another-run' }, expected),
+    /different workflow run/,
+  );
+  assert.throws(() => validateBuildSource({ ...record, runId: null }, expected), /different workflow run/);
+  // A failed publish job reuses the build from the same run, even on a new attempt.
+  validateBuildSource(record, { ...expected, runAttempt: '2' });
+  // Local publication still requires the immutable source and checksums.
+  validateBuildSource({ ...record, runId: null }, { ...expected, runId: undefined });
 });

@@ -12,6 +12,7 @@ test.each([...builtInThemes, ...themeCatalog].map((t) => t.id))(
       'ink',
       'muted',
       'accent',
+      'strong',
       'danger',
       'warning',
       'success',
@@ -27,6 +28,8 @@ test.each([...builtInThemes, ...themeCatalog].map((t) => t.id))(
         ).toBeGreaterThanOrEqual(4.5);
     }
     expect(contrastRatio(t.ink, t.selection)).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio(t.strong, t.selection)).toBeGreaterThanOrEqual(4.5);
+    expect(t.strong).not.toBe(t.ink);
     for (const color of [t['sidebar-ink'], t['sidebar-muted']]) {
       expect(contrastRatio(color, t.sidebar)).toBeGreaterThanOrEqual(4.5);
       expect(contrastRatio(color, mixColor(t['sidebar-ink'], t.sidebar, 0.14))).toBeGreaterThanOrEqual(4.5);
@@ -58,6 +61,22 @@ test('imported partial dark palettes get matching surfaces and repair illegible 
   expect(contrastRatio(t.muted, t.panel)).toBeGreaterThanOrEqual(4.5);
   expect(contrastRatio(t['sidebar-ink'], t.sidebar)).toBeGreaterThanOrEqual(4.5);
   expect(theme).toEqual(original);
+});
+
+test('custom bold colors are optional, preserved when readable and repaired when illegible', () => {
+  const theme = (strong: string): Extension => ({
+    kind: 'theme',
+    id: 'emphasis',
+    name: 'Emphasis',
+    version: '1.0.0',
+    tokens: { strong },
+  });
+  expect(themePalette('emphasis', [theme('#365747')]).tokens.strong).toBe('#365747');
+  for (const strong of ['#ffffff', 'url(https://example.com/leak)']) {
+    const { tokens } = themePalette('emphasis', [theme(strong)]);
+    for (const background of [tokens.paper, tokens.panel, tokens.selection])
+      expect(contrastRatio(tokens.strong, background)).toBeGreaterThanOrEqual(4.5);
+  }
 });
 
 test('switching an installed dark theme to Paper resets selection, colors and native controls without stale tokens', () => {

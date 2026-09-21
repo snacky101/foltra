@@ -106,6 +106,10 @@ export function themePalette(id: string, extensions: Extension[] = []) {
     tokens: {
       ...tokens,
       selection,
+      strong: readable(
+        validColor(supplied.strong) ? supplied.strong : mixColor(tokens.accent, tokens.ink, 0.6),
+        [...surfaces, selection],
+      ),
       'sidebar-muted': sidebarMuted,
       danger: semantic('danger', dark ? '#eea18c' : '#a4553f'),
       warning: semantic('warning', dark ? '#e2c77b' : '#8b661e'),

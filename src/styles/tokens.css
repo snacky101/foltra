@@ -5,6 +5,7 @@
   --muted: #667060;
   --line: #e3e5dc;
   --accent: #57785f;
+  --strong: color-mix(in srgb, var(--accent) 60%, var(--ink));
   --sidebar: #213d35;
   --sidebar-ink: #e4eadd;
   --selection: #dce8d8;

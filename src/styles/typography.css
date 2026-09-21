@@ -192,8 +192,10 @@
   transform: translate(-50%, -50%);
 }
 .markdown-preview strong,
-.editor .cm-live-strong {
-  font-weight: 600;
+.editor .cm-live-strong,
+.code-strong {
+  color: var(--strong);
+  font-weight: 700;
 }
 .markdown-preview u,
 .editor .cm-live-underline {
@@ -334,8 +336,7 @@ button.tag-chip:focus-visible,
 .code-danger {
   color: var(--danger);
 }
-.code-heading,
-.code-strong {
+.code-heading:not(.code-strong) {
   font-weight: 600;
 }
 .code-emphasis {

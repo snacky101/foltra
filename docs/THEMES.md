@@ -17,6 +17,7 @@ A theme manifest uses `kind: "theme"`, `id`, `name`, `version`, optional `descri
 
 - Surfaces/text: `paper`, `panel`, `ink`, `muted`, `line`, `accent`, `sidebar`, `sidebar-ink`.
 - Optional selection/status: `selection`, `danger`, `warning`, `success`.
+- Optional bold text: `strong`. When omitted, Foltra subtly blends the theme accent into the text color. Bold uses weight 700 in reading, live preview and source editing; its color is adjusted for contrast on content, panel and selected surfaces.
 - Optional code colors: `syntax-keyword`, `syntax-atom`, `syntax-literal`, `syntax-string`.
 
 Legacy eight-token themes remain valid. Themes cannot run code, add commands, inject CSS or load remote resources.

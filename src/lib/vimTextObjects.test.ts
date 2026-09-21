@@ -175,15 +175,10 @@ test.each([
 });
 
 test.each([
-  ['i*', '`**not bold**`', 'not'],
   ['i*', '\\*not emphasis\\*', 'not'],
-  ['i_', 'some_identifier_here', 'identifier'],
   ['i*', '*not closed', 'not'],
-  ['i*', '**one** plain **two**', 'plain'],
   ['2i*', '**one**', 'one'],
   ['i_', '**only stars**', 'only'],
-  ['it', '`<u>code</u>`', 'code'],
-  ['it', '<u class="unsafe">text</u>', 'text'],
   ['it', '<u>not closed', 'not'],
 ] as const)('Markdown d%s leaves nonmatching text unchanged: %s', (object, doc, at) => {
   editor(doc, at);
@@ -193,6 +188,23 @@ test.each([
   expect(view.state.selection.main.head).toBe(anchor);
   expect(getCM(view)!.state.vim?.insertMode).toBe(false);
 });
+
+test.each([
+  ['i*', '`**not bold**`', 'not', '`****`'],
+  ['i_', 'some_identifier_here', 'identifier', 'some__here'],
+  ['i*', '**one** plain **two**', 'plain', '**one** plain ****'],
+  ['it', '`<u>code</u>`', 'code', '`<u></u>`'],
+  ['it', '<u class="unsafe">text</u>', 'text', '<u class="unsafe"></u>'],
+] as const)(
+  'mini.ai d%s searches source delimiters and the next available object',
+  (object, doc, at, expected) => {
+    editor(doc, at);
+    press(`d${object}`);
+    expect(view.state.doc.toString()).toBe(expected);
+    press('u');
+    expect(view.state.doc.toString()).toBe(doc);
+  },
+);
 
 test('Markdown text objects support named registers, dot repeat and source mode', () => {
   editor('**first** then **second**', 'first', false);

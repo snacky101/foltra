@@ -60,8 +60,7 @@ release: check-storage ## macOS arm64 앱·DMG·서명된 업데이트 파일·C
 		test -r "$$TAURI_SIGNING_PRIVATE_KEY" || { echo 'TAURI_SIGNING_PRIVATE_KEY에 업데이트 서명 키 또는 키 파일 경로를 지정하세요.' >&2; exit 1; }; \
 	fi; \
 	export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="$${TAURI_SIGNING_PRIVATE_KEY_PASSWORD-}"; \
-	npm run release:mac
-	cargo build --release --locked -p foltra-cli
+	npm run release:mac -- -- --locked --workspace
 	$(MAKE) check-storage
 
 storage: ## 빌드 캐시와 검증 자료의 용량 보기

@@ -137,6 +137,7 @@ fn validate(value: &Value) -> Result<Manifest> {
                     "muted",
                     "line",
                     "accent",
+                    "strong",
                     "sidebar",
                     "sidebar-ink",
                     "selection",

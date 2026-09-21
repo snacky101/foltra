@@ -45,11 +45,7 @@ import type { Workspace } from '../lib/types';
 
 const previewHighlightStyle = HighlightStyle.define(
   editorHighlightStyle.specs.map((spec) =>
-    spec.tag === tags.heading
-      ? { tag: tags.heading, fontWeight: 'inherit', textDecoration: 'none' }
-      : spec.tag === tags.strong
-        ? { tag: tags.strong, fontWeight: '600' }
-        : spec,
+    spec.tag === tags.heading ? { tag: tags.heading, fontWeight: 'inherit', textDecoration: 'none' } : spec,
   ),
 );
 

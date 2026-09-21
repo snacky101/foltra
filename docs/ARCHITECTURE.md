@@ -54,7 +54,7 @@ macOS의 `foltra PATH`/`foltra open PATH`는 코어의 `path.resolve`로 기존 
 | `src/lib/builtinCommands.ts` | UI 명령 ID·제목·기본 단축키 | 이벤트 리스너 |
 | `src/lib/useCommandKeys.ts` | 시간 제한 없는 leader/일반 키 이벤트 라우팅, 조합 입력 보호 | 특정 기능의 데이터 변경 |
 | `src/lib/vimKeybindings.ts` | 설정의 Normal 조합과 서식 명령의 Visual 조합을 Vim 엔진에 등록·해제하고 공통 명령으로 전달 | 별도 전역 키 리스너, Insert 입력 처리 |
-| `markdownFormatting.ts`, `vimTextObjects.ts`, `markdownUnderline.ts`, `remarkUnderline.ts` | 서식 transaction·Markdown text object·정확한 밑줄 태그의 안전한 표시 | 별도 저장/undo 엔진, 임의 HTML 실행 |
+| `markdownFormatting.ts`, `vimTextObjectRanges.ts`, `vimTextObjects.ts`, `markdownUnderline.ts`, `remarkUnderline.ts` | 서식 transaction·순수 text object 범위 탐색과 Vim 매핑·정확한 밑줄 태그의 안전한 표시 | 별도 저장/undo 엔진, 임의 HTML 실행 |
 | `src/lib/commandKey.ts`, `vimInput.ts` | 명령 문맥의 물리 키 보정, CodeMirror Vim API 연결 | Insert 본문·literal 인수 변환, OS 입력 소스 변경 |
 | `src/lib/noteLinks.ts` | UI 백링크·연결 수에서 DB 본문 소속 관계 제외 | 원본 bodyNoteId 수정, 코어 관계 조회 계약 변경 |
 | `Backlinks`, `workspaceFocus.ts` | 열 수 있는 링크만 탐색, 갱신 중 포커스 유지 | 노트 원본 변경 |

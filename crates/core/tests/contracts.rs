@@ -349,11 +349,22 @@ fn untrusted_theme_cannot_load_external_css_or_script() {
     for tokens in [
         json!({"paper":"url(https://example.com/leak)"}),
         json!({"position":"#ffffff"}),
+        json!({"strong":"url(https://example.com/leak)"}),
     ] {
         assert!(execute(v.path().to_str().unwrap(),"extension.install",json!({"manifest":{"kind":"theme","id":"test","name":"Test","version":"1.0.0","tokens":tokens}})).is_err());
     }
     assert!(execute(v.path().to_str().unwrap(),"extension.install",json!({"manifest":{"kind":"plugin","id":"unsafe","name":"Bad","version":"1.0.0","script":"fetch('/secret')"}})).is_err());
     assert_eq!(call(&v, "extension.list", json!({})), json!([]));
+}
+#[test]
+fn theme_can_persist_an_optional_bold_text_color() {
+    let v = vault();
+    let manifest = json!({"kind":"theme","id":"emphasis","name":"Emphasis","version":"1.0.0","tokens":{"strong":"#54765f"}});
+    call(&v, "extension.install", json!({"manifest":manifest}));
+    assert_eq!(
+        call(&v, "extension.list", json!({}))[0]["tokens"]["strong"],
+        "#54765f"
+    );
 }
 #[test]
 fn declarative_extension_installs_and_removes_without_removing_notes() {

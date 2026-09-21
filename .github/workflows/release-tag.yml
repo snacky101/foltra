@@ -1,0 +1,23 @@
+name: Queue tagged release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions: {}
+
+jobs:
+  dispatch:
+    if: github.repository == 'snacky101/foltra'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: snacky101/foltra
+      RELEASE_TAG: ${{ github.ref_name }}
+    steps:
+      - name: Run the release workflow on main with the immutable tag
+        run: gh workflow run release.yml --ref main --raw-field "tag=$RELEASE_TAG"

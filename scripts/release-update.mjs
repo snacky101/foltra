@@ -1,6 +1,6 @@
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -454,11 +454,44 @@ function validateRelease(release, tag, head) {
   );
 }
 
-async function publish(tag, source) {
+export function validateBuildSource(record, { tag, head, checksums, runId }) {
+  requireValue(
+    record?.repository === REPOSITORY &&
+      record.tag === tag &&
+      record.head === head &&
+      /^[0-9a-f]{40}$/.test(head),
+    'Prepared assets do not match the release source commit and tag',
+  );
+  requireValue(record.checksumsSha256 === sha256(checksums), 'Prepared asset checksum list was changed');
+  requireValue(!runId || record.runId === runId, 'Prepared assets came from a different workflow run');
+}
+
+async function verifyPrepared(directory, tag, source) {
+  const names = [...artifactNames(source.version), 'SHA256SUMS.txt', 'BUILD_SOURCE.json'];
+  const entries = await readdir(directory);
+  requireValue(
+    entries.length === names.length && entries.every((name) => names.includes(name)),
+    'Prepared assets must contain exactly the release files and source record',
+  );
+  for (const name of names)
+    requireValue((await lstat(join(directory, name))).isFile(), 'Prepared assets must be regular files');
+  validateBuildSource(JSON.parse(await readFile(join(directory, 'BUILD_SOURCE.json'), 'utf8')), {
+    tag,
+    head: source.head,
+    checksums: await readFile(join(directory, 'SHA256SUMS.txt')),
+    runId: process.env.GITHUB_RUN_ID,
+  });
+  await verifyDirectory(directory, source.version, source.publicKey);
+  return directory;
+}
+
+async function publish(tag, source, preparedDirectory) {
   let release = releaseFor(tag);
   if (release) validateRelease(release, tag, source.head);
   if (!release || release.draft) {
-    const directory = await prepare(source.version, source.publicKey);
+    const directory = preparedDirectory
+      ? await verifyPrepared(resolve(preparedDirectory), tag, source)
+      : await prepare(source.version, source.publicKey);
     const candidate = JSON.parse(await readFile(join(directory, 'latest.json'), 'utf8'));
     assertPromotion(currentFeed(), candidate);
     if (!release) {
@@ -540,14 +573,35 @@ async function publish(tag, source) {
 }
 
 async function main() {
-  const [command, tag] = process.argv.slice(2);
+  const [command, tag, flag, directory, ...extra] = process.argv.slice(2);
   requireValue(
-    ['preflight', 'publish'].includes(command),
-    'Usage: node scripts/release-update.mjs preflight|publish vVERSION',
+    ['preflight', 'prepare', 'publish'].includes(command) &&
+      !extra.length &&
+      (!flag || (command === 'publish' && flag === '--prepared' && directory)),
+    'Usage: node scripts/release-update.mjs preflight|prepare|publish vVERSION [--prepared DIRECTORY]',
   );
   versionFromTag(tag);
   const source = await sourceVersion(tag);
-  if (command === 'publish') return publish(tag, source);
+  if (command === 'publish') return publish(tag, source, directory);
+  if (command === 'prepare') {
+    const prepared = await prepare(source.version, source.publicKey);
+    await writeFile(
+      join(prepared, 'BUILD_SOURCE.json'),
+      `${JSON.stringify(
+        {
+          repository: REPOSITORY,
+          tag,
+          head: source.head,
+          runId: process.env.GITHUB_RUN_ID ?? null,
+          checksumsSha256: sha256(await readFile(join(prepared, 'SHA256SUMS.txt'))),
+        },
+        null,
+        2,
+      )}\n`,
+    );
+    console.log(`Verified release assets for ${tag} at ${source.head}.`);
+    return;
+  }
   const release = releaseFor(tag);
   if (release) validateRelease(release, tag, source.head);
   const feed = currentFeed();
@@ -559,7 +613,7 @@ async function main() {
   if (process.env.GITHUB_OUTPUT)
     await writeFile(
       process.env.GITHUB_OUTPUT,
-      `build=${!release || release.draft}\nversion=${source.version}\n`,
+      `build=${!release || release.draft}\nversion=${source.version}\nhead=${source.head}\n`,
       { flag: 'a' },
     );
   console.log(
