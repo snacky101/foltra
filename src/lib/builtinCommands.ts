@@ -66,6 +66,51 @@ const definitions = [
     ],
   },
   { id: 'note.link', title: '노트 연결 삽입', group: '노트', bindings: [{ keys: 'll', leader: true }] },
+  {
+    id: 'note.format.bold',
+    title: '굵게 전환',
+    group: '서식',
+    bindings: [
+      { keys: 'Mod+b', leader: false },
+      { keys: 'mb', leader: true },
+    ],
+  },
+  {
+    id: 'note.format.italic',
+    title: '기울임 전환',
+    group: '서식',
+    bindings: [
+      { keys: platformModifier() === 'meta' ? 'Mod+i' : 'Mod+Shift+i', leader: false },
+      { keys: 'mi', leader: true },
+    ],
+  },
+  {
+    id: 'note.format.underline',
+    title: '밑줄 전환',
+    group: '서식',
+    bindings: [
+      { keys: 'Mod+u', leader: false },
+      { keys: 'mu', leader: true },
+    ],
+  },
+  {
+    id: 'note.format.strike',
+    title: '취소선 전환',
+    group: '서식',
+    bindings: [
+      { keys: 'Mod+Shift+x', leader: false },
+      { keys: 'ms', leader: true },
+    ],
+  },
+  {
+    id: 'note.format.code',
+    title: '인라인 코드 전환',
+    group: '서식',
+    bindings: [
+      { keys: 'Mod+Shift+c', leader: false },
+      { keys: 'mc', leader: true },
+    ],
+  },
   { id: 'note.frontmatter.edit', title: '노트 속성 · frontmatter 편집', group: '노트' },
   {
     id: 'note.task.cycle',

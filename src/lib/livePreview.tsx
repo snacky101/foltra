@@ -1,4 +1,5 @@
 import { noteTags } from './noteTags';
+import { underlineRanges } from './markdownUnderline';
 import { frontmatterRange } from './frontmatter';
 import { frontmatterDecorations, requestFrontmatterProperty } from './livePreviewFrontmatter';
 import { isQueryLanguage } from './sqlQuery';
@@ -211,6 +212,20 @@ export function livePreviewDecorations(state: EditorState, context: Context, foc
   ranges.push(...livePreviewLists(state, focused));
   ranges.push(...frontmatterDecorations(state));
   const frontmatter = frontmatterRange(state.doc.toString());
+  for (const underline of underlineRanges(state.doc.toString(), syntaxTree(state))) {
+    let parent = syntaxTree(state).resolveInner(underline.from, 1);
+    while (parent.parent && parent.name !== 'Table') parent = parent.parent;
+    // TablePreview renders the same safe AST; do not overlap its block widget.
+    if (parent.name === 'Table') continue;
+    if (underline.openEnd < underline.closeFrom)
+      ranges.push(
+        Decoration.mark({ class: 'cm-live-underline' }).range(underline.openEnd, underline.closeFrom),
+      );
+    if (!focused || !selectionTouchesLines(state, underline.from, underline.to)) {
+      ranges.push(hidden.range(underline.from, underline.openEnd));
+      ranges.push(hidden.range(underline.closeFrom, underline.to));
+    }
+  }
   const lineStyles = new Map<number, Set<string>>();
   const styleLine = (at: number, name: string) => {
     const from = state.doc.lineAt(at).from;

@@ -1,5 +1,17 @@
 [
   {
+    "id": "path.resolve",
+    "title": "Resolve an existing vault or managed note path",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": { "path": { "type": "string" } },
+      "required": ["path"],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "vault.default",
     "title": "Default vault location",
     "readOnly": true,

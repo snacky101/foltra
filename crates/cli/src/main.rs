@@ -3,11 +3,13 @@ use foltra_core::{Error, Result};
 use serde_json::{json, Map, Value};
 use std::{io::Read, path::PathBuf};
 
+mod desktop;
+
 #[derive(Parser)]
 #[command(
     name = "foltra",
     version,
-    about = "Foltra local vault CLI. Example: foltra --vault ./vault note create --title Hello --json"
+    about = "Open a Foltra vault/note: foltra PATH or foltra open PATH. Headless example: foltra --vault ./vault note create --title Hello --json"
 )]
 struct Cli {
     #[arg(long)]
@@ -26,17 +28,50 @@ fn read_file(path: &str) -> Result<String> {
     Ok(text)
 }
 
+fn normalize_command(command: &str) -> String {
+    command
+        .replace("db.record.", "record.")
+        .replace("database.record.", "record.")
+        .replace("db.", "database.")
+}
+
+fn open_target(cli: &Cli) -> Result<Option<&str>> {
+    if cli.command.first().is_some_and(|command| command == "open") {
+        if cli.command.len() != 2 || cli.vault.is_some() {
+            return Err(Error::new(
+                "invalid_arguments",
+                "Usage: foltra open PATH (one vault folder or managed note file)",
+            ));
+        }
+        return Ok(Some(&cli.command[1]));
+    }
+    if cli.vault.is_some() || cli.command.len() != 1 {
+        return Ok(None);
+    }
+    let target = &cli.command[0];
+    let command = normalize_command(target);
+    if target.starts_with('-') || command == "rpc" || command.starts_with("plugin.") {
+        return Ok(None);
+    }
+    let specs = foltra_core::execute("", "commands.list", json!({}))?;
+    let known = command == "db"
+        || specs.as_array().unwrap().iter().any(|spec| {
+            let id = spec["id"].as_str().unwrap();
+            id == command || id.split('.').next() == Some(command.as_str())
+        });
+    Ok((!known).then_some(target.as_str()))
+}
+
 fn run(cli: Cli) -> Result<Value> {
+    if let Some(path) = open_target(&cli)? {
+        return desktop::open(path);
+    }
     let split = cli
         .command
         .iter()
         .position(|s| s.starts_with("--"))
         .unwrap_or(cli.command.len());
-    let mut command = cli.command[..split].join(".");
-    command = command
-        .replace("db.record.", "record.")
-        .replace("database.record.", "record.")
-        .replace("db.", "database.");
+    let mut command = normalize_command(&cli.command[..split].join("."));
     let mut args = Map::new();
     let mut index = split;
     while index < cli.command.len() {
@@ -93,7 +128,8 @@ fn run(cli: Cli) -> Result<Value> {
             "--note-id" => {
                 args.insert("noteId".into(), json!(value));
             }
-            "--id" | "--title" | "--body" | "--name" | "--target" | "--query" | "--sort" => {
+            "--id" | "--title" | "--body" | "--name" | "--target" | "--query" | "--sort"
+            | "--path" => {
                 args.insert(flag[2..].into(), json!(value));
             }
             _ => {
@@ -130,6 +166,53 @@ fn main() {
         Err(error) => {
             eprintln!("{}", json!({"error":error}));
             std::process::exit(if error.code == "conflict" { 3 } else { 1 });
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn paths_open_and_command_names_keep_headless_precedence() {
+        for arguments in [
+            vec!["foltra", "./vault"],
+            vec!["foltra", "한글 폴더"],
+            vec!["foltra", "./commands.list"],
+            vec!["foltra", "open", "rpc"],
+        ] {
+            let cli = Cli::try_parse_from(arguments.clone()).unwrap();
+            assert_eq!(open_target(&cli).unwrap(), arguments.last().copied());
+        }
+        for arguments in [
+            vec!["foltra", "rpc"],
+            vec!["foltra", "vault.default"],
+            vec!["foltra", "commands.list"],
+            vec!["foltra", "note.list"],
+            vec!["foltra", "db.list"],
+            vec!["foltra", "plugin.example.run"],
+            vec!["foltra", "note"],
+            vec!["foltra", "db"],
+            vec!["foltra", "note", "list"],
+            vec!["foltra", "--vault", "./vault", "note.list"],
+        ] {
+            let cli = Cli::try_parse_from(arguments).unwrap();
+            assert_eq!(open_target(&cli).unwrap(), None);
+        }
+        assert_eq!(normalize_command("db.record.create"), "record.create");
+        assert_eq!(normalize_command("database.record.create"), "record.create");
+    }
+
+    #[test]
+    fn explicit_open_requires_one_path_without_a_competing_vault_flag() {
+        for arguments in [
+            vec!["foltra", "open"],
+            vec!["foltra", "open", "one", "two"],
+            vec!["foltra", "--vault", "./vault", "open", "./other"],
+        ] {
+            let cli = Cli::try_parse_from(arguments).unwrap();
+            assert_eq!(open_target(&cli).unwrap_err().code, "invalid_arguments");
         }
     }
 }

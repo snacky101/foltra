@@ -11,6 +11,7 @@ import {
   shortcutMatches,
   vimNormalBindings,
   bindingUsesLeader,
+  platformModifier,
 } from './commands';
 
 it('gd and Mod+Enter have separate commands and can be rebound independently', () => {
@@ -251,6 +252,7 @@ describe('keyboard routing contract', () => {
     expect(canStartLeader(false, true, false, true, 'NORMAL')).toBe(false);
     expect(canStartLeader(false, false, false, false, 'NORMAL')).toBe(true);
     expect(canStartLeader(false, true, true, true, 'NORMAL')).toBe(true);
+    expect(canStartLeader(false, true, true, true, 'VISUAL')).toBe(true);
   });
   it('does not swallow extra modifiers', () => {
     expect(
@@ -378,4 +380,15 @@ describe('keyboard routing contract', () => {
     );
     expect(bindingConflict(commands, settings, 'other', [{ keys: 'R n', leader: true }])).toBeNull();
   });
+});
+
+it('formatting commands have distinct editable defaults without shadowing history shortcuts', () => {
+  const commands = createBuiltinCommands({} as Record<BuiltinCommandId, () => void>);
+  for (const id of ['bold', 'italic', 'underline', 'strike', 'code']) {
+    const command = commands.find((item) => item.id === `note.format.${id}`)!;
+    expect(command.group).toBe('서식');
+    expect(command.bindings).toHaveLength(2);
+    expect(bindingConflict(commands, settings, command.id, command.bindings!, platformModifier())).toBeNull();
+    expect(bindingsFor(command, { ...settings, keybindings: { [command.id]: [] } })).toEqual([]);
+  }
 });

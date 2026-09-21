@@ -30,6 +30,7 @@ import { editorCursorExtension, refreshEditorCursor } from '../lib/editorCursor'
 import { editorLineNumbers } from '../lib/lineNumbers';
 import { markdownEditing } from '../lib/markdownEditing';
 import { cycleMarkdownTask } from '../lib/markdownTasks';
+import { toggleMarkdownFormat, type MarkdownFormat } from '../lib/markdownFormatting';
 import { imagePasteExtension } from '../lib/imagePaste';
 import {
   captureEditorLocation,
@@ -60,6 +61,7 @@ export interface EditorHandle {
   editFrontmatter: () => void;
   addFrontmatterProperty: () => void;
   cycleTask: () => void;
+  format: (format: MarkdownFormat) => void;
   jump: (line: number) => void;
   followLink: (createIfMissing?: boolean) => void;
   getLocation: () => EditorLocation | null;
@@ -143,6 +145,11 @@ export const Editor = forwardRef<EditorHandle, Props>(function Editor(props, ref
       const editor = view.current;
       if (!editor || !editor.hasFocus || latest.current.hidden || editor.compositionStarted) return;
       if (cycleMarkdownTask(editor)) editor.focus();
+    },
+    format: (format) => {
+      const editor = view.current;
+      if (!editor || !editor.hasFocus || latest.current.hidden || editor.compositionStarted) return;
+      if (toggleMarkdownFormat(editor, format)) editor.focus();
     },
     jump: (number) => {
       const editor = view.current;

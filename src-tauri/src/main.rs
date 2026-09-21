@@ -2,6 +2,7 @@
 
 #[cfg(target_os = "macos")]
 mod menu;
+mod open_paths;
 mod updates;
 
 #[tauri::command]
@@ -37,9 +38,22 @@ fn reopen_main_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     window.set_focus()
 }
 
+#[cfg(target_os = "macos")]
+fn notify_open_paths(app: &tauri::AppHandle) {
+    use tauri::Emitter;
+
+    if let Err(error) = reopen_main_window(app) {
+        eprintln!("Foltra could not reopen its window: {error}");
+    }
+    if let Err(error) = app.emit("foltra:open-paths", ()) {
+        eprintln!("Foltra could not notify its window about open paths: {error}");
+    }
+}
+
 fn main() {
     let builder = tauri::Builder::default()
         .manage(updates::UpdateLifecycle::default())
+        .manage(open_paths::PendingOpenPaths::default())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -59,15 +73,18 @@ fn main() {
         )
         .invoke_handler(tauri::generate_handler![
             execute,
+            open_paths::take_open_paths,
             updates::set_update_in_progress,
             updates::take_update_check_request
         ]);
     #[cfg(target_os = "macos")]
     let builder = builder.menu(menu::create).on_menu_event(menu::handle);
+    #[cfg(target_os = "macos")]
+    let mut app_ready = false;
     builder
         .build(tauri::generate_context!())
         .expect("Foltra could not start")
-        .run(|_app, _event| {
+        .run(move |_app, _event| {
             use std::sync::atomic::Ordering;
             use tauri::Manager;
             if let tauri::RunEvent::ExitRequested { code, api, .. } = &_event {
@@ -83,6 +100,18 @@ fn main() {
             }
             #[cfg(target_os = "macos")]
             match _event {
+                tauri::RunEvent::Ready => {
+                    app_ready = true;
+                    if _app.state::<open_paths::PendingOpenPaths>().has_pending() {
+                        notify_open_paths(_app);
+                    }
+                }
+                tauri::RunEvent::Opened { urls } => {
+                    // macOS can send file-open events before Tauri creates main.
+                    if _app.state::<open_paths::PendingOpenPaths>().enqueue(urls) && app_ready {
+                        notify_open_paths(_app);
+                    }
+                }
                 // Closing the last window should leave the macOS app running.
                 tauri::RunEvent::ExitRequested {
                     code: None, api, ..

@@ -357,8 +357,15 @@ export const SettingsView = memo(
               수 있고, 입력을 비우고 저장하면 해제됩니다.
             </p>
             <p className="muted">
-              Leader 없는 연속 키는 Vim Normal의 노트 본문에서 동작합니다. 대소문자를 구분하며, Mod는
-              macOS에서 Cmd, 다른 운영체제에서 Ctrl입니다. Ctrl+H는 Ctrl+Shift+h와 같습니다.
+              Leader 없는 연속 키는 Vim Normal의 노트 본문에서 동작하며, 서식 명령은 Visual에서도 사용할 수
+              있습니다. 대소문자를 구분하며, Mod는 macOS에서 Cmd, 다른 운영체제에서 Ctrl입니다. Ctrl+H는
+              Ctrl+Shift+h와 같습니다.
+            </p>
+            <p className="muted">
+              Vim text object: <code>ciw</code> 단어 변경 · <code>di"</code> 따옴표 안 삭제 · <code>vip</code>{' '}
+              문단 선택. <code>i*</code> / <code>i_</code>는 강조 안쪽, <code>i~</code>는 취소선 안쪽을
+              선택하며 <code>a</code>는 기호도 포함합니다. Visual 선택 후 <code>{'<leader>mb'}</code>로 굵게,{' '}
+              <code>{'<leader>mu'}</code>로 밑줄을 전환합니다.
             </p>
             <input
               className="settings-search"

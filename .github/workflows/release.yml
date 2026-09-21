@@ -30,8 +30,6 @@ jobs:
       RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
       MACOSX_DEPLOYMENT_TARGET: '11.0'
       CARGO_BUILD_JOBS: '2'
-      CARGO_PROFILE_DEV_DEBUG: '0'
-      CARGO_PROFILE_TEST_DEBUG: '0'
     steps:
       - name: Check out the release tag
         uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
@@ -72,10 +70,17 @@ jobs:
         run: |
           npm test
           cargo test --locked -p foltra-desktop
+          node scripts/build-storage.mjs check
 
       - name: Check the app
         if: steps.preflight.outputs.build == 'true'
         run: npm run check
+
+      - name: Clear development caches before release build
+        if: steps.preflight.outputs.build == 'true'
+        run: |
+          node scripts/clean-build-cache.mjs
+          node scripts/build-storage.mjs check
 
       - name: Build signed app and DMG
         if: steps.preflight.outputs.build == 'true'
@@ -88,7 +93,9 @@ jobs:
 
       - name: Build CLI
         if: steps.preflight.outputs.build == 'true'
-        run: cargo build --release --locked -p foltra-cli
+        run: |
+          cargo build --release --locked -p foltra-cli
+          node scripts/build-storage.mjs check
 
       - name: Publish verified assets and promote the update feed
         env:

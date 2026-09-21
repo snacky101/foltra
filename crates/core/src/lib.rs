@@ -14,6 +14,7 @@ mod git_sync_tests;
 mod git_transport;
 mod model;
 mod notes;
+mod open_path;
 mod plugin_manifest;
 mod plugin_runtime;
 mod query;
@@ -119,6 +120,9 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
             .ok_or_else(|| Error::new("invalid_path", "Home directory unavailable"))?
             .join("Foltra/Personal");
         return Ok(json!({"path":path}));
+    }
+    if command == "path.resolve" {
+        return open_path::resolve(text(&args, "path")?);
     }
     if matches!(command, "git.sync" | "git.resolve") {
         return git_sync::run(path, command, &args);

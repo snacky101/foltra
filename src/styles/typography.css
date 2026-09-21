@@ -195,6 +195,14 @@
 .editor .cm-live-strong {
   font-weight: 600;
 }
+.markdown-preview u,
+.editor .cm-live-underline {
+  text-decoration-line: underline;
+  text-underline-offset: 0.14em;
+}
+.editor .cm-live-underline.cm-live-strike {
+  text-decoration-line: underline line-through;
+}
 .editor .cm-editor.cm-live-preview {
   --md-separator-height: calc(var(--md-body-size) * 1.95);
   font-size: var(--md-body-size);

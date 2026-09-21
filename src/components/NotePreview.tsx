@@ -19,6 +19,7 @@ import { canCreateWikiNote, resolveWikiNote } from '../lib/wikiLinks';
 import { remarkWikiLinks, wikiTarget } from '../lib/remarkWikiLinks';
 import { remarkListSpacing } from '../lib/remarkListSpacing';
 import { remarkTasks } from '../lib/remarkTasks';
+import { remarkUnderline } from '../lib/remarkUnderline';
 import { taskStatus } from '../lib/markdownTasks';
 import { TaskIcon } from './TaskIcon';
 import { separateListParagraphs } from '../lib/markdownListLayout';
@@ -250,6 +251,7 @@ export function NotePreview({
           remarkPlugins={[
             remarkGfm,
             remarkTasks,
+            remarkUnderline,
             remarkTags,
             remarkWikiLinks,
             remarkBreaks,

@@ -42,7 +42,7 @@ git push origin main v0.1.0-preview.3
 
 `.github/workflows/release.yml`이 태그 푸시를 받아 실행됩니다. GitHub Actions의 **Release macOS update → Run workflow**에서 이미 존재하는 버전 태그를 지정해 실행할 수도 있습니다.
 
-워크플로는 macOS 15 arm64 runner, Node.js 24, Rust stable을 사용합니다. 버전·원격 태그·소스 커밋과 현재 피드보다 높은 버전인지 먼저 확인합니다. 이후 `npm ci`, `npm test`(core·CLI·프론트엔드·배포 스크립트), `cargo test --locked -p foltra-desktop`, `npm run check`, 앱·DMG·CLI 빌드를 순서대로 수행합니다. 전체 빌드는 네이티브 의존성 때문에 시간이 걸릴 수 있으며 Rust 캐시를 재사용합니다.
+워크플로는 macOS 15 arm64 runner, Node.js 24, Rust stable을 사용합니다. 버전·원격 태그·소스 커밋과 현재 피드보다 높은 버전인지 먼저 확인합니다. 이후 `npm ci`, `npm test`(core·CLI·프론트엔드·배포 스크립트), `cargo test --locked -p foltra-desktop`, `npm run check`, 앱·DMG·CLI 빌드를 순서대로 수행합니다. 검사 뒤에는 재생성 가능한 개발 의존성 캐시를 정리해 release 캐시와 합쳐 용량 제한을 넘지 않도록 하고, native 테스트·CLI 빌드 뒤에도 용량을 검사합니다. 전체 빌드는 네이티브 의존성 때문에 시간이 걸릴 수 있으며 Rust 캐시를 재사용합니다.
 
 ```sh
 # 로컬 검사 후 배포용 앱·DMG·업데이트 번들·CLI 생성

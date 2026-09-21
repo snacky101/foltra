@@ -4,10 +4,15 @@ default-members = ["crates/core", "crates/cli"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-preview.2"
+version = "0.1.0-preview.3"
 edition = "2021"
 
 [workspace.dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 foltra-core = { path = "crates/core" }
+
+# Test inherits dev. Full dependency debug info is especially large for DuckDB.
+[profile.dev]
+debug = 0
+incremental = false

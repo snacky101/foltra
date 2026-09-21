@@ -315,3 +315,85 @@ fn title_links_and_aliases_roundtrip_through_cli_and_rename() {
         "[[새이름|foo]]"
     );
 }
+
+#[test]
+fn path_resolution_and_rpc_remain_headless_without_a_vault_flag() {
+    use std::io::Write;
+    use std::process::Stdio;
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    cli(path, &["vault", "init", "--name", "Open from CLI"]);
+    let note = cli(path, &["note", "create", "--title", "Selected note"]);
+    let note_path = dir
+        .path()
+        .join(format!("notes/{}.md", note["id"].as_str().unwrap()));
+    let output = Command::new(env!("CARGO_BIN_EXE_foltra"))
+        .args(["path", "resolve", "--path", note_path.to_str().unwrap()])
+        .env_remove("FOLTRA_VAULT")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let resolved: Value = serde_json::from_slice(&output.stdout).unwrap();
+    assert_eq!(resolved["noteId"], note["id"]);
+    assert_eq!(
+        resolved["vaultPath"],
+        json!(std::fs::canonicalize(dir.path()).unwrap())
+    );
+
+    let mut process = Command::new(env!("CARGO_BIN_EXE_foltra"))
+        .arg("rpc")
+        .env_remove("FOLTRA_VAULT")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    process
+        .stdin
+        .take()
+        .unwrap()
+        .write_all(
+            json!({"command":"path.resolve","args":{"path":note_path}})
+                .to_string()
+                .as_bytes(),
+        )
+        .unwrap();
+    let output = process.wait_with_output().unwrap();
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&output.stdout).unwrap(),
+        resolved
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn direct_and_explicit_open_validate_the_app_override_without_launching_ui() {
+    let dir = tempfile::tempdir().unwrap();
+    cli(
+        dir.path().to_str().unwrap(),
+        &["vault", "init", "--name", "Open fixture"],
+    );
+    for prefix in [vec![], vec!["open"]] {
+        let output = Command::new(env!("CARGO_BIN_EXE_foltra"))
+            .args(prefix)
+            .arg(dir.path())
+            .env("FOLTRA_APP_PATH", dir.path().join("missing-app"))
+            .output()
+            .unwrap();
+        assert_eq!(output.status.code(), Some(1));
+        assert!(output.stdout.is_empty());
+        assert_eq!(
+            serde_json::from_slice::<Value>(&output.stderr).unwrap()["error"]["code"],
+            "invalid_app_path"
+        );
+    }
+}

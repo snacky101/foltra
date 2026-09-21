@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef, useState } from 'react';
+import { useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 export const settingsGroups = [
   { id: 'editor', title: '편집기', description: '노트를 읽고 쓰는 방식을 설정합니다.' },
@@ -43,6 +43,10 @@ export function useSettingsNavigation(vaultPath: string) {
     }
     wasOpen.current = opened;
   }, [opened, vaultPath, group]);
+  const close = (restoreFocus = true) => {
+    if (!restoreFocus) returnFocus.current = null;
+    setOpened(false);
+  };
   return {
     opened,
     group,
@@ -52,9 +56,21 @@ export function useSettingsNavigation(vaultPath: string) {
       if (target) setGroup(target);
       setOpened(true);
     },
-    close: (restoreFocus = true) => {
-      if (!restoreFocus) returnFocus.current = null;
-      setOpened(false);
+    close,
+    onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+      if (
+        !opened ||
+        event.key !== 'Escape' ||
+        event.defaultPrevented ||
+        event.nativeEvent.isComposing ||
+        event.nativeEvent.keyCode === 229 ||
+        // Dialogs handle Escape on window after this scoped bubbling handler.
+        document.querySelector('[role="dialog"]')
+      )
+        return;
+      event.preventDefault();
+      event.stopPropagation();
+      close();
     },
   };
 }

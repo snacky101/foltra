@@ -45,12 +45,29 @@ make dev-web
 
 macOS 기본 Make 3.81을 지원합니다. 빌드 작업 수는 `CARGO_BUILD_JOBS=4`, macOS 최소 버전은 `11.0`을 기본값으로 사용합니다. standalone Command Line Tools가 있으면 이를 사용하며, `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer make build`처럼 개발 도구를 직접 지정할 수 있습니다. 시스템의 Xcode 선택 설정은 바꾸지 않습니다. 한 번의 `make -j` 호출 안에서도 타깃은 순서대로 실행합니다.
 
+### 개발 빌드 용량 관리
+
+개발·테스트 빌드는 기본적으로 디버그 정보를 생성하지 않고 증분 컴파일 캐시를 사용하지 않습니다. 테스트 프로필은 개발 프로필을 상속합니다. Rust의 assertion·overflow 검사는 유지되지만, 내장 DuckDB는 이 설정에서 C++ 디버그 assertion도 끕니다. 상세 디버깅이 필요하면 `CARGO_PROFILE_DEV_DEBUG=2 make build` 또는 `CARGO_PROFILE_TEST_DEBUG=2 make test`로 일시적으로 켤 수 있습니다. 이 경우 큰 캐시가 다시 생길 수 있습니다.
+
+`.cargo/config.toml`에도 macOS 최소 버전 `11.0`을 지정해 직접 실행하는 Cargo/npm과 Make의 빌드 환경을 맞춥니다. 명시적인 환경변수는 여전히 우선합니다.
+
+```sh
+make storage        # 실제 빌드/검증 자료 용량 확인
+make check-storage  # target 15 GiB, test-results 1 GiB 초과 시 실패
+make clean-cache    # 다시 만들 수 있는 개발용 의존성·core 캐시 정리
+```
+
+표준 Make/npm 빌드·검사 명령은 시작과 완료 시 용량을 확인하며, 개발 서버는 시작 시 확인합니다. 기준을 넘으면 후속 작업을 중단하고 정리 방법을 안내합니다. 한 번의 빌드 중 증가량까지 제한하는 디스크 할당량은 아니며, 직접 Cargo를 실행할 때는 `make check-storage`를 함께 실행해야 합니다. `CARGO_TARGET_DIR`를 지정했다면 해당 경로를 검사합니다.
+
+`clean-cache`는 Cargo로 의존성·core의 개발 캐시만 지웁니다. 앱 번들·공용 CLI/앱 실행 파일·release 산출물·vault·검증 기록은 보존합니다. 다음 개발 빌드는 의존성을 다시 컴파일하므로 더 오래 걸립니다. 빌드·테스트와 동시에 실행하지 마세요. 검증용 CLI는 새로 빌드한 `target/debug/foltra`를 공유하고, 별도 작업 폴더마다 실행 파일이나 전체 소스를 복제해 남기지 않습니다. 릴리스 백업과 검증 증거는 자동 삭제하지 않습니다.
+
 브라우저 개발 주소는 `http://127.0.0.1:1420`입니다. 이 서버는 개발 전용이며 네트워크 공유나 호스팅용이 아닙니다. 빌드한 데스크톱 앱은 이 서버 없이 실행됩니다.
 
 ## 써볼 수 있는 것
 
 - Markdown Live Preview·원문·읽기와 자동 저장. 코드 울타리(```` ```go ````) 뒤 Enter로 닫는 울타리 자동 생성과 언어별 문법 강조. Vim은 기본 OFF, 설정에서 켤 수 있고 슬래시 메뉴도 독립적으로 on/off.
 - [작업 항목](docs/TASKS.md)의 할 일·진행·완료·북마크 등 아이콘과 원문 편집, Mod+l 상태 순환. [노트 속성](docs/FRONTMATTER.md)은 Mod+;로 추가하며 편집기와 DB 글꼴은 따로 설정.
+- [서식 편집과 Vim text object](docs/EDITING.md): 굵게·기울임·밑줄·취소선·인라인 코드, Visual/Leader 단축키, Markdown 강조 영역 편집. 설정은 Esc로 이전 화면에 복귀.
 - 사이드바 최하단 Vault 메뉴, 최근 vault 선택 팝업, 새 vault 생성, 좌우 사이드바 너비 드래그와 복원.
 - 내용 검색의 ↑/↓ 결과 선택과 Enter 열기.
 - 모든 노트 목록의 제목 검색·폴더 필터·수정일/생성일/제목 정렬, 목록에서 노트 열기와 우클릭 관리.
@@ -82,6 +99,21 @@ Vim 명령 입력줄은 화면 하단에 표시합니다. `:q`는 현재 노트�
 본문 입력 모드에서는 leader를 시작하지 않습니다. Leader와 중간 조합은 시간 제한 없이 다음 키를 기다립니다. Esc, 명령 실행, 일치하지 않는 조합, 창 포커스 이탈로 종료합니다. 초기 키 설정은 설정 화면에서 바꿀 수 있습니다. 브라우저의 자체 Vim 확장과 단축키가 겹칠 수 있어 데스크톱 입력 검증은 별도로 진행해야 합니다.
 
 ## CLI와 agent 연동
+
+macOS에서는 CLI를 PATH에 설치한 뒤 기존 볼트나 볼트 안의 노트를 앱에서 바로 열 수 있습니다.
+
+```sh
+foltra ~/Foltra/Personal
+foltra .                       # 현재 디렉터리가 Foltra 볼트인 경우
+foltra "/path/to/vault/notes/NOTE_UUID.md"
+foltra open "./commands.list"  # CLI 명령과 같은 이름의 경로는 open 또는 ./로 구분
+```
+
+상대 경로와 한글·공백이 있는 경로를 지원합니다. 노트 파일은 현재 저장 형식인 `notes/<UUID>.md`를 사용합니다. 일반 Markdown 파일이나 초기화하지 않은 폴더는 자동 가져오기·볼트 생성 없이 오류를 반환합니다. 앱이 실행 중이면 기존 창을 사용하며, 창을 닫아 둔 상태이면 다시 엽니다. 편집 창이나 이름 변경·동기화 작업을 진행 중이거나 현재 노트를 저장할 수 없으면 이동하지 않습니다. 전환 중에는 입력을 잠시 막고 진행 중인 저장이 끝나기를 기다립니다.
+
+배포 CLI는 설치된 `Foltra.app`을 찾습니다. 개발용 `target/debug/foltra`는 함께 빌드한 `target/debug/bundle/macos/Foltra.app`을 사용하므로 `make build build-cli`로 둘 다 빌드하세요. 별도 앱 경로는 `FOLTRA_APP_PATH=/path/to/Foltra.app foltra /path/to/vault`로 지정할 수 있습니다. 새 버전으로 빌드하기 전에 실행해 둔 앱은 재시작해야 새 열기 기능이 적용됩니다. Linux/Windows의 기존 headless 명령은 유지하며, 이 데스크톱 실행 기능은 현재 macOS에서 지원합니다.
+
+앱을 띄우지 않는 기존 데이터 명령은 그대로 사용할 수 있습니다.
 
 ```sh
 make build-cli

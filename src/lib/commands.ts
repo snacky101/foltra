@@ -168,5 +168,5 @@ export function canStartLeader(
   vim: boolean,
   mode: string,
 ): boolean {
-  return !composing && (!editable || (inEditor && vim && mode === 'NORMAL'));
+  return !composing && (!editable || (inEditor && vim && (mode === 'NORMAL' || mode === 'VISUAL')));
 }

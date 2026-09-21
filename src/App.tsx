@@ -27,6 +27,7 @@ import { useDatabaseActions, type DatabaseAction } from './lib/useDatabaseAction
 import { focusSidebarTree, moveWorkspaceFocus, rememberWorkspaceFocus } from './lib/workspaceFocus';
 import { useCommandKeys } from './lib/useCommandKeys';
 import { useCloseGuard } from './lib/useCloseGuard';
+import { useDesktopOpenPaths, type DesktopOpenTarget } from './lib/useDesktopOpenPaths';
 import { leaderCandidates, sequenceKeys } from './lib/commands';
 import { createBuiltinCommands } from './lib/builtinCommands';
 import { applyTheme } from './lib/theme';
@@ -42,6 +43,7 @@ import { FolderDialog } from './components/FolderDialog';
 import { DeleteDatabaseDialog } from './components/DeleteDatabaseDialog';
 import { useTreeEditing, type FolderAction } from './lib/useTreeEditing';
 import type { EditorHandle } from './components/Editor';
+import type { MarkdownFormat } from './lib/markdownFormatting';
 import type { EditorLocation } from './lib/editorLocation';
 import { moveNoteHistory, recordNoteVisit, type NoteHistory } from './lib/noteHistory';
 
@@ -113,6 +115,7 @@ export default function App() {
   const pendingLine = useRef<number | null>(null);
   const pendingLocation = useRef<EditorLocation | null>(null);
   const pendingEditorFocus = useRef(true);
+  const pathOpening = useRef(false);
   const note = useNote(
     vault.path,
     noteId,
@@ -164,6 +167,7 @@ export default function App() {
     return () => clearTimeout(timeout);
   }, [toast]);
   const editorReady = () => {
+    if (pathOpening.current) return;
     if (pendingEditorFocus.current && editor.current) {
       // A double-click can start inline naming while the first click is still loading the note.
       if (!document.querySelector('[data-inline-rename]')) editor.current.focus();
@@ -191,10 +195,17 @@ export default function App() {
     }
   };
   useEffect(() => {
-    if (!preview || settingsNavigation.opened || note.status === 'loading' || !pendingEditorFocus.current)
+    if (
+      openingPath ||
+      !preview ||
+      settingsNavigation.opened ||
+      note.status === 'loading' ||
+      !pendingEditorFocus.current
+    )
       return;
     if (note.note?.id !== noteId || view !== 'notes') return;
     const frame = requestAnimationFrame(() => {
+      if (pathOpening.current) return;
       if (pendingLocation.current && editor.current) {
         editor.current.restoreLocation(pendingLocation.current);
         pendingLocation.current = null;
@@ -396,6 +407,70 @@ export default function App() {
     onError,
     notify: setToast,
   });
+  const selectVault = async (action: () => Promise<void>, target?: DesktopOpenTarget) => {
+    if (!(await note.save())) throw new Error('현재 노트의 저장 문제를 해결한 뒤 vault를 전환하세요.');
+    await action();
+    setNoteId(target?.noteId ?? null);
+    setDatabaseId(null);
+    setHistory({ back: [], forward: [] });
+    pendingInsert.current = null;
+    pendingLine.current = null;
+    pendingLocation.current = null;
+    pendingFrontmatter.current = null;
+    setNoteListOptions(defaultNoteListOptions);
+    setTopicOptions((current) => ({ ...defaultTopicOptions, showSources: current.showSources }));
+    setQuery(undefined);
+    setView('notes');
+    selectedVault.current = target?.noteId ? target.vaultPath : '';
+  };
+  const openingPath = useDesktopOpenPaths({
+    save: note.save,
+    blocked: () => {
+      if (updates.isBlocking()) return '앱 업데이트가 끝난 뒤 다시 열어주세요.';
+      if (
+        dialog ||
+        folderDialog ||
+        noteActions.moving ||
+        noteActions.busy ||
+        treeEditing.editing ||
+        databaseActions.renaming ||
+        databaseActions.deleting ||
+        databaseActions.busy ||
+        plugins.git.connection ||
+        plugins.git.busy ||
+        plugins.busy ||
+        updates.opened ||
+        returning.current
+      )
+        return '현재 편집 중인 창이나 작업을 마치거나 취소한 뒤 다시 열어주세요.';
+    },
+    open: async (target) => {
+      if (workspace?.path === target.vaultPath) {
+        if (target.noteId) await openNote(target.noteId);
+        else setView('notes');
+      } else await selectVault(() => vault.open(target.vaultPath), target);
+      setVaultPicker(false);
+      setPalette(false);
+    },
+    onError,
+  });
+  pathOpening.current = openingPath;
+  useEffect(() => {
+    if (!openingPath && pendingEditorFocus.current) {
+      const frame = requestAnimationFrame(() => {
+        if (preview && note.note?.id === noteId && view === 'notes') {
+          document.querySelector<HTMLElement>('.note-scroll')?.focus({ preventScroll: true });
+          pendingEditorFocus.current = false;
+        } else editorReady();
+      });
+      return () => cancelAnimationFrame(frame);
+    }
+  }, [openingPath]);
+  function formatNote(format: MarkdownFormat) {
+    if (view !== 'notes' || preview || !noteId) return;
+    if (palette) editor.current?.focus();
+    editor.current?.format(format);
+  }
   const commands = createBuiltinCommands({
     'command.palette': () => setPalette(true),
     'vault.switch': () => setVaultPicker(true),
@@ -413,6 +488,11 @@ export default function App() {
     'note.mode.source': () => changeEditorMode('source'),
     'note.mode.read': () => changeEditorMode('read'),
     'note.link': () => setDialog({ kind: 'link' }),
+    'note.format.bold': () => formatNote('bold'),
+    'note.format.italic': () => formatNote('italic'),
+    'note.format.underline': () => formatNote('underline'),
+    'note.format.strike': () => formatNote('strike'),
+    'note.format.code': () => formatNote('code'),
     'note.frontmatter.edit': () => openFrontmatter('edit'),
     'note.frontmatter.add': () => openFrontmatter('add'),
     'note.task.cycle': () => {
@@ -547,7 +627,8 @@ export default function App() {
     commands,
     workspace?.settings,
     mode,
-    palette ||
+    openingPath ||
+      palette ||
       !!dialog ||
       vaultPicker ||
       !!noteMenu ||
@@ -561,24 +642,10 @@ export default function App() {
     onError,
   );
   const activeDatabase = workspace?.databases.find((db) => db.id === databaseId);
-  const selectVault = async (action: () => Promise<void>) => {
-    if (!(await note.save())) throw new Error('현재 노트의 저장 문제를 해결한 뒤 vault를 전환하세요.');
-    await action();
-    setNoteId(null);
-    setDatabaseId(null);
-    setHistory({ back: [], forward: [] });
-    pendingLocation.current = null;
-    pendingFrontmatter.current = null;
-    setNoteListOptions(defaultNoteListOptions);
-    setTopicOptions((current) => ({ ...defaultTopicOptions, showSources: current.showSources }));
-    setQuery(undefined);
-    setView('notes');
-    selectedVault.current = '';
-  };
   if (!workspace)
     return (
       <>
-        <div inert={updates.blocking}>
+        <div inert={updates.blocking || openingPath}>
           <Welcome
             open={vault.open}
             create={vault.create}
@@ -614,7 +681,8 @@ export default function App() {
     <TagNavigation value={(tag) => setDialog({ kind: 'search', query: `tag:${tag}` })}>
       <div
         className={`app-shell${sidebarHidden ? ' sidebar-collapsed' : ''}`}
-        inert={noteActions.busy || updates.blocking}
+        inert={noteActions.busy || updates.blocking || openingPath}
+        onKeyDown={settingsNavigation.onKeyDown}
         onFocusCapture={(e) => rememberWorkspaceFocus(e.target)}
       >
         <Sidebar

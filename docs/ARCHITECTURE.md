@@ -19,6 +19,8 @@ CLI ───── crates/cli/src/main.rs ────────────�
 
 GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니다. Tauri는 blocking 작업을 별도 작업 스레드로 옮기는 얇은 adapter입니다. CLI에는 저장 규칙을 복제하지 않습니다. 브라우저 개발 중에는 Vite adapter가 실제 CLI 프로세스를 호출하며 프로덕션 앱에 HTTP API를 포함하지 않습니다.
 
+macOS의 `foltra PATH`/`foltra open PATH`는 코어의 `path.resolve`로 기존 볼트 또는 관리되는 노트 경로를 검증한 뒤 Launch Services에 앱 열기를 요청합니다. 일반 데이터 명령과 RPC는 headless 실행을 유지합니다. Native `RunEvent::Opened`의 파일 경로는 `open_paths` 큐에 보관하고, 프론트엔드가 이벤트를 구독한 뒤 `take_open_paths`로 받습니다. `useDesktopOpenPaths`는 요청을 직렬 처리하며 경로 재검증·현재 초안 저장·업데이트 상태 확인을 거쳐 기존 workspace/note 탐색에 전달합니다. 이 경로는 일반 Markdown을 가져오거나 새 볼트를 만들지 않습니다.
+
 | 위치 | 책임 | 넣지 않을 것 |
 | --- | --- | --- |
 | `crates/core/src/lib.rs` | 명령 입력 계약과 분기, 공통 오류 | UI 상태, 직접 키 처리 |
@@ -51,7 +53,8 @@ GUI와 CLI는 같은 `foltra_core::execute(path, command, args)`를 호출합니
 | `src/lib/useTopics.ts`, `TopicsView` | 주제·페이지 요청 수명, 카드 표시, 원본 위치 탐색 | 파일 접근·Markdown 블록 경계 재구현 |
 | `src/lib/builtinCommands.ts` | UI 명령 ID·제목·기본 단축키 | 이벤트 리스너 |
 | `src/lib/useCommandKeys.ts` | 시간 제한 없는 leader/일반 키 이벤트 라우팅, 조합 입력 보호 | 특정 기능의 데이터 변경 |
-| `src/lib/vimKeybindings.ts` | 설정의 Normal 조합을 Vim 엔진에 등록·해제하고 공통 명령으로 전달 | 별도 전역 키 리스너, Insert 입력 처리 |
+| `src/lib/vimKeybindings.ts` | 설정의 Normal 조합과 서식 명령의 Visual 조합을 Vim 엔진에 등록·해제하고 공통 명령으로 전달 | 별도 전역 키 리스너, Insert 입력 처리 |
+| `markdownFormatting.ts`, `vimTextObjects.ts`, `markdownUnderline.ts`, `remarkUnderline.ts` | 서식 transaction·Markdown text object·정확한 밑줄 태그의 안전한 표시 | 별도 저장/undo 엔진, 임의 HTML 실행 |
 | `src/lib/commandKey.ts`, `vimInput.ts` | 명령 문맥의 물리 키 보정, CodeMirror Vim API 연결 | Insert 본문·literal 인수 변환, OS 입력 소스 변경 |
 | `src/lib/noteLinks.ts` | UI 백링크·연결 수에서 DB 본문 소속 관계 제외 | 원본 bodyNoteId 수정, 코어 관계 조회 계약 변경 |
 | `Backlinks`, `workspaceFocus.ts` | 열 수 있는 링크만 탐색, 갱신 중 포커스 유지 | 노트 원본 변경 |
