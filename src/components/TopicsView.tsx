@@ -35,10 +35,9 @@ export function TopicsView({
   updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
   refresh: () => Promise<void>;
 }) {
-  const { topics, topic, data, error, reload, saving, taskSaving, toggleTask, move, scopeKey } = useTopics(
-    workspace,
-    options,
-  );
+  const { topics, topic, data, error, reload, saving, refreshing, taskSaving, toggleTask, move, scopeKey } =
+    useTopics(workspace, options);
+  const busy = saving || refreshing;
   const dragged = useRef(false);
   const folderFilter = workspace.settings.topicFolders ?? { include: [], exclude: [] };
   const filtered = folderFilter.include.length + folderFilter.exclude.length > 0;
@@ -105,7 +104,7 @@ export function TopicsView({
     }
   };
   const hoverPage = (offset: number) => {
-    if (!drag || saving || pageHover.current || !data) return;
+    if (!drag || busy || pageHover.current || !data) return;
     pageHover.current = setTimeout(() => {
       pageHover.current = null;
       setDrop(null);
@@ -203,7 +202,7 @@ export function TopicsView({
               {visible?.length === 0 && <p className="empty-small">일치하는 주제가 없습니다.</p>}
             </div>
           </nav>
-          <div className="topic-content" aria-busy={!data && !error}>
+          <div className="topic-content" aria-busy={refreshing && !error}>
             <div className="topic-heading">
               <div>
                 <h2>{topic?.title}</h2>
@@ -223,7 +222,7 @@ export function TopicsView({
               <Select
                 aria-label="주제 카드 정렬"
                 value={options.sort ?? data?.sort ?? 'newest'}
-                disabled={saving || !!drag}
+                disabled={busy || !!drag}
                 onValueChange={(value) =>
                   onChange({
                     ...options,
@@ -281,7 +280,7 @@ export function TopicsView({
                   openNote(block.noteId, block.line);
                 }}
                 onDragOver={(event) => {
-                  if (!drag || saving || drag.source === block.id) return;
+                  if (!drag || busy || drag.source === block.id) return;
                   event.preventDefault();
                   event.dataTransfer.dropEffect = 'move';
                   const rect = event.currentTarget.getBoundingClientRect();
@@ -296,7 +295,7 @@ export function TopicsView({
                   if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDrop(null);
                 }}
                 onDrop={(event) => {
-                  if (!drag || saving || drag.source === block.id) return;
+                  if (!drag || busy || drag.source === block.id) return;
                   event.preventDefault();
                   const rect = event.currentTarget.getBoundingClientRect();
                   void reorder(
@@ -312,11 +311,11 @@ export function TopicsView({
                   className="icon-button topic-drag-handle"
                   aria-label={`${block.noteTitle} ${block.line}행 카드 순서 이동`}
                   title="드래그하여 순서 변경 · Alt+↑/↓로 이동"
-                  draggable={!saving}
+                  draggable={!busy}
                   tabIndex={cards.includes(block) ? 0 : -1}
-                  disabled={saving}
+                  disabled={busy}
                   onDragStart={(event) => {
-                    if (!data) {
+                    if (!data || busy) {
                       event.preventDefault();
                       return;
                     }
@@ -377,7 +376,7 @@ export function TopicsView({
                     openNote={openNote}
                     openLink={openLink}
                     executeQueries={false}
-                    taskDisabled={saving || !!drag}
+                    taskDisabled={busy || !!drag}
                     onToggleTask={(line) => {
                       void toggleTask(block, line).then((saved) => {
                         if (saved) void refresh();

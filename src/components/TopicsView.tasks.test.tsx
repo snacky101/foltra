@@ -8,14 +8,7 @@ import { toggleTaskInText } from '../lib/markdownTasks';
 import { call } from '../lib/api';
 import type { Workspace } from '../lib/types';
 vi.mock('../lib/api', () => ({ call: vi.fn() }));
-const workspace = {
-  path: '/disposable',
-  vault: { id: 'vault' },
-  notes: [],
-  records: [],
-  folders: [],
-  settings: {},
-} as unknown as Workspace;
+let workspace: Workspace;
 const openNote = vi.fn(),
   openLink = vi.fn(),
   refresh = vi.fn(async () => {});
@@ -44,6 +37,14 @@ beforeEach(async () => {
   vi.clearAllMocks();
   body = '---\na: true\n---\n\n- [[Foo]]\n  - [ ] first\n  - [/] second';
   revision = 'r1';
+  workspace = {
+    path: '/disposable',
+    vault: { id: 'vault' },
+    notes: [{ id: 'note', title: 'Source', revision }],
+    records: [],
+    folders: [],
+    settings: {},
+  } as unknown as Workspace;
   vi.mocked(call).mockImplementation(async (_path, command, args) => {
     const a = args as Record<string, unknown>;
     if (command === 'topics.list')
@@ -151,3 +152,58 @@ test('completing the last remaining checkbox immediately updates the completed-i
   expect(card()).toBeNull();
   expect(host.textContent).toContain('표시할 항목이 없습니다.');
 });
+
+test('checkbox refresh keeps cards mounted through delayed reads and a workspace revision update', async () => {
+  const original = card();
+  const checkbox = checkboxes()[0];
+  const navigation = host.querySelector('.topic-navigation');
+  const implementation = vi.mocked(call).getMockImplementation()!;
+  const reads: (() => void)[] = [];
+  vi.mocked(call).mockImplementation(async (path, command, args) => {
+    const result = await implementation(path, command, args);
+    if (command.startsWith('topics.')) await new Promise<void>((resolve) => reads.push(resolve));
+    return result;
+  });
+  await act(async () => checkbox.click());
+  expect(card()).toBe(original);
+  expect(host.querySelector('.topic-navigation')).toBe(navigation);
+  expect(checkboxes()[0]).toBe(checkbox);
+  expect(host.textContent).not.toMatch(/주제를 불러오는 중|카드를 모으는 중/);
+  expect(checkbox.disabled).toBe(true);
+  await act(async () => checkbox.click());
+  expect(writes()).toHaveLength(1);
+
+  workspace = { ...workspace, notes: [{ ...workspace.notes[0], revision }] };
+  await act(async () => root.render(<App />));
+  expect(card()).toBe(original);
+  expect(checkboxes()[0]).toBe(checkbox);
+  await act(async () => reads.splice(0).forEach((resolve) => resolve()));
+  expect(card()).toBe(original);
+  expect(checkboxes()[0]).toBe(checkbox);
+  expect(checkbox.getAttribute('aria-checked')).toBe('true');
+  expect(checkbox.disabled).toBe(false);
+});
+
+test.each(['topics.list', 'topics.blocks'])(
+  'a failed %s refresh preserves cards and retry fetches their new revision',
+  async (failedCommand) => {
+    const original = card();
+    const implementation = vi.mocked(call).getMockImplementation()!;
+    vi.mocked(call).mockImplementation((path, command, args) =>
+      command === failedCommand
+        ? Promise.reject(Error('다시 불러오지 못했습니다.'))
+        : implementation(path, command, args),
+    );
+    await act(async () => checkboxes()[0].click());
+    expect(card()).toBe(original);
+    expect(host.querySelector('[role=alert]')?.textContent).toContain('다시 불러오지 못했습니다.');
+    expect(checkboxes().every((button) => button.disabled)).toBe(true);
+    vi.mocked(call).mockImplementation(implementation);
+    await act(async () => host.querySelector<HTMLButtonElement>('[role=alert] button')!.click());
+    expect(card()).toBe(original);
+    expect(host.querySelector('[role=alert]')).toBeNull();
+    expect(checkboxes()[0].getAttribute('aria-checked')).toBe('true');
+    await act(async () => checkboxes()[0].click());
+    expect(writes()[1][2]).toMatchObject({ expectedRevision: 'r1x' });
+  },
+);

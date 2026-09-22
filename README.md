@@ -4,7 +4,7 @@
 
 메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.15) · [이번 버전의 변화](docs/releases/v0.1.0-preview.15.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.16) · [이번 버전의 변화](docs/releases/v0.1.0-preview.16.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
 ![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
@@ -13,7 +13,7 @@
 
 ## 설치하고 첫 노트 쓰기
 
-1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.15/Foltra_0.1.0-preview.15_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.16/Foltra_0.1.0-preview.16_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
 2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
 3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 

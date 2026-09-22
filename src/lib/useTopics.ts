@@ -31,7 +31,12 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
     workspace.topicOrderRevision,
     retry,
   ]);
-  const [catalog, setCatalog] = useState<{ key: string; topics?: Topic[]; error?: string } | null>(null);
+  const [catalog, setCatalog] = useState<{
+    key: string;
+    scope: string;
+    topics?: Topic[];
+    error?: string;
+  } | null>(null);
   useEffect(() => {
     let active = true;
     void call<Topic[]>(workspace.path, 'topics.list', {
@@ -39,20 +44,28 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       ...(options.hideCompleted ? { hideCompleted: true } : {}),
     }).then(
       (topics) => {
-        if (active) setCatalog({ key: sourceKey, topics });
+        if (active) setCatalog({ key: sourceKey, scope: scopeKey, topics });
       },
       (error) => {
-        if (active) setCatalog({ key: sourceKey, error: error.message });
+        if (active)
+          setCatalog((previous) => ({
+            key: sourceKey,
+            scope: scopeKey,
+            topics: previous?.scope === scopeKey ? previous.topics : undefined,
+            error: error.message,
+          }));
       },
     );
     return () => {
       active = false;
     };
   }, [sourceKey, workspace.path]);
-  const topics = catalog?.key === sourceKey ? catalog.topics : undefined;
+  // Revisions invalidate requests, not the visible view. Keep the same scope mounted.
+  const topics = catalog?.scope === scopeKey ? catalog.topics : undefined;
   const topic = topics?.find((topic) => topic.id === options.topicId) ?? topics?.[0];
   const offset = topic?.id === options.topicId ? options.offset : 0;
   const requestKey = JSON.stringify([sourceKey, topic?.id, offset, options.sort]);
+  const viewKey = JSON.stringify([scopeKey, topic?.id, offset, options.sort]);
   const context = JSON.stringify([scopeKey, topic?.id]);
   const currentContext = useRef(context);
   currentContext.current = context;
@@ -60,7 +73,16 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const [saving, setSaving] = useState(false);
   const [taskSaving, setTaskSaving] = useState(false);
   const [saveError, setSaveError] = useState<{ context: string; message: string } | null>(null);
-  const [page, setPage] = useState<{ key: string; data?: TopicBlocks; error?: string } | null>(null);
+  const [page, setPage] = useState<{
+    key: string;
+    view: string;
+    data?: TopicBlocks;
+    error?: string;
+  } | null>(null);
+  const refreshing =
+    catalog?.key !== sourceKey ||
+    !!catalog?.error ||
+    (!!topic && (page?.key !== requestKey || !!page?.error));
   useEffect(() => {
     if (!topic) return;
     let active = true;
@@ -73,10 +95,16 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       ...(options.sort ? { sort: options.sort } : {}),
     }).then(
       (data) => {
-        if (active) setPage({ key: requestKey, data });
+        if (active) setPage({ key: requestKey, view: viewKey, data });
       },
       (error) => {
-        if (active) setPage({ key: requestKey, error: error.message });
+        if (active)
+          setPage((previous) => ({
+            key: requestKey,
+            view: viewKey,
+            data: previous?.view === viewKey ? previous.data : undefined,
+            error: error.message,
+          }));
       },
     );
     return () => {
@@ -100,7 +128,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
     expectedRevision: string,
     sort: TopicSort,
   ) => {
-    if (pending.current || !topic) return false;
+    if (pending.current || refreshing || !topic) return false;
     pending.current = true;
     setSaving(true);
     setSaveError(null);
@@ -127,7 +155,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
     }
   };
   const toggleTask = async (block: TopicBlock, line: number) => {
-    if (pending.current) return false;
+    if (pending.current || refreshing) return false;
     pending.current = true;
     setTaskSaving(true);
     setSaveError(null);
@@ -152,7 +180,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
     topics,
     scopeKey,
     topic,
-    data: page?.key === requestKey ? page.data : undefined,
+    data: page?.view === viewKey ? page.data : undefined,
     error:
       (saveError?.context === context && saveError.message) ||
       (catalog?.key === sourceKey && catalog.error) ||
@@ -160,6 +188,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       '',
     reload,
     saving: saving || taskSaving,
+    refreshing,
     taskSaving,
     toggleTask,
     move,
