@@ -278,6 +278,10 @@
   color: var(--ink);
   background: var(--panel);
 }
+.plugin-calendar-grid {
+  display: grid;
+  grid-template-rows: auto repeat(6, 32px);
+}
 .plugin-calendar-week {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
