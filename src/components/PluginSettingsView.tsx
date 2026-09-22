@@ -66,6 +66,7 @@ export function PluginSettingsView({
   };
   return (
     <PluginView
+      pluginId={pluginId}
       embedded
       title={title}
       tree={tree}

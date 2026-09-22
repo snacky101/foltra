@@ -1,3 +1,4 @@
+mod ai_chat;
 mod anki_bridge;
 mod attachments;
 mod backup;
@@ -129,6 +130,9 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
     if command == "vault.locate" {
         return open_path::locate(args["path"].as_str());
     }
+    if command == "chat.send" {
+        return ai_chat::send(path, &args);
+    }
     if matches!(command, "git.sync" | "git.resolve") {
         return git_sync::run(path, command, &args);
     }
@@ -155,6 +159,9 @@ pub fn execute(path: &str, command: &str, args: Value) -> Result<Value> {
 pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Value> {
     validate_arguments(command, &args)?;
     match command {
+        "chat.settings" | "chat.configure" | "chat.history" | "chat.clear" | "chat.apply" => {
+            ai_chat::dispatch(store, command, &args)
+        }
         "git.status" => git_sync::status(store),
         "git.configure" => git_sync::configure(store, &args),
         "workspace.get" => vault::workspace(

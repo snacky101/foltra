@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { call } from './api';
-import type { Topic, TopicBlocks, TopicSort, Workspace } from './types';
+import type { Topic, TopicBlock, TopicBlocks, TopicSort, Workspace } from './types';
 
 export const defaultTopicOptions = {
   topicId: null as string | null,
@@ -58,6 +58,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   currentContext.current = context;
   const pending = useRef(false);
   const [saving, setSaving] = useState(false);
+  const [taskSaving, setTaskSaving] = useState(false);
   const [saveError, setSaveError] = useState<{ context: string; message: string } | null>(null);
   const [page, setPage] = useState<{ key: string; data?: TopicBlocks; error?: string } | null>(null);
   useEffect(() => {
@@ -125,6 +126,28 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       setSaving(false);
     }
   };
+  const toggleTask = async (block: TopicBlock, line: number) => {
+    if (pending.current) return false;
+    pending.current = true;
+    setTaskSaving(true);
+    setSaveError(null);
+    try {
+      await call(workspace.path, 'task.update', {
+        id: block.noteId,
+        line: block.line + line - 1,
+        toggle: true,
+        expectedRevision: block.revision,
+      });
+      if (currentContext.current === context) reload();
+      return true;
+    } catch (error) {
+      if (currentContext.current === context) setSaveError({ context, message: (error as Error).message });
+      return false;
+    } finally {
+      pending.current = false;
+      setTaskSaving(false);
+    }
+  };
   return {
     topics,
     scopeKey,
@@ -136,7 +159,9 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       (page?.key === requestKey && page.error) ||
       '',
     reload,
-    saving,
+    saving: saving || taskSaving,
+    taskSaving,
+    toggleTask,
     move,
   };
 }

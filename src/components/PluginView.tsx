@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Puzzle, RefreshCw } from 'lucide-react';
 import { Select } from './Select';
+import { PluginNoteChat } from './NoteChat';
 import { PluginCalendar } from './PluginCalendar';
 import type { PluginNode } from '../lib/pluginTypes';
 type Action = (id: string, value?: string | boolean, payload?: unknown) => Promise<void>;
@@ -109,8 +110,22 @@ function PluginChoice({ node, action }: { node: PluginNode; action: Action }) {
     </div>
   );
 }
-function Node({ node, action, disabled = false }: { node: PluginNode; action: Action; disabled?: boolean }) {
+function Node({
+  node,
+  action,
+  disabled = false,
+  pluginId,
+}: {
+  node: PluginNode;
+  action: Action;
+  disabled?: boolean;
+  pluginId?: string;
+}) {
   if (disabled) node = { ...node, disabled: true };
+  if (node.type === 'note-chat' || node.type === 'ai-settings')
+    return (
+      <PluginNoteChat pluginId={pluginId} settingsOnly={node.type === 'ai-settings'} disabled={disabled} />
+    );
   if (node.type === 'calendar') return <PluginCalendar node={node} action={action} />;
   if (node.type === 'text') return <p className={`plugin-text ${node.tone ?? ''}`}>{node.text}</p>;
   if (node.type === 'heading') return <h2 className="plugin-heading">{node.text}</h2>;
@@ -129,6 +144,7 @@ function Node({ node, action, disabled = false }: { node: PluginNode; action: Ac
       {node.children?.map((child, index) => (
         <Node
           key={`${child.action ?? child.type}:${JSON.stringify(child.payload) ?? index}`}
+          pluginId={pluginId}
           node={child}
           action={action}
           disabled={disabled}
@@ -138,6 +154,7 @@ function Node({ node, action, disabled = false }: { node: PluginNode; action: Ac
   );
 }
 export function PluginView({
+  pluginId,
   title,
   tree,
   busy,
@@ -147,6 +164,7 @@ export function PluginView({
   embedded = false,
   preserveOnError = false,
 }: {
+  pluginId?: string;
   title: string;
   tree: PluginNode | null;
   busy: boolean;
@@ -185,7 +203,7 @@ export function PluginView({
         </div>
       ) : tree ? (
         <div aria-busy={busy} aria-disabled={error ? true : undefined}>
-          <Node node={tree} action={action} disabled={!!error} />
+          <Node pluginId={pluginId} node={tree} action={action} disabled={!!error} />
         </div>
       ) : error ? null : (
         <p className="muted">{busy ? '화면을 불러오는 중…' : '설정 → 확장에서 플러그인을 활성화하세요.'}</p>

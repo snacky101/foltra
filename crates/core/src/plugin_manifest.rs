@@ -72,6 +72,7 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         "ui",
         "anki.connect",
         "git.sync",
+        "ai.chat",
         "automation",
     ];
     let mut ids = HashSet::new();
@@ -195,12 +196,32 @@ pub(crate) fn validate_tree(tree: &Value) -> Result<()> {
         }
         let kind = node["type"].as_str().unwrap_or("");
         if ![
-            "stack", "row", "grid", "card", "text", "heading", "button", "input", "select",
-            "checkbox", "calendar",
+            "stack",
+            "row",
+            "grid",
+            "card",
+            "text",
+            "heading",
+            "button",
+            "input",
+            "select",
+            "checkbox",
+            "calendar",
+            "note-chat",
+            "ai-settings",
         ]
         .contains(&kind)
         {
             return Err(Error::new("invalid_view", "Unsupported view element"));
+        }
+        if kind == "note-chat" || kind == "ai-settings" {
+            if node.as_object().unwrap().len() != 1 {
+                return Err(Error::new(
+                    "invalid_view",
+                    "AI views do not accept plugin-supplied parameters",
+                ));
+            }
+            return Ok(());
         }
         if kind == "calendar" {
             return validate_calendar(node);

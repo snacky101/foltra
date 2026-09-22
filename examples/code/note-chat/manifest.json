@@ -1,0 +1,24 @@
+{
+  "kind": "plugin",
+  "id": "note-chat",
+  "name": "노트 채팅",
+  "version": "1.0.0",
+  "description": "OpenAI 호환 Provider로 현재 노트와 대화하고, 답변을 덧붙이거나 수정안을 확인 후 적용합니다. 대화는 노트별로 이 기기에 저장됩니다.",
+  "commands": [
+    {
+      "id": "open",
+      "title": "현재 노트와 채팅",
+      "bindings": [{ "keys": "ac", "leader": true }],
+      "action": { "type": "script" }
+    }
+  ],
+  "runtime": {
+    "apiVersion": 1,
+    "permissions": ["ai.chat", "notes.read", "notes.write", "ui"],
+    "views": [
+      { "id": "chat", "title": "노트 채팅", "placement": "right-sidebar" },
+      { "id": "provider", "title": "Provider 연결" }
+    ],
+    "settingsView": "provider"
+  }
+}

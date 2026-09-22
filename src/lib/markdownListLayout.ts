@@ -76,11 +76,17 @@ export function markdownListLayout(doc: Text, tree: ReturnType<typeof parser.par
 // Insert rendering-only separators before parsing reading mode. Stored Markdown
 // and editor positions remain untouched; inline syntax uses the same parser path.
 export function separateListParagraphs(body: string) {
+  return previewListSource(body).body;
+}
+
+export function previewListSource(body: string) {
   const source = body.split('\n');
+  const sourceLines = source.map((_, index) => index + 1);
   const { paragraphBreaks } = markdownListLayout(Text.of(source), previewParser.parse(body));
   for (const number of [...paragraphBreaks.keys()].sort((a, b) => b - a)) {
     const quote = source[number - 1].match(/^(?:[ \t]*>[ \t]*)+/)?.[0] ?? '';
     source.splice(number - 1, 0, quote);
+    sourceLines.splice(number - 1, 0, 0);
   }
-  return source.join('\n');
+  return { body: source.join('\n'), sourceLines };
 }

@@ -118,7 +118,7 @@ GitHub의 동일 이름 파일 교체는 삭제 후 업로드이므로, 마지�
 
 ```sh
 foltra_feed_repair_dir=$(mktemp -d)
-gh release download v0.1.0-preview.14 --repo snacky101/foltra \
+gh release download v0.1.0-preview.15 --repo snacky101/foltra \
   --pattern latest.json --dir "$foltra_feed_repair_dir"
 gh release upload updater "$foltra_feed_repair_dir/latest.json" \
   --repo snacky101/foltra --clobber

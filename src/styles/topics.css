@@ -202,6 +202,7 @@
   border-radius: 8px;
   margin-bottom: 18px;
   overflow: hidden;
+  cursor: pointer;
 }
 .topic-order-hint {
   margin: -8px 0 18px;

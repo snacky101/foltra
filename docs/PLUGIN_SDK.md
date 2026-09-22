@@ -25,7 +25,7 @@ The module exports a default object with `commands`, `views`, `completions`, opt
 - `api.editor.read()` / `api.editor.replaceSelection(text)`: current editor selection and an undoable replacement. The application verifies the original note, document and selection still match before applying an asynchronous result. Live Preview/IME internals remain owned by the editor.
 - `api.state`: JSON session state; independent per plugin/vault and reset on deactivation.
 
-Permissions are `notes.read`, `notes.write`, `databases.read`, `databases.write`, `editor.read`, `editor.write`, `ui`, `anki.connect`, `git.sync`, and `automation`. Own settings/storage do not expose any other plugin's data. General network/native-file APIs and arbitrary CodeMirror extensions are outside SDK v1.
+Permissions are `notes.read`, `notes.write`, `databases.read`, `databases.write`, `editor.read`, `editor.write`, `ui`, `anki.connect`, `ai.chat`, `git.sync`, and `automation`. Own settings/storage do not expose any other plugin's data. General network/native-file APIs and arbitrary CodeMirror extensions are outside SDK v1.
 
 ## Views and commands
 
@@ -36,6 +36,12 @@ Commands use `plugin.<package-id>.<command-id>` in the existing registry, palett
 Commands may declare optional default `bindings`, for example `[{"keys":"Mod+Shift+d","leader":false},{"keys":"nd","leader":true}]`. Up to 10 bindings per command use the same validation and keyboard router as user shortcuts. `commands.list` exposes the defaults, and the settings page uses them when that command has no saved override. An explicit saved empty array disables all bindings. Installation, updates, activation and removal do not rewrite user shortcut settings. `Mod` means Cmd on macOS and Ctrl elsewhere; Leader sequences use the configured Leader key. Script commands and their defaults become active only when plugin use and the individual package are enabled.
 
 Views may declare `placement: "right-sidebar"`; omission means the main view. Enabled sidebar views use the same serialized plugin session and appear below backlinks even without an open note. Calling `api.openView` for such a view reveals the sidebar without opening a central plugin page. Load/render handlers do not navigate. The `calendar` view node accepts a real `YYYY-MM` month, a real `YYYY-MM-DD` today, at most 31 unique marked dates in that month, and declared navigation/date actions. The host owns its themed rendering and keyboard focus; plugins do not receive DOM access. `examples/code/calendar/` demonstrates this contract.
+
+## Host note chat
+
+`{type:'note-chat'}` and `{type:'ai-settings'}` are host-rendered nodes with no additional properties. They require `ai.chat`, `ui`, and `notes.read`; applying an answer also requires `notes.write`. The host supplies the owning package ID/digest and current note; packages cannot override the provider, note, or credentials through view props. `runtime.settingsView` can point to an `ai-settings` view. See `examples/code/note-chat/` and [NOTE_CHAT.md](NOTE_CHAT.md).
+
+The host uses the shared `chat.*` core commands. They are not exposed through QuickJS `api.call`. Provider HTTP runs outside the vault writer lock and QuickJS invocation limits, with a separate 90-second timeout and bounded payload/response sizes. Activation, permissions, provider revision, and conversation revision are checked again after the request. Applying a rewrite additionally requires the note revision used to generate it. Provider credentials are device-local and never returned to package code; this is not a general network capability.
 
 ## Text completions
 

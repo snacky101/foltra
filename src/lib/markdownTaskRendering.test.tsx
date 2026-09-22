@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { EditorSelection, EditorState } from '@codemirror/state';
+import { EditorSelection, EditorState, StateEffect } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 import {
   cursorCharLeft,
@@ -317,24 +317,27 @@ test.each(markers)('Vim h/l can enter [%s], edit its list marker and state, and 
   expect(view.state.doc.toString()).toBe(doc);
 });
 
-test.each(markers)('clicking a moved [%s] icon exposes its entire prefix for editing', (marker) => {
-  const view = live(`- [${marker}] Text`);
-  view.dispatch({ changes: { from: 0, insert: 'Before\n\n' } });
-  const from = view.state.doc.toString().indexOf('[');
-  const icon = view.dom.querySelector('.cm-live-task')!;
-  const event = new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true });
-  icon.dispatchEvent(event);
-  expect(event.defaultPrevented).toBe(true);
-  expect(view.hasFocus).toBe(true);
-  expect(view.state.selection.main.head).toBe(from + 1);
-  expect(view.dom.querySelector('.cm-live-task')).toBeNull();
-  expect(view.contentDOM.textContent).toContain(`- [${marker}] Text`);
-  view.dispatch({ selection: EditorSelection.range(from + 1, from + 2) });
-  view.dispatch(view.state.replaceSelection('x'));
-  view.dispatch({ selection: { anchor: view.state.doc.length } });
-  expect(view.dom.querySelector('.task-icon')?.getAttribute('data-task-status')).toBe('done');
-  expect(view.state.doc.toString()).toBe('Before\n\n- [x] Text');
-});
+test.each(markers.filter((marker) => ![' ', '/', 'x', 'X'].includes(marker)))(
+  'clicking a moved [%s] custom icon exposes its entire prefix for editing',
+  (marker) => {
+    const view = live(`- [${marker}] Text`);
+    view.dispatch({ changes: { from: 0, insert: 'Before\n\n' } });
+    const from = view.state.doc.toString().indexOf('[');
+    const icon = view.dom.querySelector('.cm-live-task')!;
+    const event = new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true });
+    icon.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    expect(view.hasFocus).toBe(true);
+    expect(view.state.selection.main.head).toBe(from + 1);
+    expect(view.dom.querySelector('.cm-live-task')).toBeNull();
+    expect(view.contentDOM.textContent).toContain(`- [${marker}] Text`);
+    view.dispatch({ selection: EditorSelection.range(from + 1, from + 2) });
+    view.dispatch(view.state.replaceSelection('x'));
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    expect(view.dom.querySelector('.task-icon')?.getAttribute('data-task-status')).toBe('done');
+    expect(view.state.doc.toString()).toBe('Before\n\n- [x] Text');
+  },
+);
 
 test('deleting and retyping a state preserves native input through temporarily invalid task syntax', () => {
   const view = live('- [x] Text', 4);
@@ -498,4 +501,38 @@ test('focus recovery lets native focusChanged notifications reach other editor e
   await Promise.resolve();
   await Promise.resolve();
   expect(focusEvents).toEqual([true, false]);
+});
+
+test.each([' ', '/', 'x', 'X'])(
+  'clicking a [%s] checkbox toggles only its marker, preserves the cursor and can undo',
+  (marker) => {
+    const doc = `- [${marker}] 한글 내용\n\n다른 문단`;
+    const view = live(doc);
+    view.dispatch({ changes: { from: 0, insert: 'Before\n\n' } });
+    const before = view.state.doc.toString();
+    const selection = view.state.selection;
+    const button = view.dom.querySelector<HTMLButtonElement>('.task-toggle')!;
+    expect(button.getAttribute('role')).toBe('checkbox');
+    const event = new MouseEvent('mousedown', { button: 0, bubbles: true, cancelable: true });
+    button.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(true);
+    button.click();
+    const next = marker.toLowerCase() === 'x' ? ' ' : 'x';
+    expect(view.state.doc.toString()).toBe(before.replace(`[${marker}]`, `[${next}]`));
+    expect(view.state.selection.eq(selection)).toBe(true);
+    expect(view.dom.querySelector('.task-toggle')?.getAttribute('aria-checked')).toBe(
+      next === 'x' ? 'true' : 'false',
+    );
+    expect(undo(view)).toBe(true);
+    expect(view.state.doc.toString()).toBe(before);
+    expect(view.state.selection.eq(selection)).toBe(true);
+  },
+);
+
+test('a read-only live preview does not allow mouse task changes', () => {
+  const view = live('- [ ] 내용');
+  view.dispatch({ effects: StateEffect.appendConfig.of(EditorState.readOnly.of(true)) });
+  const before = view.state.doc.toString();
+  view.dom.querySelector<HTMLButtonElement>('.task-toggle')!.click();
+  expect(view.state.doc.toString()).toBe(before);
 });

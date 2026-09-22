@@ -18,6 +18,21 @@ export const taskMarkers = [
 
 export type TaskStatus = (typeof taskMarkers)[number]['status'];
 
+export const isTaskCheckbox = (status: TaskStatus) => ['todo', 'doing', 'done'].includes(status);
+
+// Used by reading mode; the line comes from the parsed, original Markdown source.
+export function toggleTaskInText(body: string, line: number) {
+  const lines = body.split('\n');
+  const text = lines[line - 1];
+  if (text === undefined) return body;
+  lines[line - 1] = text.replace(
+    /^([\t >]*(?:[-+*]|\d+[.)])[ \t]+\[)([ /xX])(\](?=[ \t]))/,
+    (_, prefix: string, marker: string, suffix: string) =>
+      `${prefix}${marker.toLowerCase() === 'x' ? ' ' : 'x'}${suffix}`,
+  );
+  return lines.join('\n');
+}
+
 export function taskStatus(marker: string): TaskStatus | null {
   return taskMarkers.find((item) => item.marker === marker.toLowerCase())?.status ?? null;
 }

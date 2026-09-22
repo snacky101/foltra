@@ -23,3 +23,5 @@ Declare `runtime.views: [{id, title, placement: 'right-sidebar'}]` to place a pe
 `api.storage` is durable, scoped by package ID and revision checked. Its data/settings survive uninstall and are included in vault exports. Execution trust is device-local and never exported. A package change invalidates approval. Command handlers declared `headless: true` also run through `foltra --vault PATH plugin.ID.COMMAND`; UI APIs fail there. Consult `docs/PLUGIN_SDK.md` for limits and the full contract.
 
 SDK regression packages live in `tests/fixtures/plugins/`. They exercise individual host capabilities and are not part of the app catalog or shipped examples.
+
+For note chat, declare `ai.chat`, `notes.read`, and `ui`, then return `{type:'note-chat'}` from a sidebar view and `{type:'ai-settings'}` from its `runtime.settingsView`. Add `notes.write` to allow explicit answer application. These nodes accept no extra props: the host supplies the current note and owning extension. Credentials and HTTP remain in the host, outside plugin JavaScript. See `examples/code/note-chat/` and [Note chat](../../docs/NOTE_CHAT.md).

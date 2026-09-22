@@ -5,6 +5,8 @@ import { BlockGap } from './livePreviewLayout';
 import { markdownListLayout } from './markdownListLayout';
 import { taskPrefix, type TaskStatus } from './markdownTasks';
 import { taskIconDOM } from '../components/TaskIcon';
+import { isTaskCheckbox } from './markdownTasks';
+import { isolateHistory } from '@codemirror/commands';
 
 class ListMarker extends WidgetType {
   constructor(
@@ -28,7 +30,35 @@ class ListMarker extends WidgetType {
     const dom = document.createElement('span');
     dom.className = `cm-live-list-marker${this.task ? ' cm-live-task' : this.bullet ? ' cm-live-bullet' : ''}`;
     dom.textContent = this.bullet || this.task ? '\u00a0' : this.marker;
-    if (this.task) {
+    if (this.task && isTaskCheckbox(this.task)) {
+      const toggle = document.createElement('button');
+      toggle.type = 'button';
+      toggle.className = 'task-toggle';
+      toggle.setAttribute('role', 'checkbox');
+      toggle.setAttribute('aria-checked', this.task === 'doing' ? 'mixed' : String(this.task === 'done'));
+      toggle.setAttribute('aria-label', this.task === 'done' ? '완료 해제' : '완료로 표시');
+      toggle.disabled = view.state.readOnly;
+      toggle.append(taskIconDOM(this.task));
+      toggle.onmousedown = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+      };
+      toggle.onclick = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (view.state.readOnly) return;
+        view.dispatch({
+          changes: {
+            from: this.taskFrom! + 1,
+            to: this.taskFrom! + 2,
+            insert: this.task === 'done' ? ' ' : 'x',
+          },
+          annotations: isolateHistory.of('full'),
+          userEvent: 'input.task',
+        });
+      };
+      dom.append(toggle);
+    } else if (this.task) {
       dom.append(taskIconDOM(this.task));
       dom.title = '클릭하여 작업 상태 편집';
     }
@@ -51,8 +81,8 @@ class ListMarker extends WidgetType {
     const x = pos === 0 ? box.left : box.right;
     return { left: x, right: x, top: text.top, bottom: text.bottom };
   }
-  ignoreEvent() {
-    return false;
+  ignoreEvent(event: Event) {
+    return event.target instanceof Element && !!event.target.closest('.task-toggle');
   }
 }
 

@@ -7,6 +7,7 @@ export type PluginPermission =
   | 'editor.write'
   | 'ui'
   | 'anki.connect'
+  | 'ai.chat'
   | 'git.sync'
   | 'automation';
 export interface PluginRuntime {
@@ -55,7 +56,9 @@ export interface PluginNode {
     | 'input'
     | 'select'
     | 'checkbox'
-    | 'calendar';
+    | 'calendar'
+    | 'note-chat'
+    | 'ai-settings';
   text?: string;
   label?: string;
   value?: string;
@@ -116,6 +119,7 @@ export const pluginPermissionLabels: Record<PluginPermission, string> = {
   'editor.write': '현재 선택 영역 편집',
   ui: '플러그인 화면·노트 열기, 알림 표시',
   'anki.connect': '이 기기의 AnkiConnect로 카드 읽기·생성·수정',
+  'ai.chat': '설정한 AI Provider에 현재 노트·대화 전송',
   'git.sync': '사용자가 연결한 Git 저장소에 vault 데이터 전송·병합',
   automation: '노트·DB 변경 후 백그라운드 명령 실행',
 };

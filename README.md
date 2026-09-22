@@ -4,7 +4,7 @@
 
 메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.14) · [이번 버전의 변화](docs/releases/v0.1.0-preview.14.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.15) · [이번 버전의 변화](docs/releases/v0.1.0-preview.15.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
 ![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
@@ -13,7 +13,7 @@
 
 ## 설치하고 첫 노트 쓰기
 
-1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.14/Foltra_0.1.0-preview.14_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.15/Foltra_0.1.0-preview.15_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
 2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
 3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 
@@ -52,7 +52,7 @@
 - 첫 시제품을 보여주고 의견 받기 [[프로젝트]]
 ```
 
-**주제 모음 → 프로젝트**를 열면 두 노트의 해당 블록이 카드로 모입니다. 첫 카드에는 하위 항목도 함께 나옵니다. 원본은 각 노트에 그대로 있고, 카드를 끌어 원하는 순서로 읽을 수 있습니다. **완료된 항목 숨기기**를 켜면 카드 안의 체크박스가 모두 완료된 항목을 제외합니다.
+**주제 모음 → 프로젝트**를 열면 두 노트의 해당 블록이 카드로 모입니다. 첫 카드에는 하위 항목도 함께 나옵니다. 원본은 각 노트에 그대로 있고, 카드를 끌어 원하는 순서로 읽을 수 있습니다. **완료된 항목 숨기기**를 켜면 카드 안의 체크박스가 모두 완료된 항목을 제외합니다. 체크박스는 노트의 Live Preview·읽기 모드와 주제 카드에서 클릭해 완료·해제할 수 있습니다. 카드의 빈 공간을 클릭하면 원본 노트의 해당 줄을 엽니다.
 
 이 연결은 다른 화면에서도 활용합니다.
 
@@ -120,6 +120,7 @@
 | [Anki 연결](docs/ANKI.md)       | 태그가 붙은 블록이나 DB 행을 AnkiConnect로 카드에 동기화. 연결된 노트 본문과 이미지도 사용 |
 | [일지 캘린더](docs/CALENDAR.md) | 오른쪽 달력에 날짜 노트를 표시하고 오늘 노트를 열거나 생성                                 |
 | 날짜 자동완성                   | `@Today`, `@Yesterday`, `@Tomorrow` 후보를 골라 날짜 입력 (`[[@` 안에서도 사용, Esc로 취소)                |
+| [노트 채팅](docs/NOTE_CHAT.md) | OpenAI 호환 서버로 현재 노트와 대화하고 답변 추가·수정안 적용 |
 | [Git 동기화](docs/GIT.md)       | 사용자가 연결한 Git 저장소에 기록을 보내고 다른 기기의 변경 가져오기                       |
 
 전체 플러그인 사용을 꺼도 개별 활성화 선택은 기억합니다. 확장이 사용하는 권한은 각 항목에서 펼쳐볼 수 있습니다. **파일로 설치**도 지원하며, 모든 Obsidian 플러그인을 그대로 설치하는 호환 기능은 아닙니다.

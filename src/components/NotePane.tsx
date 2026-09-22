@@ -12,6 +12,7 @@ import { Backlinks } from './Backlinks';
 import type { EditorHandle } from './Editor';
 import type { Workspace } from '../lib/types';
 import type { useNote } from '../lib/useNote';
+import { toggleTaskInText } from '../lib/markdownTasks';
 import type { Dialog } from './AppDialogs';
 import type { NoteCommand } from '../lib/noteCommands';
 import { noteLinks } from '../lib/noteLinks';
@@ -178,6 +179,7 @@ export function NotePane({
                         workspace={workspace}
                         openNote={(id) => void openNote(id)}
                         openLink={openLink}
+                        onToggleTask={(line) => note.edit({ body: toggleTaskInText(note.draft.body, line) })}
                       />
                     </Suspense>
                   )}

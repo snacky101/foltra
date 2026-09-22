@@ -25,6 +25,7 @@ function App() {
     <TopicsView
       workspace={workspace}
       options={options}
+      refresh={async () => {}}
       onChange={onChange}
       toggleSources={() => onChange({ ...options, showSources: !options.showSources })}
       openNote={openNote}
@@ -463,4 +464,14 @@ test('completed filter reaches catalog, pagination and reorder; toggling resets 
   expect(lastArgs('topics.list')).not.toHaveProperty('hideCompleted');
   expect(ids()).toHaveLength(50);
   expect(button('완료된 항목 숨기기').getAttribute('aria-pressed')).toBe('false');
+});
+
+test('a click following card drag does not open the source; the next pointer click does', async () => {
+  await act(async () => dragEvent(handle('c2'), 'dragstart'));
+  await act(async () => dragEvent(handle('c2'), 'dragend'));
+  await act(async () => elements()[0].click());
+  expect(openNote).not.toHaveBeenCalled();
+  await act(async () => elements()[0].dispatchEvent(new Event('pointerdown', { bubbles: true })));
+  await act(async () => elements()[0].click());
+  expect(openNote).toHaveBeenCalledWith('note', 1);
 });

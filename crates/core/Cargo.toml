@@ -22,7 +22,9 @@ saphyr = { version = "0.0.12", default-features = false }
 saphyr-parser = "0.0.12"
 rquickjs = { version = "0.12.2", default-features = false, features = ["std"] }
 
-ureq = { version = "3", default-features = false, features = ["json"] }
+ureq = { version = "3", default-features = false, features = ["json", "rustls"] }
+
+url = "2"
 
 [dev-dependencies]
 tempfile = "3"

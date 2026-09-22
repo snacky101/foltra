@@ -24,6 +24,7 @@ export function TopicsView({
   openNote,
   openLink,
   updateSettings,
+  refresh,
 }: {
   workspace: Workspace;
   options: TopicOptions;
@@ -32,8 +33,13 @@ export function TopicsView({
   openNote: (id: string, line?: number) => void;
   openLink: (target: string) => void;
   updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
+  refresh: () => Promise<void>;
 }) {
-  const { topics, topic, data, error, reload, saving, move, scopeKey } = useTopics(workspace, options);
+  const { topics, topic, data, error, reload, saving, taskSaving, toggleTask, move, scopeKey } = useTopics(
+    workspace,
+    options,
+  );
+  const dragged = useRef(false);
   const folderFilter = workspace.settings.topicFolders ?? { include: [], exclude: [] };
   const filtered = folderFilter.include.length + folderFilter.exclude.length > 0;
   const previousScope = useRef(scopeKey);
@@ -233,11 +239,13 @@ export function TopicsView({
               </Select>
             </div>
             <p className="topic-order-hint" role="status">
-              {saving
-                ? '순서 저장 중…'
-                : drag
-                  ? '원하는 위치에 놓으세요. 이전·다음 버튼 위에서 페이지를 넘길 수 있습니다.'
-                  : '손잡이를 드래그하여 순서를 바꿀 수 있습니다.'}
+              {taskSaving
+                ? '체크박스 저장 중…'
+                : saving
+                  ? '순서 저장 중…'
+                  : drag
+                    ? '원하는 위치에 놓으세요. 이전·다음 버튼 위에서 페이지를 넘길 수 있습니다.'
+                    : '손잡이를 드래그하여 순서를 바꿀 수 있습니다.'}
             </p>
             {topic?.noteId && (
               <button className="topic-note-link" onClick={() => openNote(topic.noteId!)}>
@@ -255,6 +263,23 @@ export function TopicsView({
                 key={block.id}
                 data-card-id={block.id}
                 aria-hidden={!cards.includes(block) || undefined}
+                onPointerDown={() => {
+                  dragged.current = false;
+                }}
+                onClick={(event) => {
+                  if (
+                    event.defaultPrevented ||
+                    dragged.current ||
+                    drag ||
+                    window.getSelection()?.isCollapsed === false
+                  )
+                    return;
+                  if (
+                    (event.target as Element).closest('button, a, input, select, textarea, [role="checkbox"]')
+                  )
+                    return;
+                  openNote(block.noteId, block.line);
+                }}
                 onDragOver={(event) => {
                   if (!drag || saving || drag.source === block.id) return;
                   event.preventDefault();
@@ -295,6 +320,7 @@ export function TopicsView({
                       event.preventDefault();
                       return;
                     }
+                    dragged.current = true;
                     event.dataTransfer.effectAllowed = 'move';
                     event.dataTransfer.setData('application/x-foltra-topic-card', block.id);
                     event.dataTransfer.setDragImage(event.currentTarget.closest('article')!, 20, 20);
@@ -351,6 +377,12 @@ export function TopicsView({
                     openNote={openNote}
                     openLink={openLink}
                     executeQueries={false}
+                    taskDisabled={saving || !!drag}
+                    onToggleTask={(line) => {
+                      void toggleTask(block, line).then((saved) => {
+                        if (saved) void refresh();
+                      });
+                    }}
                   />
                 </Suspense>
               </article>

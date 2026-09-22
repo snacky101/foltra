@@ -49,7 +49,9 @@ export interface ViewNode {
     | 'input'
     | 'select'
     | 'checkbox'
-    | 'calendar';
+    | 'calendar'
+    | 'note-chat'
+    | 'ai-settings';
   text?: string;
   label?: string;
   value?: string;

@@ -185,6 +185,32 @@
 .editor .cm-live-task {
   position: relative;
 }
+.task-toggle {
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+.task-toggle:hover {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+.task-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.task-toggle:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.editor .cm-live-task .task-toggle {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+}
 .editor .cm-live-task .task-icon {
   position: absolute;
   left: 50%;

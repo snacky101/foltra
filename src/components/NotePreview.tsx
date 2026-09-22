@@ -20,9 +20,9 @@ import { remarkWikiLinks, wikiTarget } from '../lib/remarkWikiLinks';
 import { remarkListSpacing } from '../lib/remarkListSpacing';
 import { remarkTasks } from '../lib/remarkTasks';
 import { remarkUnderline } from '../lib/remarkUnderline';
-import { taskStatus } from '../lib/markdownTasks';
+import { isTaskCheckbox, taskStatus } from '../lib/markdownTasks';
 import { TaskIcon } from './TaskIcon';
-import { separateListParagraphs } from '../lib/markdownListLayout';
+import { previewListSource } from '../lib/markdownListLayout';
 import type { QueryResult, Workspace } from '../lib/types';
 
 function EmbeddedQuery({
@@ -112,23 +112,46 @@ interface NotePreviewProps {
   openLink: (target: string) => void;
   executeQueries?: boolean;
   openTag?: (tag: string) => void;
+  onToggleTask?: (line: number) => void;
+  taskDisabled?: boolean;
 }
 
-const PreviewContext = createContext<Omit<NotePreviewProps, 'body'> | null>(null);
+const PreviewContext = createContext<(Omit<NotePreviewProps, 'body'> & { sourceLines: number[] }) | null>(
+  null,
+);
 // Stable component identities preserve query state when a block moves or its context updates.
 const markdownComponents: Components = {
   li: function PreviewListItem({ node, children, ...props }) {
+    const { onToggleTask, taskDisabled, sourceLines } = useContext(PreviewContext)!;
     const marker = node?.properties['data-task-marker'];
     const status = typeof marker === 'string' ? taskStatus(marker) : null;
+    const sourceLine = sourceLines[Number(node?.properties['data-task-line']) - 1];
     return (
       <li
         {...props}
         className={[props.className, status ? 'task-list-item' : ''].filter(Boolean).join(' ') || undefined}
       >
-        {status && (
-          <span className="task-list-marker">
+        {status && isTaskCheckbox(status) && onToggleTask && sourceLine ? (
+          <button
+            type="button"
+            className="task-list-marker task-toggle"
+            role="checkbox"
+            aria-checked={status === 'doing' ? 'mixed' : status === 'done'}
+            aria-label={status === 'done' ? '완료 해제' : '완료로 표시'}
+            disabled={taskDisabled}
+            onClick={(event) => {
+              event.stopPropagation();
+              onToggleTask(sourceLine);
+            }}
+          >
             <TaskIcon status={status} />
-          </span>
+          </button>
+        ) : (
+          status && (
+            <span className="task-list-marker">
+              <TaskIcon status={status} />
+            </span>
+          )
         )}
         {children}
       </li>
@@ -229,13 +252,17 @@ export function NotePreview({
   openLink,
   executeQueries = true,
   openTag,
+  onToggleTask,
+  taskDisabled,
 }: NotePreviewProps) {
   const navigateTag = useContext(TagNavigation);
   const frontmatter = useMemo(() => frontmatterRange(body), [body]);
-  const previewBody = useMemo(
-    () => separateListParagraphs(body.slice(frontmatter?.bodyFrom ?? 0)),
-    [body, frontmatter],
-  );
+  const preview = useMemo(() => {
+    const from = frontmatter?.bodyFrom ?? 0;
+    const source = previewListSource(body.slice(from));
+    const offset = body.slice(0, from).split('\n').length - 1;
+    return { ...source, sourceLines: source.sourceLines.map((line) => line && line + offset) };
+  }, [body, frontmatter]);
   return (
     <div
       className="markdown-preview"
@@ -245,7 +272,16 @@ export function NotePreview({
     >
       {frontmatter && <FrontmatterPanel source={frontmatter.yaml} />}
       <PreviewContext
-        value={{ workspace, openNote, openLink, executeQueries, openTag: openTag ?? navigateTag }}
+        value={{
+          workspace,
+          openNote,
+          openLink,
+          executeQueries,
+          openTag: openTag ?? navigateTag,
+          onToggleTask,
+          taskDisabled,
+          sourceLines: preview.sourceLines,
+        }}
       >
         <ReactMarkdown
           remarkPlugins={[
@@ -259,7 +295,7 @@ export function NotePreview({
           ]}
           components={markdownComponents}
         >
-          {previewBody || '*아직 작성한 내용이 없습니다.*'}
+          {preview.body || '*아직 작성한 내용이 없습니다.*'}
         </ReactMarkdown>
       </PreviewContext>
     </div>

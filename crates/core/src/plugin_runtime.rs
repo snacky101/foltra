@@ -18,7 +18,7 @@ fn package(store: &Store, id: &str) -> Result<(Value, RuntimeConfig, String)> {
     let digest = revision(&manifest.to_string());
     Ok((manifest, config, digest))
 }
-fn device_directory(store: &Store) -> Result<PathBuf> {
+pub(crate) fn device_directory(store: &Store) -> Result<PathBuf> {
     #[cfg(test)]
     let root = {
         thread_local! { static ROOT: tempfile::TempDir = tempfile::tempdir().unwrap(); }
@@ -96,6 +96,27 @@ pub(crate) fn authorize_git(store: &Store, id: &str, expected_digest: &str) -> R
         ));
     }
     permission(&config, "git.sync")?;
+    Ok(())
+}
+pub(crate) fn authorize_chat(
+    store: &Store,
+    id: &str,
+    expected_digest: &str,
+    write: bool,
+) -> Result<()> {
+    let (_, config, digest) = package(store, id)?;
+    if digest != expected_digest || !approved(store, id, &digest)? {
+        return Err(Error::new(
+            "plugin_disabled",
+            "AI 확장이 변경되거나 비활성화되었습니다.",
+        ));
+    }
+    for name in ["ai.chat", "ui", "notes.read"] {
+        permission(&config, name)?;
+    }
+    if write {
+        permission(&config, "notes.write")?;
+    }
     Ok(())
 }
 pub fn enable(store: &Store, id: &str, expected_digest: &str) -> Result<Value> {

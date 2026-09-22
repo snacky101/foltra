@@ -1865,5 +1865,192 @@
       ],
       "additionalProperties": false
     }
+  },
+  {
+    "id": "chat.settings",
+    "title": "Read AI provider settings",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "chat.configure",
+    "title": "Configure an AI provider",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        },
+        "baseUrl": {
+          "type": "string"
+        },
+        "model": {
+          "type": "string"
+        },
+        "apiKey": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest",
+        "baseUrl",
+        "model",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "chat.history",
+    "title": "Read this note conversation",
+    "readOnly": true,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest",
+        "noteId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "chat.send",
+    "title": "Chat with the current note",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest",
+        "noteId",
+        "message",
+        "mode",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "chat.clear",
+    "title": "Clear this note conversation",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest",
+        "noteId",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "id": "chat.apply",
+    "title": "Apply a chat reply to the note",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string"
+        },
+        "pluginDigest": {
+          "type": "string"
+        },
+        "noteId": {
+          "type": "string"
+        },
+        "messageId": {
+          "type": "string"
+        },
+        "expectedRevision": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "pluginId",
+        "pluginDigest",
+        "noteId",
+        "messageId",
+        "expectedRevision"
+      ],
+      "additionalProperties": false
+    }
   }
 ]

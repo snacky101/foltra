@@ -60,7 +60,11 @@ export function remarkTasks() {
             node.checked = null;
             node.data = {
               ...node.data,
-              hProperties: { ...node.data?.hProperties, 'data-task-marker': task.marker },
+              hProperties: {
+                ...node.data?.hProperties,
+                'data-task-marker': task.marker,
+                'data-task-line': node.position!.start.line,
+              },
             };
           }
         }

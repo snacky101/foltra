@@ -1,3 +1,4 @@
+import { NoteChatHost } from './lib/noteChat';
 import { TagNavigation } from './lib/tagNavigation';
 import { PluginCompletionContext } from './lib/pluginCompletionContext';
 import { usePlugins } from './lib/usePlugins';
@@ -678,7 +679,7 @@ export default function App() {
     settings: '설정',
     trash: '휴지통',
   };
-  return (
+  const content = (
     <TagNavigation value={(tag) => setDialog({ kind: 'search', query: `tag:${tag}` })}>
       <div
         className={`app-shell${sidebarHidden ? ' sidebar-collapsed' : ''}`}
@@ -932,6 +933,7 @@ export default function App() {
                   key={workspace.vault.id}
                   workspace={workspace}
                   options={topicOptions}
+                  refresh={vault.refresh}
                   updateSettings={updateSettings}
                   toggleSources={() => dispatch('topics.sources.toggle')}
                   onChange={setTopicOptions}
@@ -941,6 +943,7 @@ export default function App() {
               )}
               {workView === 'plugin' && (
                 <PluginView
+                  pluginId={plugins.active?.pluginId}
                   title={plugins.active?.title ?? '플러그인'}
                   tree={plugins.tree}
                   busy={plugins.busy}
@@ -1141,5 +1144,18 @@ export default function App() {
         </div>
       )}
     </TagNavigation>
+  );
+  return (
+    <NoteChatHost
+      value={{
+        workspace,
+        noteId: workView === 'notes' ? noteId : null,
+        save: note.save,
+        refresh: vault.refresh,
+        notify: setToast,
+      }}
+    >
+      {content}
+    </NoteChatHost>
   );
 }

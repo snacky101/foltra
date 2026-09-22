@@ -138,11 +138,17 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 `SqlQuery`는 vault·SQL·DB/행 snapshot 변경에 따라 다시 요청하고 이전 요청의 늦은 응답은 버립니다. `{columns:[{name,type}],rows,truncated,limit}` 결과의 행은 문자열/`null` 배열이며 React 텍스트로 표시합니다. 표는 읽기 전용이고 결과를 노트 원문에 저장하지 않습니다.
 
+### 노트 채팅
+
+`ai_chat.rs`는 선택 설치 확장의 `ai.chat` 권한과 활성 digest를 확인하고 OpenAI 호환 Chat Completions를 호출합니다. `chat.send`는 현재 노트·설정·대화 revision을 캡처한 뒤 vault 잠금을 놓고 HTTP를 수행하며, 응답 저장 전에 권한과 설정·대화 revision을 다시 확인합니다. 동일 노트 요청은 별도 파일 잠금으로 중복 실행을 차단합니다. 실제 본문 변경은 사용자가 `chat.apply`를 요청해야 하며, 수정안은 생성 기준 노트 revision도 일치해야 합니다.
+
+Provider 키는 vault 밖 기기 앱 데이터에, 대화는 Git·내보내기 제외 대상인 `.foltra/local/ai-chat/`에 저장합니다. QuickJS에는 HTTP·키 조회 API를 주지 않고, `note-chat`·`ai-settings` 호스트 UI primitive가 소유 확장과 현재 노트를 React context에서 받습니다. UI·CLI가 같은 `chat.*` 명령을 사용합니다. 상세 사용법과 한도는 [NOTE_CHAT.md](NOTE_CHAT.md)에 있습니다.
+
 ### 확장 명령과 단축키
 
 플러그인 관리 UI는 설정의 `extensions` 그룹에, 테마 설치·제거·선택은 `theme` 그룹에 있습니다. `extensions.open` 명령은 현재 작업을 저장한 뒤 확장 그룹을 직접 열며, 기존 작업 뷰는 유지합니다. 플러그인은 `ExtensionsView`, 테마는 `ThemeSettings`에서 관리합니다. 테마 기본 선택지는 Paper & Pine과 Midnight이고, 카탈로그와 파일로 추가한 테마는 선택 카드에서 바로 삭제합니다. 사용 중인 테마 삭제와 Paper 복귀는 코어의 한 저장 트랜잭션입니다. 파일 종류가 다른 경우 올바른 설정 그룹을 안내합니다.
 
-`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki·일지 캘린더·날짜 자동완성를 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
+`src/lib/extensionCatalog.ts`는 `examples/`의 JSON manifest를 가져와 앱에 포함되는 카탈로그를 구성합니다. 둘러보기의 설치 버튼과 사용자 파일 설치는 모두 기존 `extension.install` 경로를 사용하며 설치 상태는 현재 vault snapshot의 ID로 판단합니다. 같은 ID가 있으면 버전·내용이 달라도 덮어쓰지 않습니다. 기본 플러그인은 Anki·일지 캘린더·날짜 자동완성·Git 동기화·노트 채팅을 제공하며 기본 테마는 Paper & Pine·Midnight 두 가지입니다. 설치형 Catppuccin Mocha·Rosé Pine·Tokyo Night·Darcula는 `examples/themes/`와 `themeCatalog.ts`를 통해 테마 탭에서 제공합니다. 새 기본 확장을 추가하려면 검증 가능한 manifest를 `examples/`에 넣고 카탈로그 목록에 등록합니다. SDK 검증용 패키지는 `tests/fixtures/plugins/`에 두고 배포 번들에 포함하지 않습니다. 코어 계약 테스트는 테마 및 검증용 확장의 설치·명령 실행·제거와 생성된 노트 보존을 확인합니다. 카탈로그 자체는 서버·계정·네트워크 요청 없이 동작하며 앱 업데이트로 갱신합니다. 공개 업로드·온라인 검색·자동 업데이트는 아직 구현하지 않았습니다.
 
 1. JSON 설치 시 `extensions.rs`가 허용 필드, command/action, theme token을 검사합니다. 읽을 때도 다시 검사합니다.
 2. core `commands.list`가 `plugin.<extension-id>.<command-id>`를 반환합니다. UI도 같은 ID를 팔레트와 단축키 설정에 등록합니다.
@@ -166,7 +172,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 활성화는 설치와 분리됩니다. `extension.enable`은 사용자가 확인한 digest가 현재 manifest와 같은지 확인하고, 기기의 앱 데이터 폴더 `app.foltra.desktop/plugin-grants/<vault-path-hash>/<id>.json`에 승인을 저장합니다. Vault 안에 승인 정보를 두지 않으며 코드/권한 변경과 복원한 다른 경로의 vault는 다시 활성화해야 합니다. `plugin-data`는 백업에 포함하지만 실행 승인은 포함하지 않습니다. Core의 `Store` 복제는 동일한 잠금 파일의 `Arc`를 공유해 JS callback의 소유 수명 동안에도 vault 잠금을 유지합니다. 플러그인 API도 공통 `dispatch`의 명령/인자/revision 검사를 거칩니다. 개별 데이터 명령은 원자적이지만 여러 호출을 하나의 transaction으로 묶지는 않습니다.
 
-이 API는 임의 DOM/CSS·CodeMirror 내부 확장이나 새 DB property type을 허용하지 않습니다. 네트워크·외부 파일 API, OS 프로세스 격리, 공개 marketplace/자동 업데이트, 기존 Obsidian 플러그인 호환은 미구현입니다. 테마는 계속 지정된 색상 token을 사용합니다. 자세한 계약과 제한은 [PLUGIN_SDK.md](PLUGIN_SDK.md)에 있습니다.
+이 API는 임의 DOM/CSS·CodeMirror 내부 확장이나 새 DB property type을 허용하지 않습니다. 일반 네트워크·외부 파일 API, OS 프로세스 격리, 공개 marketplace/자동 업데이트, 기존 Obsidian 플러그인 호환은 미구현입니다. 테마는 계속 지정된 색상 token을 사용합니다. 자세한 계약과 제한은 [PLUGIN_SDK.md](PLUGIN_SDK.md)에 있습니다.
 
 ## 새 기능을 추가할 때
 
@@ -201,6 +207,9 @@ Markdown의 raw HTML과 원격 이미지 자동 로딩을 사용하지 않습니
 선택한 모양·효과는 별도 compartment로 갱신해 문서와 undo history를 유지합니다. `editorCursor`는 `requestMeasure`에서 좌표를 읽고 본문 위의 입력을 받지 않는 레이어만 그립니다. Vim 모드 이벤트와 스크롤도 재측정을 요청합니다. 순수 `cursorAppearance`는 모드별 모양을, `cursorMotion`은 경과 시간에 따른 위치와 잔상을 계산합니다. 이동이 끝나면 animation frame을 중단하고, blur/조합 입력/multiple selection에서는 기본 커서로 복귀하며 unmount 시 리스너와 레이어를 제거합니다. 시스템의 `prefers-reduced-motion`이 켜지면 점멸과 이동 효과를 모두 생략합니다. 이 레이어는 제목·Ex 입력창·읽기 모드에는 적용하지 않습니다.
 
 주제 모음은 [TOPICS.md](TOPICS.md)의 블록 범위/그룹 계약을 사용합니다. 코어의 `topics.list`/`topics.blocks`와 `topics.reorder`는 CLI에서도 사용할 수 있습니다. 순서는 별도 vault 메타데이터에 저장하고 노트 본문을 바꾸지 않습니다. 원본/순서 snapshot revision을 함께 검사하며, 순서 키의 이름→UUID 이전은 노트 변경 transaction에 포함합니다. 백업/복원은 이 메타데이터를 검증하고 보존합니다. 원본 정보 표시는 기기별 localStorage에 저장하고 공통 `topics.sources.toggle` 명령으로 전환하며, 조회 조건·원본 데이터와 분리합니다. 카드의 원본 버튼은 노트 본문의 1-based 행을 기존 `openNote` 경로에 전달합니다. 편집기는 mount effect가 안정된 다음 프레임에 준비 완료를 알리고, cleanup은 이전 알림을 취소합니다. 개발 StrictMode의 편집기 재생성이 대기 중인 커서 이동을 먼저 소비하지 않도록 한 규칙입니다.
+
+체크박스의 `[ ]`·`[/]`·`[x]` 마우스 전환은 Live Preview에서 CodeMirror transaction, 읽기 모드에서 기존 note draft/자동 저장, 주제 모음에서 revision을 포함한 `task.update`를 사용합니다. `previewListSource`의 원본 행 매핑은 프론트매터 제거와 표시용 목록 구분 줄 삽입을 거친 `remarkTasks`의 위치를 실제 본문 행으로 복원합니다. 주제 카드 빈 공간 클릭은 원본 버튼과 같은 `openNote(id,line)`을 호출하되 컨트롤·선택·드래그 클릭을 제외합니다.
+
 
 새 vault는 `vim: false`, `editorMode: live`로 시작합니다. 기존의 명시적 Vim 설정은 유지합니다. live/source 전환은 CodeMirror compartment를 재설정하며 같은 문서와 undo history를 사용합니다. 읽기 모드는 별도 renderer입니다. Live Preview의 decoration은 편집기 focus effect와 선택 범위를 따라 활성 줄/블록만 원문으로 드러내고, 본문을 떠나면 미리보기로 복귀합니다. 선택 끝이 다음 줄 시작과 일치하면 선택되지 않은 다음 줄은 제외합니다. 보기 모드 버튼/명령은 편집기 mount 완료 시 대기 중인 focus를 적용합니다. 표·쿼리는 기존 NotePreview를 재사용합니다. 위키링크와 웹 링크는 편집 중 Ctrl/Cmd+클릭으로 열 수 있습니다.
 

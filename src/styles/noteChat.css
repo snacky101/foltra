@@ -1,0 +1,310 @@
+.note-chat {
+  color: var(--ink);
+  min-width: 0;
+  font: 12px/1.6 var(--body-font);
+}
+.note-chat-header,
+.note-chat-header > div,
+.note-chat-settings-heading,
+.note-chat-settings-footer,
+.note-chat-send,
+.note-chat-wait,
+.note-chat-apply {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.note-chat-header,
+.note-chat-send,
+.note-chat-settings-footer {
+  justify-content: space-between;
+}
+.note-chat-header {
+  margin-bottom: 8px;
+}
+.note-chat-header strong {
+  font-size: 12px;
+  font-weight: 650;
+}
+.note-chat-header .icon-button {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  color: var(--muted);
+}
+.note-chat-note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 11px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.note-chat-messages {
+  min-height: 120px;
+  max-height: 300px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 0 4px 0 0;
+  scrollbar-width: thin;
+}
+.note-chat-empty {
+  padding: 25px 14px;
+  text-align: center;
+  color: var(--muted);
+}
+.note-chat-empty > svg {
+  opacity: 0.55;
+}
+.note-chat-empty p {
+  margin: 9px 0 4px;
+  color: var(--ink);
+}
+.note-chat-empty small {
+  font-size: 11px;
+  line-height: 1.7;
+}
+.note-chat-message {
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+.note-chat-message.is-user {
+  background: color-mix(in srgb, var(--accent) 7%, transparent);
+  border: 0;
+  border-radius: 9px;
+  padding: 10px 12px;
+  margin: 8px 0;
+}
+.note-chat-role {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  margin-bottom: 5px;
+}
+.note-chat-markdown {
+  overflow-wrap: anywhere;
+}
+.note-chat-markdown > :first-child {
+  margin-top: 0;
+}
+.note-chat-markdown > :last-child {
+  margin-bottom: 0;
+}
+.note-chat-markdown p {
+  margin: 8px 0;
+}
+.note-chat-markdown h1,
+.note-chat-markdown h2,
+.note-chat-markdown h3 {
+  font-size: 1.12em;
+  font-family: inherit;
+  margin: 12px 0 6px;
+}
+.note-chat-markdown ul,
+.note-chat-markdown ol {
+  padding-left: 20px;
+}
+.note-chat-markdown pre {
+  overflow-x: auto;
+  padding: 10px;
+  border-radius: 6px;
+  background: var(--panel);
+}
+.note-chat-markdown code {
+  font-size: 0.92em;
+}
+.note-chat-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.note-chat-markdown table {
+  width: 100%;
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+.note-chat-markdown td,
+.note-chat-markdown th {
+  padding: 4px 7px;
+  border: 1px solid var(--line);
+}
+.note-chat-apply {
+  font-size: 10px;
+  color: var(--accent);
+  margin-top: 10px;
+  padding: 4px 0;
+}
+.note-chat-apply:hover {
+  text-decoration: underline;
+}
+.note-chat-wait {
+  font-size: 11px;
+  color: var(--muted);
+  padding: 10px 0;
+}
+.note-chat-spinner {
+  animation: note-chat-spin 1s linear infinite;
+}
+@keyframes note-chat-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .note-chat-spinner {
+    animation: none;
+  }
+}
+.note-chat-composer {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  margin-top: 12px;
+  padding: 9px;
+}
+.note-chat-composer:focus-within {
+  border-color: var(--accent);
+}
+.note-chat-modes {
+  display: inline-flex;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.note-chat-modes button {
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.note-chat-modes button[aria-pressed='true'] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.note-chat-composer textarea {
+  width: 100%;
+  min-height: 66px;
+  max-height: 160px;
+  border: 0;
+  outline: 0;
+  box-shadow: none;
+  background: transparent;
+  padding: 4px 2px;
+  resize: vertical;
+  color: var(--ink);
+  font: 12px/1.7 var(--body-font);
+}
+.note-chat-composer textarea:focus {
+  outline: 0;
+  box-shadow: none;
+}
+.note-chat-send small {
+  font-size: 9px;
+  color: var(--muted);
+}
+.note-chat-send button {
+  display: grid;
+  place-items: center;
+  width: 27px;
+  height: 27px;
+  border-radius: 7px;
+  color: var(--paper);
+  background: var(--accent);
+}
+.note-chat button:disabled,
+.note-chat-settings button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.note-chat button:focus-visible,
+.note-chat-settings button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.note-chat-hint {
+  font: 11px/1.7 var(--body-font);
+  color: var(--muted);
+  margin: 8px 0 12px;
+}
+.note-chat-error {
+  font-size: 11px;
+  line-height: 1.7;
+  color: var(--danger);
+  margin: 10px 0;
+  overflow-wrap: anywhere;
+}
+.note-chat-error p {
+  margin: 0 0 4px;
+}
+.note-chat-error button {
+  text-decoration: underline;
+}
+.note-chat-confirm {
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  font-size: 11px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.note-chat-confirm span {
+  width: 100%;
+}
+.note-chat-confirm button:first-of-type {
+  color: var(--danger);
+}
+.note-chat-settings {
+  max-width: 560px;
+  color: var(--ink);
+}
+.note-chat-settings-heading {
+  margin-bottom: 12px;
+}
+.note-chat-settings-heading strong {
+  font-size: 14px;
+}
+.note-chat-settings > label {
+  display: grid;
+  gap: 7px;
+  margin: 16px 0;
+  font-size: 12px;
+}
+.note-chat-settings label small {
+  margin-left: 7px;
+  font-size: 10px;
+  color: var(--accent);
+}
+.note-chat-settings input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font: 12px/1.5 var(--body-font);
+}
+.note-chat-settings input:focus {
+  outline: 2px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  outline-offset: 1px;
+}
+.note-chat-text-button {
+  color: var(--danger);
+  font-size: 11px;
+}
+.note-chat-settings-footer {
+  margin-top: 20px;
+  gap: 12px;
+}
+.note-chat-settings-footer > span {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 10px;
+  color: var(--accent);
+}
+.note-chat-settings-footer .primary-button {
+  padding: 8px 18px;
+  font-size: 12px;
+}
