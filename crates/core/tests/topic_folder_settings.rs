@@ -57,3 +57,37 @@ fn invalid_topic_folder_preferences_do_not_partially_save() {
         assert_eq!(std::fs::read(&file).unwrap(), before);
     }
 }
+
+#[test]
+fn graph_timeline_and_custom_tree_preferences_are_independent_and_validated() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().to_str().unwrap();
+    execute(path, "vault.init", json!({"name":"Views"})).unwrap();
+    let folder = execute(path, "folder.create", json!({"name":"Work"})).unwrap();
+    let id = folder["id"].clone();
+    let graph = json!({"include":[id],"exclude":[]});
+    execute(
+        path,
+        "settings.update",
+        json!({"graphFolders":graph,"treeCustomSort":true,"treeOrder":[id]}),
+    )
+    .unwrap();
+    let settings = execute(path, "settings.get", json!({})).unwrap();
+    assert_eq!(settings["graphFolders"], graph);
+    assert_eq!(
+        settings["timelineFolders"],
+        json!({"include":[],"exclude":[]})
+    );
+    assert_eq!(settings["topicFolders"], json!({"include":[],"exclude":[]}));
+    assert_eq!(settings["treeOrder"], json!([id]));
+    for patch in [
+        json!({"graphFolders":{"include":["invalid"],"exclude":[]}}),
+        json!({"timelineFolders":{"exclude":true}}),
+        json!({"treeOrder":[id,id]}),
+        json!({"treeOrder":["../path"]}),
+        json!({"treeCustomSort":"yes"}),
+    ] {
+        assert!(execute(path, "settings.update", patch).is_err());
+        assert_eq!(execute(path, "settings.get", json!({})).unwrap(), settings);
+    }
+}

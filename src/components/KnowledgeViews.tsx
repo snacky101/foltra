@@ -1,18 +1,25 @@
 import { Select } from './Select';
 import { useState } from 'react';
 import { ArrowUpRight } from 'lucide-react';
-import type { Workspace } from '../lib/types';
+import { TopicFolderFilter } from './TopicFolderFilter';
+import { filterFolderNotes } from '../lib/folderFilter';
+import type { Settings, Workspace } from '../lib/types';
 import { noteLinks } from '../lib/noteLinks';
 
 export function TimelineView({
   workspace,
   openNote,
+  updateSettings,
 }: {
   workspace: Workspace;
+  updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
   openNote: (id: string) => void;
 }) {
   const [basis, setBasis] = useState<'createdAt' | 'updatedAt'>('updatedAt');
-  const notes = [...workspace.notes].sort((a, b) => b[basis].localeCompare(a[basis]));
+  const filter = workspace.settings.timelineFolders ?? { include: [], exclude: [] };
+  const notes = filterFolderNotes(workspace.notes, workspace.folders, filter).sort((a, b) =>
+    b[basis].localeCompare(a[basis]),
+  );
   const links = noteLinks(workspace);
   return (
     <section className="page-view">
@@ -29,6 +36,13 @@ export function TimelineView({
         </Select>
       </div>
       <p className="page-description">생각이 이어진 시간을 따라, 기록을 다시 만나보세요.</p>
+      <TopicFolderFilter
+        folders={workspace.folders}
+        value={filter}
+        setting="timelineFolders"
+        label="기록의 흐름 폴더 범위"
+        updateSettings={updateSettings}
+      />
       <div className="timeline-list">
         {notes.map((note) => (
           <button className="timeline-entry" key={note.id} onClick={() => openNote(note.id)}>
@@ -50,7 +64,9 @@ export function TimelineView({
           </button>
         ))}
       </div>
-      {!notes.length && <p className="empty-small">첫 노트를 만들면 이곳에서 기록의 흐름을 볼 수 있어요.</p>}
+      {!notes.length && (
+        <p className="empty-small">표시할 노트가 없습니다. 노트를 만들거나 폴더 필터를 확인하세요.</p>
+      )}
     </section>
   );
 }

@@ -7,6 +7,8 @@ use std::collections::HashSet;
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub(crate) struct RuntimeConfig {
     pub api_version: u32,
+    #[serde(default)]
+    pub tree_icons: bool,
     pub source: String,
     #[serde(default)]
     pub permissions: Vec<String>,
@@ -76,7 +78,8 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         "automation",
     ];
     let mut ids = HashSet::new();
-    if config.api_version != 1
+    if (config.tree_icons && !config.permissions.iter().any(|p| p == "ui"))
+        || config.api_version != 1
         || config.source.trim().is_empty()
         || config.source.len() > 200_000
         || config.permissions.len() > allowed.len()
@@ -154,6 +157,51 @@ pub(crate) fn validate(value: &Value) -> Result<RuntimeConfig> {
         }
     }
     Ok(config)
+}
+
+pub(crate) fn validate_tree_icons(value: &Value) -> Result<()> {
+    let names = [
+        "file-text",
+        "folder",
+        "table",
+        "book-open",
+        "notebook",
+        "bookmark",
+        "star",
+        "heart",
+        "lightbulb",
+        "code",
+        "calendar",
+        "check-square",
+        "briefcase",
+        "graduation-cap",
+        "music",
+        "image",
+        "globe",
+        "coffee",
+        "archive",
+        "inbox",
+    ];
+    let icon = |value: &Value| value.as_str().is_some_and(|name| names.contains(&name));
+    let valid = value.as_object().is_some_and(|object| {
+        object.iter().all(|(key, value)| match key.as_str() {
+            "note" | "folder" | "database" => icon(value),
+            "items" => value.as_object().is_some_and(|items| {
+                items.len() <= 5000
+                    && items
+                        .iter()
+                        .all(|(id, value)| crate::id(id).is_ok() && icon(value))
+            }),
+            _ => false,
+        })
+    });
+    if !valid {
+        return Err(Error::new(
+            "invalid_tree_icons",
+            "Tree icons must use supported icon names and object UUIDs",
+        ));
+    }
+    Ok(())
 }
 
 pub(crate) fn validate_completions(value: &Value) -> Result<()> {

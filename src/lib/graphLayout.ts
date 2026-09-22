@@ -13,6 +13,8 @@ export interface GraphNode {
   radius: number;
   x: number;
   y: number;
+  fx?: number | null;
+  fy?: number | null;
 }
 export interface GraphLayout {
   nodes: GraphNode[];
@@ -21,7 +23,7 @@ export interface GraphLayout {
 }
 
 // Runs in a worker: d3 mutates only these disposable layout objects, never vault data.
-export function layoutGraph(input: GraphInput): GraphLayout {
+export function createGraphSimulation(input: GraphInput) {
   const nodes: GraphNode[] = input.notes
     .slice(0, 120)
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -72,14 +74,17 @@ export function layoutGraph(input: GraphInput): GraphLayout {
     .force('x', forceX(0).strength(0.012))
     .force('y', forceY(0).strength(0.012))
     .velocityDecay(0.45);
-  simulation.tick(300);
+  return { nodes, edges, simulation };
+}
+
+export function graphSnapshot(nodes: GraphNode[], edges: GraphLayout['edges']): GraphLayout {
   const left = Math.min(0, ...nodes.map((n) => n.x - Math.max(n.labelWidth / 2, n.radius + 10))) - 40;
   const right = Math.max(0, ...nodes.map((n) => n.x + Math.max(n.labelWidth / 2, n.radius + 10))) + 40;
   const top = Math.min(0, ...nodes.map((n) => n.y - n.radius - 10)) - 40;
   const bottom = Math.max(0, ...nodes.map((n) => n.y + n.radius + 30)) + 60;
   const scale = Math.max((right - left) / 840, (bottom - top) / 560, 1);
   return {
-    nodes,
+    nodes: nodes.map((node) => ({ ...node })),
     edges,
     bounds: {
       x: (left + right - 840 * scale) / 2,
@@ -88,4 +93,10 @@ export function layoutGraph(input: GraphInput): GraphLayout {
       height: 560 * scale,
     },
   };
+}
+
+export function layoutGraph(input: GraphInput): GraphLayout {
+  const { nodes, edges, simulation } = createGraphSimulation(input);
+  simulation.tick(300);
+  return graphSnapshot(nodes, edges);
 }

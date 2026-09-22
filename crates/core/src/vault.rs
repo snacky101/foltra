@@ -172,7 +172,7 @@ pub fn restore(store: &Store, args: &Value) -> Result<Value> {
 }
 
 pub fn settings(store: &Store) -> Result<Value> {
-    let mut defaults = json!({"vim":false,"editorMode":"live","lineNumbers":"none","editorFontFamily":"","databaseFontFamily":"","databaseFontSize":14,"topicFolders":{"include":[],"exclude":[]},"cursorShape":"bar","cursorFollowVim":true,"cursorBlink":"blink","cursorBlinkRate":600,"cursorAnimation":"none","slash":false,"showUnresolvedLinks":true,"leader":" ","theme":"paper","keybindings":{},"shortcutVersion":4});
+    let mut defaults = json!({"vim":false,"editorMode":"live","lineNumbers":"none","editorFontFamily":"","databaseFontFamily":"","databaseFontSize":14,"topicFolders":{"include":[],"exclude":[]},"graphFolders":{"include":[],"exclude":[]},"timelineFolders":{"include":[],"exclude":[]},"treeCustomSort":false,"treeOrder":[],"cursorShape":"bar","cursorFollowVim":true,"cursorBlink":"blink","cursorBlinkRate":600,"cursorAnimation":"none","slash":false,"showUnresolvedLinks":true,"leader":" ","theme":"paper","keybindings":{},"shortcutVersion":4});
     if let Some(raw) = store.optional(".foltra/settings.json")? {
         let mut saved: Map<String, Value> = serde_json::from_str(&raw)?;
         validate_settings(&saved)?;
@@ -193,7 +193,8 @@ pub(crate) fn validate_settings(values: &Map<String, Value>) -> Result<()> {
     for (key, value) in values {
         match key.as_str() {
             "shortcutVersion" if matches!(value.as_u64(), Some(1..=4)) => {}
-            "vim" | "slash" | "showUnresolvedLinks" | "cursorFollowVim" if value.is_boolean() => {}
+            "vim" | "slash" | "showUnresolvedLinks" | "cursorFollowVim" | "treeCustomSort"
+                if value.is_boolean() => {}
             "editorMode"
                 if value
                     .as_str()
@@ -222,7 +223,17 @@ pub(crate) fn validate_settings(values: &Map<String, Value>) -> Result<()> {
                         && name.chars().count() <= 100
                         && !name.chars().any(char::is_control)
                 }) => {}
-            "topicFolders" if crate::topics::validate_folder_filter(value).is_ok() => {}
+            "topicFolders" | "graphFolders" | "timelineFolders"
+                if crate::topics::validate_folder_filter(value).is_ok() => {}
+            "treeOrder"
+                if value.as_array().is_some_and(|items| {
+                    let mut unique = std::collections::HashSet::new();
+                    items.len() <= 20_000
+                        && items.iter().all(|item| {
+                            item.as_str()
+                                .is_some_and(|id| crate::id(id).is_ok() && unique.insert(id))
+                        })
+                }) => {}
             "theme"
                 if value.as_str().is_some_and(|s| {
                     s.len() <= 80 && s.bytes().all(|c| c.is_ascii_alphanumeric() || c == b'-')

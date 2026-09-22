@@ -133,7 +133,7 @@ test('pending writes block repeated clicks and conflicting revisions are never r
       : implementation(path, command, args),
   );
   await act(async () => checkboxes()[0].click());
-  expect(checkboxes().every((button) => button.disabled)).toBe(true);
+  expect(checkboxes().every((button) => button.getAttribute('aria-disabled') === 'true')).toBe(true);
   await act(async () => checkboxes()[1].click());
   expect(writes()).toHaveLength(1);
   await act(async () => reject(Error('외부에서 변경되었습니다.')));
@@ -153,6 +153,50 @@ test('completing the last remaining checkbox immediately updates the completed-i
   expect(host.textContent).toContain('표시할 항목이 없습니다.');
 });
 
+test('task saves preserve the hint, checkbox focus and an open sort dropdown through refresh', async () => {
+  const hint = host.querySelector('.topic-order-hint')!;
+  const description = hint.textContent;
+  const checkbox = checkboxes()[0];
+  const sort = host.querySelector<HTMLButtonElement>('[aria-label="주제 카드 정렬"]')!;
+  const filter = host.querySelector<HTMLButtonElement>('.topic-completed-filter')!;
+  const handle = host.querySelector<HTMLButtonElement>('.topic-drag-handle')!;
+  const implementation = vi.mocked(call).getMockImplementation()!;
+  let finishWrite!: () => void;
+  const reads: (() => void)[] = [];
+  vi.mocked(call).mockImplementation(async (path, command, args) => {
+    if (command === 'task.update') await new Promise<void>((resolve) => (finishWrite = resolve));
+    const result = await implementation(path, command, args);
+    if (command.startsWith('topics.')) await new Promise<void>((resolve) => reads.push(resolve));
+    return result;
+  });
+  await act(async () => {
+    checkbox.focus();
+    checkbox.click();
+  });
+  expect(hint.textContent).toBe(description);
+  expect(checkbox.disabled).toBe(false);
+  expect(checkbox.getAttribute('aria-disabled')).toBe('true');
+  expect(document.activeElement).toBe(checkbox);
+  expect(handle.disabled).toBe(false);
+  expect(handle.getAttribute('aria-disabled')).toBe('true');
+  expect(sort.disabled).toBe(false);
+  expect(filter.disabled).toBe(false);
+  await act(async () => sort.click());
+  const dropdown = host.querySelector('[role=listbox]');
+  expect(dropdown).not.toBeNull();
+  await act(async () => finishWrite());
+  expect(hint.textContent).toBe(description);
+  expect(host.querySelector('[role=listbox]')).toBe(dropdown);
+  expect(sort.disabled).toBe(false);
+  workspace = { ...workspace, notes: [{ ...workspace.notes[0], revision }] };
+  await act(async () => root.render(<App />));
+  expect(host.querySelector('[role=listbox]')).toBe(dropdown);
+  await act(async () => reads.splice(0).forEach((resolve) => resolve()));
+  expect(hint.textContent).toBe(description);
+  expect(host.querySelector('[role=listbox]')).toBe(dropdown);
+  expect(checkbox.getAttribute('aria-checked')).toBe('true');
+});
+
 test('checkbox refresh keeps cards mounted through delayed reads and a workspace revision update', async () => {
   const original = card();
   const checkbox = checkboxes()[0];
@@ -169,7 +213,7 @@ test('checkbox refresh keeps cards mounted through delayed reads and a workspace
   expect(host.querySelector('.topic-navigation')).toBe(navigation);
   expect(checkboxes()[0]).toBe(checkbox);
   expect(host.textContent).not.toMatch(/주제를 불러오는 중|카드를 모으는 중/);
-  expect(checkbox.disabled).toBe(true);
+  expect(checkbox.getAttribute('aria-disabled')).toBe('true');
   await act(async () => checkbox.click());
   expect(writes()).toHaveLength(1);
 
@@ -181,7 +225,7 @@ test('checkbox refresh keeps cards mounted through delayed reads and a workspace
   expect(card()).toBe(original);
   expect(checkboxes()[0]).toBe(checkbox);
   expect(checkbox.getAttribute('aria-checked')).toBe('true');
-  expect(checkbox.disabled).toBe(false);
+  expect(checkbox.getAttribute('aria-disabled')).not.toBe('true');
 });
 
 test.each(['topics.list', 'topics.blocks'])(
@@ -197,7 +241,7 @@ test.each(['topics.list', 'topics.blocks'])(
     await act(async () => checkboxes()[0].click());
     expect(card()).toBe(original);
     expect(host.querySelector('[role=alert]')?.textContent).toContain('다시 불러오지 못했습니다.');
-    expect(checkboxes().every((button) => button.disabled)).toBe(true);
+    expect(checkboxes().every((button) => button.getAttribute('aria-disabled') === 'true')).toBe(true);
     vi.mocked(call).mockImplementation(implementation);
     await act(async () => host.querySelector<HTMLButtonElement>('[role=alert] button')!.click());
     expect(card()).toBe(original);

@@ -321,3 +321,53 @@ test('folder moves use the current snapshot and report failure without changing 
   await drop(folder('parent'), await startFolder('other'));
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
 });
+
+test('collapse all folds nested folders and leaves root notes selectable', async () => {
+  await render();
+  await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="폴더 모두 접기"]')!.click());
+  expect(row('source')).not.toBeNull();
+  expect(row('nested-note')).toBeNull();
+  expect(folder('parent').querySelector('button')!.getAttribute('aria-expanded')).toBe('false');
+  await act(async () => folder('parent').querySelector<HTMLButtonElement>('button')!.click());
+  expect(folder('nested').querySelector('button')!.getAttribute('aria-expanded')).toBe('false');
+  expect(row('parent-note')).not.toBeNull();
+});
+
+test('custom sorting inserts beside folders, while center drops still enter folders', async () => {
+  props.workspace = { ...workspace, settings: { ...workspace.settings, treeCustomSort: true } };
+  props.updateSettings = vi.fn().mockResolvedValue(true);
+  await render();
+  vi.spyOn(folder('parent'), 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40 } as DOMRect);
+  const data = await start();
+  await drag(folder('parent'), 'dragover', data);
+  expect(folder('parent').dataset.dropPosition).toBe('before');
+  await drag(folder('parent'), 'drop', data);
+  expect(props.moveNote).not.toHaveBeenCalled();
+  const patch = vi.mocked(props.updateSettings).mock.calls[0][0];
+  expect(patch.treeOrder!.indexOf('source')).toBe(patch.treeOrder!.indexOf('parent') - 1);
+  props.workspace = { ...props.workspace, settings: { ...props.workspace.settings, ...patch } };
+  await render();
+  expect(row('source').nextElementSibling).toBe(branch('parent'));
+  // Default ordering can be restored without deleting the user's order.
+  props.workspace = { ...props.workspace, settings: { ...props.workspace.settings, treeCustomSort: false } };
+  await render();
+  expect(host.querySelector('.note-navigation > :first-child')?.classList.contains('folder-branch')).toBe(
+    true,
+  );
+  props.workspace.settings.treeCustomSort = true;
+  await render();
+  const next = await start();
+  vi.spyOn(folder('parent'), 'getBoundingClientRect').mockReturnValue({ top: -20, height: 40 } as DOMRect);
+  await drop(folder('parent'), next);
+  expect(props.moveNote).toHaveBeenCalledWith(source, 'parent');
+});
+
+test('custom ordering rejects a dragged folder inside its descendants', async () => {
+  props.workspace = { ...workspace, settings: { ...workspace.settings, treeCustomSort: true } };
+  props.updateSettings = vi.fn().mockResolvedValue(true);
+  await render();
+  vi.spyOn(row('nested-note'), 'getBoundingClientRect').mockReturnValue({ top: 0, height: 40 } as DOMRect);
+  await drop(row('nested-note'), await startFolder('parent'));
+  expect(props.treeEditing.moveFolder).not.toHaveBeenCalled();
+  expect(props.updateSettings).not.toHaveBeenCalled();
+});

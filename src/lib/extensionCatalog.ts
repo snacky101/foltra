@@ -1,3 +1,4 @@
+import treeIcons from '../../examples/plugins/tree-icons.json';
 import noteChat from '../../examples/plugins/note-chat.json';
 import anki from '../../examples/plugins/anki.json';
 import calendar from '../../examples/plugins/daily-calendar.json';
@@ -12,5 +13,6 @@ export const extensionCatalog = [
   dates,
   gitSync,
   noteChat,
+  treeIcons,
   ...themeCatalog,
 ] as readonly Extension[];

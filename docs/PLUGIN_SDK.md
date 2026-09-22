@@ -115,3 +115,11 @@ A manifest `backgroundCommand` requires `automation` and must reference a declar
 ## Git host effects
 
 `api.git('status')` reads device-local connection, job, conflict previews and recent history under the `git.sync` permission. `api.git('configure' | 'sync' | 'resolve', params)` only queues a host effect from a desktop command/action with `git.sync` and `ui`; it never executes a shell or waits for Git inside QuickJS. Rendering/completions/headless effects and `api.call('git.*')` bypasses are rejected. The host verifies the current package grant, confirms connection changes in its own dialog, appends the real plugin ID/digest, saves the draft, and starts a separate core request. Core rechecks authorization before apply and push. Status polling runs independently of the plugin queue and vault data rerenders. Expected transport/merge failures become job states instead of disabling the interpreter session. Device-local settings are never read from synchronized plugin storage. See [GIT.md](GIT.md) for command contracts and limits.
+
+## File-tree icons
+
+Declare `runtime.treeIcons: true` with the `ui` permission and implement `treeIcons(api): TreeIcons`. The desktop invokes this read-only provider on activation and plugin-data changes. Return optional `note`, `folder`, `database` icon names and an `items` map of object UUIDs to icon names (up to 5,000). Individual overrides take precedence over type defaults. Multiple enabled providers merge in workspace order, with later values winning. No HTML, SVG strings, remote images or CSS are accepted; icons inherit the current theme color and fixed row size.
+
+Supported names: `file-text`, `folder`, `table`, `book-open`, `notebook`, `bookmark`, `star`, `heart`, `lightbulb`, `code`, `calendar`, `check-square`, `briefcase`, `graduation-cap`, `music`, `image`, `globe`, `coffee`, `archive`, `inbox`.
+
+The event is desktop-only and cannot write, navigate, notify, read the editor or use Anki/Git effects. Use a settings-view action and revision-checked `api.storage.write` to save choices. Providers should depend on their own settings/storage, not session state or live note contents. Deactivation/uninstall immediately restores host icons without changing any file. See `examples/code/tree-icons` for defaults, per-object overrides, search and reset controls.

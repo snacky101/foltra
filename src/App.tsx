@@ -27,6 +27,7 @@ import { useNoteActions, type NoteAction } from './lib/useNoteActions';
 import { useDatabaseActions, type DatabaseAction } from './lib/useDatabaseActions';
 import { focusSidebarTree, moveWorkspaceFocus, rememberWorkspaceFocus } from './lib/workspaceFocus';
 import { useCommandKeys } from './lib/useCommandKeys';
+import { useMouseNavigation } from './lib/useMouseNavigation';
 import { useCloseGuard } from './lib/useCloseGuard';
 import { useDesktopOpenPaths, type DesktopOpenTarget } from './lib/useDesktopOpenPaths';
 import { leaderCandidates, sequenceKeys } from './lib/commands';
@@ -38,6 +39,8 @@ import { runNoteCommand, type NoteCommand } from './lib/noteCommands';
 import type { Note, Row, Settings, View, Query, Folder, Database, Property } from './lib/types';
 import { Welcome } from './components/Welcome';
 import { VaultPicker } from './components/VaultPicker';
+import { savedTreeOrder } from './lib/treeOrder';
+import { useTreeIcons } from './lib/useTreeIcons';
 import { Sidebar } from './components/Sidebar';
 import { NoteContextMenu, type NoteMenuTarget } from './components/NoteContextMenu';
 import { FolderDialog } from './components/FolderDialog';
@@ -87,6 +90,7 @@ export default function App() {
   const editorMode = workspace?.settings.editorMode ?? 'live';
   const preview = editorMode === 'read';
   const [backlinks, setBacklinks] = useState(true);
+  const [collapseTreeVersion, setCollapseTreeVersion] = useState(0);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('foltra:sidebar-collapsed:left') === 'true',
   );
@@ -292,6 +296,7 @@ export default function App() {
     }
     if (preview) void updateSettings({ editorMode: 'live' });
   };
+  const treeIcons = useTreeIcons(workspace, onError);
   const updateSettings = async (patch: Partial<Settings>) => {
     try {
       await call(vault.path, 'settings.update', patch);
@@ -505,7 +510,7 @@ export default function App() {
     },
     'note.follow-link': () => editor.current?.followLink(),
     'note.follow-existing-link': () => editor.current?.followLink(false),
-    'note.back': () => navigateHistory('back'),
+    'note.back': () => (settingsNavigation.opened ? settingsNavigation.close() : navigateHistory('back')),
     'note.forward': () => navigateHistory('forward'),
     'note.query': () => setDialog({ kind: 'query' }),
     'note.delete': () => currentNoteAction('delete'),
@@ -545,6 +550,14 @@ export default function App() {
         document.activeElement === sidebarToggle.current;
       setSidebarCollapsed((p) => !p);
       if (restoreFocus) requestAnimationFrame(() => sidebarToggle.current?.focus());
+    },
+    'tree.collapse-all': () => setCollapseTreeVersion((version) => version + 1),
+    'tree.sort.toggle': async () => {
+      if (workspace)
+        await updateSettings({
+          treeCustomSort: !workspace.settings.treeCustomSort,
+          ...(!workspace.settings.treeCustomSort ? { treeOrder: savedTreeOrder(workspace) } : {}),
+        });
     },
     'sidebar.navigation.compact': () => setCompactNavigation((p) => !p),
     'database.create': () => setDialog({ kind: 'new-database' }),
@@ -625,24 +638,21 @@ export default function App() {
     const command = commands.find((c) => c.id === id);
     if (command) void Promise.resolve().then(command.run).catch(onError);
   };
-  const pending = useCommandKeys(
-    commands,
-    workspace?.settings,
-    mode,
+  const commandsBlocked =
     openingPath ||
-      palette ||
-      !!dialog ||
-      vaultPicker ||
-      !!noteMenu ||
-      !!noteActions.moving ||
-      !!folderDialog ||
-      !!databaseActions.deleting ||
-      !!plugins.git.connection ||
-      updates.opened ||
-      updates.blocking ||
-      noteActions.busy,
-    onError,
-  );
+    palette ||
+    !!dialog ||
+    vaultPicker ||
+    !!noteMenu ||
+    !!noteActions.moving ||
+    !!folderDialog ||
+    !!databaseActions.deleting ||
+    !!plugins.git.connection ||
+    updates.opened ||
+    updates.blocking ||
+    noteActions.busy;
+  const pending = useCommandKeys(commands, workspace?.settings, mode, commandsBlocked, onError);
+  useMouseNavigation(dispatch, !workspace || commandsBlocked);
   const activeDatabase = workspace?.databases.find((db) => db.id === databaseId);
   if (!workspace)
     return (
@@ -688,6 +698,11 @@ export default function App() {
         onFocusCapture={(e) => rememberWorkspaceFocus(e.target)}
       >
         <Sidebar
+          treeIcons={treeIcons}
+          collapseTreeVersion={collapseTreeVersion}
+          collapseTree={() => dispatch('tree.collapse-all')}
+          toggleCustomSort={() => dispatch('tree.sort.toggle')}
+          updateSettings={updateSettings}
           workspace={workspace}
           settingsOpen={settingsNavigation.opened}
           settingsGroup={settingsNavigation.group}
@@ -749,13 +764,7 @@ export default function App() {
               className="icon-button"
               aria-label={settingsNavigation.opened ? '작업으로 돌아가기' : '이전 노트'}
               disabled={!settingsNavigation.opened && !history.back.length}
-              onClick={() => {
-                if (settingsNavigation.opened) {
-                  settingsNavigation.close();
-                  return;
-                }
-                dispatch('note.back');
-              }}
+              onClick={() => dispatch('note.back')}
             >
               <ArrowLeft size={17} />
             </button>
@@ -919,6 +928,7 @@ export default function App() {
                 ))}
               {workView === 'graph' && (
                 <GraphView
+                  updateSettings={updateSettings}
                   key={workspace.vault.id}
                   workspace={workspace}
                   openNote={(id) => void openNote(id)}
@@ -926,7 +936,11 @@ export default function App() {
                 />
               )}
               {workView === 'timeline' && (
-                <TimelineView workspace={workspace} openNote={(id) => void openNote(id)} />
+                <TimelineView
+                  workspace={workspace}
+                  openNote={(id) => void openNote(id)}
+                  updateSettings={updateSettings}
+                />
               )}
               {workView === 'topics' && (
                 <TopicsView

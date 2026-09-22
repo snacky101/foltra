@@ -2285,3 +2285,27 @@
 .note-navigation-row > button[draggable='true']:active {
   cursor: grabbing;
 }
+
+.sidebar-section-actions button[aria-pressed='true'] {
+  color: var(--sidebar-ink);
+  background: color-mix(in srgb, var(--sidebar-ink) 14%, transparent);
+}
+.note-navigation-row[data-drop-position] {
+  position: relative;
+}
+.note-navigation-row[data-drop-position]::after {
+  content: '';
+  position: absolute;
+  height: 2px;
+  left: 8px;
+  right: 4px;
+  background: var(--sidebar-ink);
+  pointer-events: none;
+  z-index: 1;
+}
+.note-navigation-row[data-drop-position='before']::after {
+  top: -1px;
+}
+.note-navigation-row[data-drop-position='after']::after {
+  bottom: -1px;
+}

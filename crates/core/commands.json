@@ -885,6 +885,25 @@
           "type": "object",
           "description": "Topic source folders: include/exclude UUID arrays. Empty include means all; exclusions win; descendants included; empty ID means root-level notes."
         },
+        "graphFolders": {
+          "type": "object",
+          "description": "Graph include/exclude folders; same rules as topicFolders."
+        },
+        "timelineFolders": {
+          "type": "object",
+          "description": "Timeline include/exclude folders; same rules as topicFolders."
+        },
+        "treeCustomSort": {
+          "type": "boolean",
+          "description": "Use the saved manual file-tree order."
+        },
+        "treeOrder": {
+          "type": "array",
+          "description": "Ordered unique note/folder UUIDs, at most 20000; only sibling order is affected.",
+          "items": {
+            "type": "string"
+          }
+        },
         "cursorShape": {
           "type": "string"
         },

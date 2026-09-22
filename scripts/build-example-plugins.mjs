@@ -5,3 +5,5 @@ await packPlugin('examples/code/date-mentions', 'examples/plugins/date-mentions.
 await packPlugin('examples/code/git-sync', 'examples/plugins/git-sync.json');
 
 await packPlugin('examples/code/note-chat', 'examples/plugins/note-chat.json');
+
+await packPlugin('examples/code/tree-icons', 'examples/plugins/tree-icons.json');

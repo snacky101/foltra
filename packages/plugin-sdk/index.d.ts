@@ -115,7 +115,36 @@ export interface Api {
   notify(message: string): void;
   editor: { read(): EditorSnapshot; replaceSelection(text: string): void };
 }
+export type TreeIconName =
+  | 'file-text'
+  | 'folder'
+  | 'table'
+  | 'book-open'
+  | 'notebook'
+  | 'bookmark'
+  | 'star'
+  | 'heart'
+  | 'lightbulb'
+  | 'code'
+  | 'calendar'
+  | 'check-square'
+  | 'briefcase'
+  | 'graduation-cap'
+  | 'music'
+  | 'image'
+  | 'globe'
+  | 'coffee'
+  | 'archive'
+  | 'inbox';
+export interface TreeIcons {
+  note?: TreeIconName;
+  folder?: TreeIconName;
+  database?: TreeIconName;
+  items?: Record<string, TreeIconName>;
+}
 export interface Plugin {
+  /** Declare runtime.treeIcons:true and ui permission. Read-only; no editor snapshot or effects. At most 5000 UUID overrides. */
+  treeIcons?(api: Api): TreeIcons;
   onLoad?(api: Api): void;
   onUnload?(api: Api): void;
   onEvent?(api: Api, event: { name: string; args?: Record<string, unknown> }): void;

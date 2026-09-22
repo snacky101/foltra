@@ -6,9 +6,13 @@ export function TopicFolderFilter({
   folders,
   value,
   updateSettings,
+  setting = 'topicFolders',
+  label = '주제 모음 폴더 범위',
 }: {
   folders: Folder[];
   value: Settings['topicFolders'];
+  setting?: 'topicFolders' | 'graphFolders' | 'timelineFolders';
+  label?: string;
   updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
 }) {
   const [open, setOpen] = useState(false);
@@ -37,7 +41,7 @@ export function TopicFolderFilter({
     pending.current = true;
     setSaving(true);
     try {
-      await updateSettings({ topicFolders: next });
+      await updateSettings({ [setting]: next });
     } finally {
       pending.current = false;
       setSaving(false);
@@ -78,7 +82,7 @@ export function TopicFolderFilter({
       </div>
       <div id={panelId} className="topic-filter-panel" hidden={!open}>
         <p>폴더를 선택하면 하위 폴더도 적용합니다. 포함을 비워두면 전체이며, 제외가 우선합니다.</p>
-        <fieldset disabled={saving} aria-label="주제 모음 폴더 범위">
+        <fieldset disabled={saving} aria-label={label}>
           <div className="topic-filter-columns" aria-hidden="true">
             <span>폴더</span>
             <span>포함</span>

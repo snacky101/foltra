@@ -1,18 +1,11 @@
 import { SettingsNavigation } from './SettingsNavigation';
 import type { SettingsGroup } from '../lib/settingsNavigation';
+import { TreeIcon, type TreeIcons } from './TreeIcon';
+import type { Settings } from '../lib/types';
 import { NoteTree } from './NoteTree';
 import { useCallback, useLayoutEffect, useState, type Ref } from 'react';
 import type { FolderAction, useTreeEditing } from '../lib/useTreeEditing';
-import {
-  ChevronDown,
-  Plus,
-  Table2,
-  Settings2,
-  Trash2,
-  ChevronsUpDown,
-  FolderOpen,
-  PanelLeft,
-} from 'lucide-react';
+import { ChevronDown, Plus, Settings2, Trash2, ChevronsUpDown, FolderOpen, PanelLeft } from 'lucide-react';
 import type { Workspace, View, NoteSummary, Database } from '../lib/types';
 import { ResizableSidebar } from './ResizableSidebar';
 import { SidebarNavigation } from './SidebarNavigation';
@@ -22,6 +15,11 @@ import { InlineTreeName } from './InlineTreeName';
 import { SidebarTreeContextMenu, type SidebarMenuTarget } from './SidebarTreeContextMenu';
 
 interface Props {
+  collapseTreeVersion?: number;
+  collapseTree?: () => void;
+  toggleCustomSort?: () => void;
+  updateSettings?: (patch: Partial<Settings>) => Promise<boolean>;
+  treeIcons?: TreeIcons;
   settingsOpen: boolean;
   settingsGroup: SettingsGroup;
   selectSettingsGroup: (group: SettingsGroup) => void;
@@ -57,6 +55,11 @@ interface Props {
   treeEditing: ReturnType<typeof useTreeEditing>;
 }
 export function Sidebar({
+  collapseTreeVersion,
+  collapseTree,
+  toggleCustomSort,
+  updateSettings,
+  treeIcons,
   settingsOpen,
   settingsGroup,
   selectSettingsGroup,
@@ -157,6 +160,7 @@ export function Sidebar({
                     <div className="database-navigation-row" data-database-id={db.id} key={db.id}>
                       {databaseEditing?.target.id === db.id ? (
                         <InlineTreeName
+                          icons={treeIcons}
                           key={db.id}
                           target={databaseEditing.target}
                           commit={databaseEditing.commit}
@@ -184,7 +188,7 @@ export function Sidebar({
                             }
                           }}
                         >
-                          <Table2 size={16} />
+                          <TreeIcon kind="database" id={db.id} icons={treeIcons} />
                           <span>{db.name}</span>
                           <small>{workspace.records.filter((r) => r.databaseId === db.id).length}</small>
                         </button>
@@ -200,6 +204,11 @@ export function Sidebar({
                 </div>
               </div>
               <NoteTree
+                collapseVersion={collapseTreeVersion}
+                collapseAll={collapseTree}
+                toggleCustomSort={toggleCustomSort}
+                updateSettings={updateSettings}
+                icons={treeIcons}
                 key={workspace.vault.id}
                 workspace={workspace}
                 activeId={view === 'notes' ? noteId : null}

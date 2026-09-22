@@ -194,6 +194,7 @@ test('bundled plugins are offered alongside local plugins', async () => {
     'date-mentions',
     'git-sync',
     'note-chat',
+    'tree-icons',
   ]);
   expect(extensionCatalog.filter((e) => e.kind === 'theme').map((e) => e.id)).toEqual([
     'catppuccin-mocha',
@@ -207,6 +208,7 @@ test('bundled plugins are offered alongside local plugins', async () => {
     '날짜 자동완성',
     'Git 동기화',
     '노트 채팅',
+    '파일 트리 아이콘',
   ]);
   const custom = { ...calendarFixture, id: 'local-calendar', name: 'My calendar' };
   await upload(JSON.stringify(custom));

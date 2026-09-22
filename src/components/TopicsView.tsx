@@ -38,6 +38,7 @@ export function TopicsView({
   const { topics, topic, data, error, reload, saving, refreshing, taskSaving, toggleTask, move, scopeKey } =
     useTopics(workspace, options);
   const busy = saving || refreshing;
+  const reordering = saving && !taskSaving;
   const dragged = useRef(false);
   const folderFilter = workspace.settings.topicFolders ?? { include: [], exclude: [] };
   const filtered = folderFilter.include.length + folderFilter.exclude.length > 0;
@@ -131,7 +132,7 @@ export function TopicsView({
         className="secondary-button topic-completed-filter"
         aria-pressed={options.hideCompleted}
         title="카드 안의 체크박스가 모두 완료된 항목을 숨깁니다"
-        disabled={saving || !!drag}
+        disabled={reordering || !!drag}
         onClick={() => onChange({ ...options, hideCompleted: !options.hideCompleted, offset: 0 })}
       >
         <ListChecks size={15} /> 완료된 항목 숨기기
@@ -202,7 +203,7 @@ export function TopicsView({
               {visible?.length === 0 && <p className="empty-small">일치하는 주제가 없습니다.</p>}
             </div>
           </nav>
-          <div className="topic-content" aria-busy={refreshing && !error}>
+          <div className="topic-content" aria-busy={busy && !error}>
             <div className="topic-heading">
               <div>
                 <h2>{topic?.title}</h2>
@@ -222,7 +223,7 @@ export function TopicsView({
               <Select
                 aria-label="주제 카드 정렬"
                 value={options.sort ?? data?.sort ?? 'newest'}
-                disabled={busy || !!drag}
+                disabled={reordering || !!drag}
                 onValueChange={(value) =>
                   onChange({
                     ...options,
@@ -238,13 +239,11 @@ export function TopicsView({
               </Select>
             </div>
             <p className="topic-order-hint" role="status">
-              {taskSaving
-                ? '체크박스 저장 중…'
-                : saving
-                  ? '순서 저장 중…'
-                  : drag
-                    ? '원하는 위치에 놓으세요. 이전·다음 버튼 위에서 페이지를 넘길 수 있습니다.'
-                    : '손잡이를 드래그하여 순서를 바꿀 수 있습니다.'}
+              {reordering
+                ? '순서 저장 중…'
+                : drag
+                  ? '원하는 위치에 놓으세요. 이전·다음 버튼 위에서 페이지를 넘길 수 있습니다.'
+                  : '손잡이를 드래그하여 순서를 바꿀 수 있습니다.'}
             </p>
             {topic?.noteId && (
               <button className="topic-note-link" onClick={() => openNote(topic.noteId!)}>
@@ -313,7 +312,7 @@ export function TopicsView({
                   title="드래그하여 순서 변경 · Alt+↑/↓로 이동"
                   draggable={!busy}
                   tabIndex={cards.includes(block) ? 0 : -1}
-                  disabled={busy}
+                  aria-disabled={busy || undefined}
                   onDragStart={(event) => {
                     if (!data || busy) {
                       event.preventDefault();
@@ -327,7 +326,8 @@ export function TopicsView({
                   }}
                   onDragEnd={endDrag}
                   onKeyDown={(event) => {
-                    if (!data || !event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key)) return;
+                    if (busy || !data || !event.altKey || !['ArrowUp', 'ArrowDown'].includes(event.key))
+                      return;
                     event.preventDefault();
                     const target = data.blocks[index + (event.key === 'ArrowUp' ? -1 : 1)];
                     if (target) {

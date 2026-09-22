@@ -268,3 +268,13 @@ Cmd+W(macOS)/Ctrl+W(그 외)는 공통 `note.close` 명령으로 현재 노트�
 `extension.policy`와 `extension.policy.update`는 기기의 앱 데이터에 vault 경로별 최초 동의·전체 사용 여부를 저장합니다. vault 원본·Git·백업으로 전파하지 않습니다. 전체 사용을 꺼도 개별 digest 활성화 기록은 보존하고 `pluginStates.enabled`를 false로 반환하므로 UI 세션·명령·자동완성·백그라운드 실행이 함께 중단됩니다. 코어 invoke와 Git 재검증도 같은 정책을 확인합니다. `extension.update`를 통한 명시적 로컬 업데이트만 기존 활성화 digest를 갱신하며 외부 파일 변경은 자동 활성화하지 않습니다. 기존 사용자는 첫 전체 동의 후 보존된 개별 상태로 복귀합니다.
 
 주제 모음의 `hideCompleted`는 `markdown_query::tasks`의 실제 작업 파싱을 재사용해 블록 범위 내 작업이 하나 이상이며 모두 done일 때 숨깁니다. catalog 수·페이지·드래그 대상에 동일하게 적용하며, 전체 카드 anchors는 보존해 필터 중 재정렬이 숨긴 카드를 잃지 않게 합니다. 필터는 orderRevision에도 포함됩니다.
+
+### Tree ordering, icon providers and view scopes
+
+`treeOrder.ts` derives sibling display order from vault settings `treeCustomSort` / `treeOrder` (unique object UUIDs). Toggling to manual order snapshots the existing order; disabling it retains that snapshot. Note/folder moves keep their existing revision-checked core commands; ordering is a separate `settings.update` preference. Row edge drops choose sibling order; folder centers retain the existing folder-move behavior. `tree.collapse-all` and `tree.sort.toggle` use the common UI registry.
+
+`graphFolders` and `timelineFolders` use the existing topic-folder validator and filter UI but persist independently. `folderFilter.ts` applies descendant inclusion and exclusion precedence to workspace summaries. Graph endpoints and unresolved targets are derived only from matching notes.
+
+The graph worker streams force-simulation snapshots with a fixed viewport, cools to a stop and pauses while hidden. Node drag pins one node, reheats neighbors, then releases it. Reduced-motion settings settle without animated steps. Wheel handling is nonpassive, bounded and centered on the pointer; no vault content changes.
+
+`runtime.treeIcons` and `treeIcons(api)` expose a validated, read-only icon provider. `useTreeIcons` loads enabled providers through `extension.invoke`, retains icons during data refresh and discards old vault/package results. Host-owned Lucide components render a bounded whitelist; plugin storage and normal settings views own configuration. Inline naming uses the same icon component to keep row geometry stable.

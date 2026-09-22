@@ -138,10 +138,10 @@ const markdownComponents: Components = {
             role="checkbox"
             aria-checked={status === 'doing' ? 'mixed' : status === 'done'}
             aria-label={status === 'done' ? '완료 해제' : '완료로 표시'}
-            disabled={taskDisabled}
+            aria-disabled={taskDisabled || undefined}
             onClick={(event) => {
               event.stopPropagation();
-              onToggleTask(sourceLine);
+              if (!taskDisabled) onToggleTask(sourceLine);
             }}
           >
             <TaskIcon status={status} />

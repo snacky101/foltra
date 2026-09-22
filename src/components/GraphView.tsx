@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowUpRight, Maximize2, Minus, Plus } from 'lucide-react';
-import type { Workspace } from '../lib/types';
+import { TopicFolderFilter } from './TopicFolderFilter';
+import type { GraphMessage } from '../lib/graphLayout.worker';
+import type { Settings, Workspace } from '../lib/types';
 import type { GraphInput, GraphLayout } from '../lib/graphLayout';
 import { graphDocuments } from '../lib/graphDocuments';
 
@@ -8,8 +10,10 @@ export function GraphView({
   workspace,
   openNote,
   openLink,
+  updateSettings,
 }: {
   workspace: Workspace;
+  updateSettings: (patch: Partial<Settings>) => Promise<boolean>;
   openNote: (id: string) => void;
   openLink: (target: string) => void;
 }) {
@@ -20,6 +24,11 @@ export function GraphView({
   const [local, setLocal] = useState(false);
   const [result, setResult] = useState<{ key: string; layout: GraphLayout } | null>(null);
   const [error, setError] = useState(false);
+  const svg = useRef<SVGSVGElement>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const nodeDrag = useRef<{ id: string; x: number; y: number; moved: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const send = (message: GraphMessage) => workerRef.current?.postMessage(message);
   const drag = useRef<{ x: number; y: number; pan: { x: number; y: number } } | null>(null);
   const documents = graphDocuments(workspace);
   const current = documents.notes.find((note) => note.id === selected);
@@ -51,20 +60,30 @@ export function GraphView({
     let active = true;
     setError(false);
     const worker = new Worker(new URL('../lib/graphLayout.worker.ts', import.meta.url), { type: 'module' });
+    workerRef.current = worker;
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
     worker.onmessage = (event: MessageEvent<GraphLayout>) => {
       if (!active) return;
       setResult({ key, layout: event.data });
-      setZoom(1);
-      setPan({ x: 0, y: 0 });
-      worker.terminate();
     };
     worker.onerror = () => {
       if (active) setError(true);
       worker.terminate();
     };
-    worker.postMessage(JSON.parse(key));
+    const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const start = () =>
+      worker.postMessage({ type: 'start', input: JSON.parse(key), reducedMotion: media.matches });
+    const visibility = () => worker.postMessage({ type: 'pause', paused: document.hidden });
+    start();
+    visibility();
+    media.addEventListener('change', start);
+    document.addEventListener('visibilitychange', visibility);
     return () => {
       active = false;
+      workerRef.current = null;
+      media.removeEventListener('change', start);
+      document.removeEventListener('visibilitychange', visibility);
       worker.terminate();
     };
   }, [key]);
@@ -81,6 +100,35 @@ export function GraphView({
   const bounds = graph?.bounds ?? { x: -420, y: -280, width: 840, height: 560 };
   const cx = bounds.x + bounds.width / 2;
   const cy = bounds.y + bounds.height / 2;
+  const camera = useRef({ zoom, pan, cx, cy });
+  camera.current = { zoom, pan, cx, cy };
+  useEffect(() => {
+    const element = svg.current;
+    if (!element) return;
+    const wheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const matrix = element.getScreenCTM();
+      if (!matrix) return;
+      const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(matrix.inverse());
+      const old = camera.current;
+      const delta =
+        event.deltaY * (event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? element.clientHeight : 1);
+      const next = Math.min(
+        4,
+        Math.max(0.4, old.zoom * Math.exp(-Math.max(-300, Math.min(300, delta)) * 0.002)),
+      );
+      const ratio = next / old.zoom;
+      const nextPan = {
+        x: point.x - old.cx - (point.x - old.cx - old.pan.x) * ratio,
+        y: point.y - old.cy - (point.y - old.cy - old.pan.y) * ratio,
+      };
+      camera.current = { ...old, zoom: next, pan: nextPan };
+      setZoom(next);
+      setPan(nextPan);
+    };
+    element.addEventListener('wheel', wheel, { passive: false });
+    return () => element.removeEventListener('wheel', wheel);
+  }, []);
   const textScale = Math.max(1, bounds.width / 840) / zoom;
   const labelBoxes: { left: number; right: number; top: number; bottom: number }[] = [];
   const visibleLabels = new Set<string>();
@@ -119,13 +167,32 @@ export function GraphView({
         </label>
       </div>
       <p className="page-description">서로 다른 생각 사이에서, 다음 연결을 발견하세요.</p>
+      <TopicFolderFilter
+        folders={workspace.folders}
+        value={workspace.settings.graphFolders ?? { include: [], exclude: [] }}
+        setting="graphFolders"
+        label="지식 그래프 폴더 범위"
+        updateSettings={updateSettings}
+      />
       <div className="graph-canvas" aria-busy={!graph && !error}>
         <svg
+          ref={svg}
           viewBox={`${bounds.x} ${bounds.y} ${bounds.width} ${bounds.height}`}
           role="group"
           aria-label="노트 연결 그래프"
           onPointerDown={(e) => {
-            if (e.button !== 0 || (e.target as Element).closest('.graph-node')) return;
+            if (e.button !== 0) return;
+            suppressClick.current = false;
+            const node = (e.target as Element).closest('[data-node-id]');
+            if (node) {
+              nodeDrag.current = {
+                id: node.getAttribute('data-node-id')!,
+                x: e.clientX,
+                y: e.clientY,
+                moved: false,
+              };
+              return;
+            }
             e.preventDefault();
             const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(
               e.currentTarget.getScreenCTM()!.inverse(),
@@ -134,6 +201,23 @@ export function GraphView({
             e.currentTarget.setPointerCapture(e.pointerId);
           }}
           onPointerMove={(e) => {
+            const moving = nodeDrag.current;
+            if (moving) {
+              if (Math.hypot(e.clientX - moving.x, e.clientY - moving.y) < 4 && !moving.moved) return;
+              e.currentTarget.setPointerCapture(e.pointerId);
+              moving.moved = true;
+              suppressClick.current = true;
+              const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(
+                e.currentTarget.getScreenCTM()!.inverse(),
+              );
+              send({
+                type: 'drag',
+                id: moving.id,
+                x: (point.x - pan.x - cx) / zoom + cx,
+                y: (point.y - pan.y - cy) / zoom + cy,
+              });
+              return;
+            }
             if (!drag.current) return;
             const point = new DOMPoint(e.clientX, e.clientY).matrixTransform(
               e.currentTarget.getScreenCTM()!.inverse(),
@@ -144,10 +228,18 @@ export function GraphView({
             });
           }}
           onPointerUp={(e) => {
+            if (nodeDrag.current && !nodeDrag.current.moved) nodeDrag.current = null;
             if (e.currentTarget.hasPointerCapture(e.pointerId))
               e.currentTarget.releasePointerCapture(e.pointerId);
           }}
+          onPointerCancel={() => {
+            if (nodeDrag.current?.moved) send({ type: 'release', id: nodeDrag.current.id });
+            nodeDrag.current = null;
+            drag.current = null;
+          }}
           onLostPointerCapture={() => {
+            if (nodeDrag.current?.moved) send({ type: 'release', id: nodeDrag.current.id });
+            nodeDrag.current = null;
             drag.current = null;
           }}
         >
@@ -187,8 +279,12 @@ export function GraphView({
                 tabIndex={0}
                 role="button"
                 aria-label={`노트 ${node.title}`}
-                onClick={() => setSelected(node.id)}
-                onDoubleClick={() => open(node.id)}
+                onClick={() => {
+                  if (!suppressClick.current) setSelected(node.id);
+                }}
+                onDoubleClick={() => {
+                  if (!suppressClick.current) open(node.id);
+                }}
                 onPointerEnter={() => setHovered(node.id)}
                 onPointerLeave={() => setHovered(null)}
                 onFocus={() => setHovered(node.id)}
@@ -264,7 +360,8 @@ export function GraphView({
         </button>
       ) : (
         <p className="graph-help">
-          배경을 드래그해 이동하고, 노드를 선택해 연결을 살펴보세요. 두 번 클릭하거나 Enter로 노트를 엽니다.
+          휠로 확대·축소하고 배경을 끌어 이동하세요. 노드를 끌면 주변 연결도 따라 움직입니다. 두 번 클릭하거나
+          Enter로 노트를 엽니다.
         </p>
       )}
     </section>

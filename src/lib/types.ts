@@ -44,6 +44,10 @@ export interface Binding {
   keys: string;
   leader: boolean;
 }
+export interface FolderFilter {
+  include: string[];
+  exclude: string[];
+}
 export interface Settings {
   readonly shortcutVersion?: 4;
   vim: boolean;
@@ -52,7 +56,11 @@ export interface Settings {
   databaseFontSize: number;
   editorFontFamily: string;
   databaseFontFamily: string;
-  topicFolders: { include: string[]; exclude: string[] };
+  topicFolders: FolderFilter;
+  graphFolders?: FolderFilter;
+  timelineFolders?: FolderFilter;
+  treeCustomSort?: boolean;
+  treeOrder?: string[];
   cursorShape: 'bar' | 'block' | 'underline';
   cursorFollowVim: boolean;
   cursorBlink: 'steady' | 'blink' | 'breath';

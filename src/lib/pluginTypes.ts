@@ -12,6 +12,7 @@ export type PluginPermission =
   | 'automation';
 export interface PluginRuntime {
   apiVersion: 1;
+  treeIcons?: boolean;
   backgroundCommand?: string;
   source: string;
   permissions: PluginPermission[];
@@ -80,7 +81,7 @@ export interface PluginNode {
   todayAction?: string;
 }
 export interface PluginEvent {
-  type: 'load' | 'unload' | 'command' | 'render' | 'action' | 'event' | 'completion';
+  type: 'load' | 'unload' | 'command' | 'render' | 'action' | 'event' | 'completion' | 'tree-icons';
   id?: string;
   name?: string;
   action?: { id: string; value?: string | boolean; payload?: unknown };

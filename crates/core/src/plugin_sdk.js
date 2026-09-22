@@ -25,6 +25,7 @@
   let view = null;
   let handler;
   if (event.type === 'command') handler = plugin.commands?.[event.id];
+  else if (event.type === 'tree-icons') handler = plugin.treeIcons;
   else if (event.type === 'completion') handler = plugin.completions?.[event.id];
   else if (event.type === 'load') handler = plugin.onLoad;
   else if (event.type === 'unload') handler = plugin.onUnload;
@@ -32,6 +33,7 @@
   else if (event.type === 'action') handler = plugin.views?.[event.id]?.onAction;
   else if (event.type !== 'render') throw new Error('Unknown plugin event');
   if (event.type === 'command' && typeof handler !== 'function') throw new Error('Plugin command handler is missing');
+  if (event.type === 'tree-icons' && typeof handler !== 'function') throw new Error('Plugin treeIcons handler is missing');
   if (event.type === 'completion' && typeof handler !== 'function') throw new Error('Plugin completion handler is missing');
   if (handler) result = handler(api, event.type === 'command' || event.type === 'completion' ? (event.args || {}) : event.type === 'action' ? event.action : event);
   if (result && typeof result.then === 'function') throw new Error('SDK v1 handlers must be synchronous');

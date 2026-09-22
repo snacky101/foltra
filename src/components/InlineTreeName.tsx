@@ -1,15 +1,18 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder, Table2 } from 'lucide-react';
+import { TreeIcon, type TreeIcons } from './TreeIcon';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { CoreError } from '../lib/api';
 
 export function InlineTreeName({
   target,
+  icons,
   expanded,
   commit,
   cancel,
 }: {
   target: { kind: 'note' | 'folder' | 'database'; id: string; name: string };
   expanded?: boolean;
+  icons?: TreeIcons;
   commit: (name: string) => Promise<void>;
   cancel: () => void;
 }) {
@@ -75,13 +78,7 @@ export function InlineTreeName({
           {target.kind === 'folder' && (expanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />)}
         </span>
       )}
-      {target.kind === 'folder' ? (
-        <Folder size={15} />
-      ) : target.kind === 'database' ? (
-        <Table2 size={16} />
-      ) : (
-        <FileText size={15} />
-      )}
+      <TreeIcon kind={target.kind} id={target.id} icons={icons} />
       <input
         ref={input}
         aria-label={

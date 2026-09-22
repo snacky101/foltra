@@ -298,6 +298,14 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                 return Err(Error::new("invalid_view", "Plugin view is unavailable"));
             }
         }
+        "tree-icons" => {
+            if headless || !config.tree_icons {
+                return Err(Error::new(
+                    "invalid_tree_icons",
+                    "Undeclared desktop tree icon provider",
+                ));
+            }
+        }
         "completion" => {
             if headless {
                 return Err(Error::new(
@@ -382,7 +390,7 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                         permission(config,"git.sync")?;
                         let action=text(params,"action")?;
                         if action == "status" {
-                            if kind == "completion" { return Err(Error::new("permission_denied","Git is unavailable to completions")); }
+                            if ["completion", "tree-icons"].contains(&kind) { return Err(Error::new("permission_denied","Git is unavailable to completions")); }
                             return crate::git_sync::status(store);
                         }
                         if readonly || headless { return Err(Error::new("requires_ui","Request Git operations from a desktop command or view action; CLI clients use the git.* commands directly")); }
@@ -426,12 +434,12 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
                     },
                     "editor.read" => {
                         permission(config,"editor.read")?;
-                        if kind == "completion" { return Err(Error::new("permission_denied","Completions receive only their query")); }
+                        if ["completion", "tree-icons"].contains(&kind) { return Err(Error::new("permission_denied","Completions receive only their query")); }
                         if headless || !args["editor"].is_object() { return Err(Error::new("requires_editor","Open an editable note first")); }
                         Ok(args["editor"].clone())
                     },
                     op @ ("openView" | "openNote" | "notify" | "editor.replaceSelection") => {
-                        if kind == "completion" { return Err(Error::new("permission_denied","Completion requests cannot produce UI effects")); }
+                        if ["completion", "tree-icons"].contains(&kind) { return Err(Error::new("permission_denied","Completion requests cannot produce UI effects")); }
                         if headless { return Err(Error::new("requires_ui","This action needs the desktop app")); }
                         permission(config,if op == "editor.replaceSelection" {"editor.write"} else {"ui"})?;
                         if readonly && op != "notify" { return Err(Error::new("permission_denied","UI navigation and editing require a command or view action")); }
@@ -491,6 +499,9 @@ pub fn invoke(store: &Store, args: &Value, headless: bool) -> Result<Value> {
     if !output["view"].is_null() {
         plugin_manifest::validate_tree(&output["view"])?;
     }
+    if kind == "tree-icons" {
+        plugin_manifest::validate_tree_icons(&output["result"])?;
+    }
     if kind == "completion" {
         plugin_manifest::validate_completions(&output["result"])?;
     }
@@ -526,6 +537,65 @@ mod tests {
     fn run(store: &Store) -> Result<Value> {
         extensions::execute_command(store, "plugin.test-code.run", &json!({}))
     }
+    #[test]
+    fn tree_icons_install_configure_and_enforce_readonly_contract() {
+        let (_dir, store, original) = setup("export default {}", json!(["ui"]));
+        let manifest: Value =
+            serde_json::from_str(include_str!("../../../examples/plugins/tree-icons.json"))
+                .unwrap();
+        extensions::install(&store, &manifest).unwrap();
+        update_policy(&store, &json!({"enabled":true,"acceptConsent":true})).unwrap();
+        let statuses = statuses(&store).unwrap();
+        let state = statuses
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|item| item["id"] == "tree-icons")
+            .unwrap();
+        enable(&store, "tree-icons", state["digest"].as_str().unwrap()).unwrap();
+        let request = json!({"id":"tree-icons","event":{"type":"tree-icons"}});
+        assert_eq!(
+            invoke(&store, &request, false).unwrap()["result"]["note"],
+            "notebook"
+        );
+        invoke(&store,&json!({"id":"tree-icons","event":{"type":"action","id":"settings","action":{"id":"default","value":"별","payload":"note"}}}),false).unwrap();
+        let icons = invoke(&store, &request, false).unwrap();
+        assert_eq!(icons["result"]["note"], "star");
+        assert_eq!(icons["effects"], json!([]));
+        assert_eq!(icons["changed"], false);
+        assert!(invoke(&store, &request, true).is_err());
+        let view = invoke(
+            &store,
+            &json!({"id":"tree-icons","event":{"type":"render","id":"settings"}}),
+            false,
+        )
+        .unwrap();
+        assert_eq!(view["view"]["type"], "stack");
+        let mut malicious = manifest.clone();
+        malicious["id"] = json!("test-code");
+        malicious["runtime"]["source"] = json!("export default {treeIcons(api){for(const run of [()=>api.notify('bad'),()=>api.storage.write({},api.storage.read().revision),()=>api.call('note.create',{title:'bad'}),()=>api.editor.read()]){try{run();return {note:'heart'}}catch(e){if(e.code!=='permission_denied')throw e}}return {note:'star'}}}");
+        malicious["runtime"]["permissions"] = json!(["ui", "notes.write", "editor.read"]);
+        extensions::update(&store, &malicious, &revision(&original.to_string())).unwrap();
+        allow(&store);
+        assert_eq!(
+            invoke(
+                &store,
+                &json!({"id":"test-code","event":{"type":"tree-icons"}}),
+                false
+            )
+            .unwrap()["result"]["note"],
+            "star"
+        );
+        for invalid in [
+            json!({"note":"<svg>"}),
+            json!({"items":{"../file":"star"}}),
+            json!({"html":"x"}),
+            json!(null),
+        ] {
+            assert!(plugin_manifest::validate_tree_icons(&invalid).is_err());
+        }
+    }
+
     fn completion_plugin(source: &str, permissions: Value) -> (tempfile::TempDir, Store, Value) {
         let dir = tempfile::tempdir().unwrap();
         crate::execute(

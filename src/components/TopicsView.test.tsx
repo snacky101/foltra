@@ -243,7 +243,7 @@ test('pending writes block duplicate moves and retain display preferences change
   });
   await act(async () => dragEvent(handle('c2'), 'dragstart'));
   await act(async () => dragEvent(elements()[0], 'drop', -1));
-  expect(handle('c1').disabled).toBe(true);
+  expect(handle('c1').getAttribute('aria-disabled')).toBe('true');
   await act(async () => {
     handle('c1').dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', altKey: true, bubbles: true }));
     button('원본 노트 정보 표시').click();

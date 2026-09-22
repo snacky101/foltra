@@ -183,6 +183,8 @@ const definitions = [
     group: '탐색',
     bindings: [{ keys: 'e', leader: true }],
   },
+  { id: 'tree.collapse-all', title: '파일 트리 폴더 모두 접기', group: '탐색' },
+  { id: 'tree.sort.toggle', title: '파일 트리 커스텀 정렬 전환', group: '탐색' },
   { id: 'sidebar.navigation.compact', title: '탐색 메뉴 컴팩트 모드 전환', group: '탐색' },
   {
     id: 'database.create',

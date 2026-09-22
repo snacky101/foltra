@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, test } from 'vitest';
 import { layoutGraph, type GraphInput } from './graphLayout';
 
 const notes = (count: number) =>
@@ -91,4 +91,25 @@ describe('force graph layout', () => {
       graph.nodes.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y) && node.degree === 0),
     ).toBe(true);
   });
+});
+
+test('live forces move neighbors when a node is dragged and cool to a finite stop', async () => {
+  const { createGraphSimulation, graphSnapshot } = await import('./graphLayout');
+  const {
+    nodes: live,
+    edges,
+    simulation,
+  } = createGraphSimulation({ notes: notes(3), links: [{ source: 'n000', target: 'n001' }] });
+  simulation.tick(300);
+  const before = graphSnapshot(live, edges);
+  live[0].fx = live[0].x + 200;
+  live[0].fy = live[0].y + 100;
+  simulation.alpha(0.3).tick(60);
+  expect(distance(live[1], before.nodes[1])).toBeGreaterThan(5);
+  expect(live[0].x).toBe(live[0].fx);
+  live[0].fx = live[0].fy = null;
+  simulation.tick(300);
+  expect(simulation.alpha()).toBeLessThan(simulation.alphaMin());
+  expect(live.every((node) => Number.isFinite(node.x) && Number.isFinite(node.y))).toBe(true);
+  expect(before.nodes[0].x).not.toBe(live[0].x);
 });

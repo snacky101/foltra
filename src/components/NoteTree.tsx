@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState, type DragEvent } from 'react';
-import { ChevronDown, ChevronRight, FileText, Folder as FolderIcon, FolderPlus, Plus } from 'lucide-react';
-import type { Folder, NoteSummary, Workspace } from '../lib/types';
+import { ChevronDown, ChevronRight, FolderPlus, Plus, ListCollapse, ListOrdered } from 'lucide-react';
+import type { Folder, NoteSummary, Workspace, Settings } from '../lib/types';
 import type { NoteMenuTarget } from './NoteContextMenu';
 import type { FolderAction, useTreeEditing } from '../lib/useTreeEditing';
+import { treeChildren, reorderTree } from '../lib/treeOrder';
+import { TreeIcon, type TreeIcons } from './TreeIcon';
 import { InlineTreeName } from './InlineTreeName';
 
 const dragTypes = { note: 'application/x-foltra-note', folder: 'application/x-foltra-folder' };
@@ -22,7 +24,17 @@ export function NoteTree({
   moveNote,
   onError,
   treeEditing,
+  collapseVersion = 0,
+  collapseAll,
+  toggleCustomSort,
+  updateSettings,
+  icons,
 }: {
+  collapseVersion?: number;
+  collapseAll?: () => void;
+  toggleCustomSort?: () => void;
+  updateSettings?: (patch: Partial<Settings>) => Promise<boolean>;
+  icons?: TreeIcons;
   workspace: Workspace;
   activeId: string | null;
   openNote: (id: string) => void;
@@ -37,6 +49,13 @@ export function NoteTree({
   treeEditing: ReturnType<typeof useTreeEditing>;
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
+  useEffect(() => {
+    if (collapseVersion) setCollapsed(new Set(workspace.folders.map((folder) => folder.id)));
+  }, [collapseVersion]);
+  const [insertion, setInsertion] = useState<{ id: string; after: boolean } | null>(null);
+  const pending = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const custom = workspace.settings?.treeCustomSort ?? false;
   const { editing, commit, cancel } = treeEditing;
   useEffect(() => {
     if (!editing) return;
@@ -61,8 +80,13 @@ export function NoteTree({
     dragSource.current = null;
     setDragging(null);
     setDropTarget(null);
+    setInsertion(null);
   };
   const startDrag = (event: DragEvent, kind: TreeDrag['kind'], id: string) => {
+    if (pending.current) {
+      event.preventDefault();
+      return;
+    }
     event.stopPropagation();
     event.dataTransfer.setData(dragTypes[kind], id);
     event.dataTransfer.effectAllowed = 'move';
@@ -73,7 +97,7 @@ export function NoteTree({
     const source = (event: DragEvent): DragItem | undefined => {
       // Only drags started in this vault's tree are accepted, never external payloads.
       const drag = dragSource.current;
-      if (!drag || !event.dataTransfer.types.includes(dragTypes[drag.kind])) return;
+      if (pending.current || !drag || !event.dataTransfer.types.includes(dragTypes[drag.kind])) return;
       if (drag.kind === 'note') {
         const note = workspace.notes.find((n) => n.id === drag.id);
         if (note && (note.folderId ?? '') !== folderId) return { kind: 'note', item: note };
@@ -102,6 +126,7 @@ export function NoteTree({
           return;
         }
         event.dataTransfer.dropEffect = 'move';
+        setInsertion(null);
         setDropTarget(folderId);
       },
       onDragLeave: (event: DragEvent<HTMLElement>) => {
@@ -136,12 +161,85 @@ export function NoteTree({
       else next.add(id);
       return next;
     });
-  const branch = (parentId: string | null): React.ReactNode => (
-    <>
-      {workspace.folders
-        .filter((f) => f.parentId === parentId)
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((folder) => (
+  const insertionEvents = (id: string, parent: string | null) => {
+    const placement = (event: DragEvent<HTMLElement>) => {
+      const source = dragSource.current;
+      if (
+        !custom ||
+        pending.current ||
+        !source ||
+        source.id === id ||
+        !event.dataTransfer.types.includes(dragTypes[source.kind])
+      )
+        return null;
+      if (
+        source.kind === 'note'
+          ? !workspace.notes.some((note) => note.id === source.id)
+          : !workspace.folders.some((folder) => folder.id === source.id)
+      )
+        return null;
+      const rect = event.currentTarget.getBoundingClientRect();
+      const ratio = (event.clientY - rect.top) / rect.height;
+      if (ratio >= 0.25 && ratio <= 0.75) return null;
+      const folder =
+        source.kind === 'folder' ? workspace.folders.find((folder) => folder.id === source.id) : null;
+      const seen = new Set<string>();
+      let ancestor = parent;
+      while (ancestor && !seen.has(ancestor)) {
+        if (ancestor === folder?.id) return null;
+        seen.add(ancestor);
+        ancestor = workspace.folders.find((item) => item.id === ancestor)?.parentId ?? null;
+      }
+      return { source, after: ratio > 0.5 };
+    };
+    return {
+      onDragOver: (event: DragEvent<HTMLElement>) => {
+        const destination = placement(event);
+        if (!destination) {
+          setInsertion(null);
+          return;
+        }
+        event.preventDefault();
+        event.stopPropagation();
+        event.dataTransfer.dropEffect = 'move';
+        setDropTarget(null);
+        setInsertion({ id, after: destination.after });
+      },
+      onDragLeave: (event: DragEvent<HTMLElement>) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setInsertion(null);
+      },
+      onDrop: (event: DragEvent<HTMLElement>) => {
+        const destination = placement(event);
+        if (!destination || !updateSettings) return;
+        event.preventDefault();
+        event.stopPropagation();
+        endDrag();
+        pending.current = true;
+        setSaving(true);
+        const { source, after } = destination;
+        void (async () => {
+          if (source.kind === 'note') {
+            const note = workspace.notes.find((note) => note.id === source.id)!;
+            if ((note.folderId ?? null) !== parent) await moveNote(note, parent ?? '');
+          } else {
+            const folder = workspace.folders.find((folder) => folder.id === source.id)!;
+            if (folder.parentId !== parent) await treeEditing.moveFolder(folder, parent ?? '');
+          }
+          await updateSettings({ treeOrder: reorderTree(workspace, source.id, id, after) });
+        })()
+          .catch(onError)
+          .finally(() => {
+            pending.current = false;
+            setSaving(false);
+          });
+      },
+    };
+  };
+  const branch = (parentId: string | null): React.ReactNode =>
+    treeChildren(workspace, parentId).map((entry) => {
+      if (entry.kind === 'folder') {
+        const folder = entry.item;
+        return (
           <div
             className={`folder-branch${dropTarget === folder.id ? ' note-drop-branch' : ''}${dragging?.kind === 'folder' && dragging.id === folder.id ? ' note-dragging' : ''}`}
             key={folder.id}
@@ -150,11 +248,16 @@ export function NoteTree({
             <div
               className={`note-navigation-row${dropTarget === folder.id ? ' note-drop-target' : ''}`}
               data-folder-id={folder.id}
+              {...insertionEvents(folder.id, parentId)}
+              data-drop-position={
+                insertion?.id === folder.id ? (insertion.after ? 'after' : 'before') : undefined
+              }
             >
               {editing?.kind === 'folder' && editing.id === folder.id ? (
                 <InlineTreeName
                   key={editing.id}
                   target={editing}
+                  icons={icons}
                   expanded={!collapsed.has(folder.id)}
                   commit={commit}
                   cancel={cancel}
@@ -191,72 +294,70 @@ export function NoteTree({
                   }}
                 >
                   {collapsed.has(folder.id) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-                  <FolderIcon size={15} />
+                  <TreeIcon kind="folder" id={folder.id} icons={icons} />
                   <span>{folder.name}</span>
                 </button>
               )}
             </div>
             {!collapsed.has(folder.id) && <div className="folder-children">{branch(folder.id)}</div>}
           </div>
-        ))}
-      {workspace.notes
-        .filter(
-          (n) =>
-            (n.folderId ?? null) === parentId ||
-            (parentId === null && n.folderId && !workspace.folders.some((f) => f.id === n.folderId)),
-        )
-        .map((note) => (
-          <div
-            className={`note-navigation-row${dragging?.kind === 'note' && dragging.id === note.id ? ' note-dragging' : ''}`}
-            key={note.id}
-            data-note-id={note.id}
-          >
-            {editing?.kind === 'note' && editing.id === note.id ? (
-              <InlineTreeName key={editing.id} target={editing} commit={commit} cancel={cancel} />
-            ) : (
-              <button
-                draggable
-                onDragStart={(event) => startDrag(event, 'note', note.id)}
-                onDragEnd={endDrag}
-                data-sidebar-item
-                data-tree-item
-                data-parent-folder={note.folderId ?? ''}
-                className={activeId === note.id ? 'active' : ''}
-                title={note.title}
-                onClick={(event) => {
-                  if (event.detail < 2) openNote(note.id);
-                }}
-                onDoubleClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  renameNote(note);
-                }}
-                onContextMenu={(e) => {
+        );
+      }
+      const note = entry.item;
+      return (
+        <div
+          className={`note-navigation-row${dragging?.kind === 'note' && dragging.id === note.id ? ' note-dragging' : ''}`}
+          key={note.id}
+          data-note-id={note.id}
+          {...insertionEvents(note.id, parentId)}
+          data-drop-position={insertion?.id === note.id ? (insertion.after ? 'after' : 'before') : undefined}
+        >
+          {editing?.kind === 'note' && editing.id === note.id ? (
+            <InlineTreeName icons={icons} key={editing.id} target={editing} commit={commit} cancel={cancel} />
+          ) : (
+            <button
+              draggable
+              onDragStart={(event) => startDrag(event, 'note', note.id)}
+              onDragEnd={endDrag}
+              data-sidebar-item
+              data-tree-item
+              data-parent-folder={note.folderId ?? ''}
+              className={activeId === note.id ? 'active' : ''}
+              title={note.title}
+              onClick={(event) => {
+                if (event.detail < 2) openNote(note.id);
+              }}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                renameNote(note);
+              }}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.currentTarget.focus();
+                noteMenu({ note, x: e.clientX, y: e.clientY });
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
                   e.preventDefault();
                   e.stopPropagation();
-                  e.currentTarget.focus();
-                  noteMenu({ note, x: e.clientX, y: e.clientY });
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    const r = e.currentTarget.getBoundingClientRect();
-                    noteMenu({ note, x: r.left + 12, y: r.bottom });
-                  }
-                }}
-              >
-                <FileText size={15} />
-                <span>{note.title}</span>
-              </button>
-            )}
-          </div>
-        ))}
-    </>
-  );
+                  const r = e.currentTarget.getBoundingClientRect();
+                  noteMenu({ note, x: r.left + 12, y: r.bottom });
+                }
+              }}
+            >
+              <TreeIcon kind="note" id={note.id} icons={icons} />
+              <span>{note.title}</span>
+            </button>
+          )}
+        </div>
+      );
+    });
   return (
     <div
       className="note-tree"
+      aria-busy={saving}
       aria-label="노트 영역"
       onContextMenu={(event) => {
         if ((event.target as HTMLElement).closest('[data-inline-rename]')) return;
@@ -275,6 +376,28 @@ export function NoteTree({
           {dragging && <small title={destinationName}>{destinationName}</small>}
         </span>
         <div className="sidebar-section-actions">
+          <button
+            aria-label="폴더 모두 접기"
+            title="폴더 모두 접기"
+            onClick={
+              collapseAll ?? (() => setCollapsed(new Set(workspace.folders.map((folder) => folder.id))))
+            }
+          >
+            <ListCollapse size={14} />
+          </button>
+          <button
+            aria-label="커스텀 정렬"
+            title={
+              custom
+                ? '커스텀 정렬 사용 중 · 끄면 기본 정렬'
+                : '커스텀 정렬 · 행 가장자리로 드래그하여 순서 변경'
+            }
+            aria-pressed={custom}
+            disabled={saving}
+            onClick={toggleCustomSort}
+          >
+            <ListOrdered size={14} />
+          </button>
           <button
             data-sidebar-item
             aria-label="새 폴더"

@@ -4,7 +4,7 @@
 
 메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.16) · [이번 버전의 변화](docs/releases/v0.1.0-preview.16.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.17) · [이번 버전의 변화](docs/releases/v0.1.0-preview.17.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
 ![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
@@ -13,7 +13,7 @@
 
 ## 설치하고 첫 노트 쓰기
 
-1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.16/Foltra_0.1.0-preview.16_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.17/Foltra_0.1.0-preview.17_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
 2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
 3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 
@@ -63,6 +63,10 @@
 | 기록을 만들거나 수정한 흐름  | **타임라인**                              |
 | 같은 주제를 다룬 문단과 목록 | **주제 모음**                             |
 
+지식 그래프·기록의 흐름·주제 모음의 **폴더 필터**에서 포함할 폴더와 제외할 폴더를 선택할 수 있습니다. 하위 폴더도 함께 적용하며, 화면마다 선택을 따로 기억합니다. 그래프는 휠로 확대·축소하고, 노드를 끌어 연결이 움직이는 모습을 살펴보세요.
+
+파일 트리의 **모두 접기** 버튼으로 폴더를 한 번에 접습니다. **커스텀 정렬**을 켜고 행 위·아래 가장자리로 끌면 순서가 저장됩니다. 폴더 가운데로 끌면 그 안으로 이동합니다. 토글을 꺼도 저장한 순서는 유지됩니다. 두 버튼의 기능은 설정에서 원하는 단축키에 연결할 수 있습니다.
+
 자세한 규칙은 [링크](docs/LINKS.md)와 [주제 모음](docs/TOPICS.md) 안내에 있습니다. `[[노트 이름|화면에 보일 이름]]`처럼 표시 이름을 따로 지정할 수도 있습니다.
 
 ## 필요한 방식으로 쓰세요
@@ -103,7 +107,7 @@
 
 - `:w` 저장, `:q` 현재 노트 닫기, `:wq` 저장 후 닫기.
 - `gd`는 이미 있는 링크 대상으로 이동합니다. `Cmd+Enter`는 없는 노트 링크라면 생성해서 엽니다.
-- `Ctrl+o` / `Ctrl+i`로 링크 탐색의 이전 / 다음 위치를 엽니다.
+- `Ctrl+o` / `Ctrl+i` 또는 마우스의 뒤로 / 앞으로 버튼으로 노트 탐색의 이전 / 다음 위치를 엽니다. 설정에서 뒤로 이동하면 기존 작업 화면으로 돌아옵니다.
 - `Ctrl+h/j/k/l`로 화면 영역을 옮기고, 사이드바에서 `j/k`로 항목을 고릅니다. 노트 영역으로 돌아오면 본문에 포커스를 둡니다.
 - 굵게·기울임·링크·괄호 등의 범위를 편집하는 text object는 [편집 안내](docs/EDITING.md)에서 확인하세요.
 
@@ -120,6 +124,7 @@
 | [Anki 연결](docs/ANKI.md)       | 태그가 붙은 블록이나 DB 행을 AnkiConnect로 카드에 동기화. 연결된 노트 본문과 이미지도 사용 |
 | [일지 캘린더](docs/CALENDAR.md) | 오른쪽 달력에 날짜 노트를 표시하고 오늘 노트를 열거나 생성                                 |
 | 날짜 자동완성                   | `@Today`, `@Yesterday`, `@Tomorrow` 후보를 골라 날짜 입력 (`[[@` 안에서도 사용, Esc로 취소)                |
+| 파일 트리 아이콘 | 노트·폴더·DB 기본 아이콘과 파일별 아이콘을 20가지 중 선택 |
 | [노트 채팅](docs/NOTE_CHAT.md) | OpenAI 호환 서버로 현재 노트와 대화하고 답변 추가·수정안 적용 |
 | [Git 동기화](docs/GIT.md)       | 사용자가 연결한 Git 저장소에 기록을 보내고 다른 기기의 변경 가져오기                       |
 
