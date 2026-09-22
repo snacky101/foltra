@@ -64,6 +64,8 @@ Node.js 24와 Rust stable을 사용합니다. 개발용 검사 cache와 release 
 make verify release
 ```
 
+`npm run release:mac`의 마지막 단계는 DMG에 오프라인 **설치 안내.html**과 **보안 설정.inetloc**을 추가합니다. `make release`와 CI도 같은 경로를 사용합니다. 변환·검증이 성공한 뒤에만 DMG를 교체하며, 앱 번들과 업데이트 압축 파일은 변경하지 않습니다. DMG를 여는 것만으로 안내가 자동 실행되지는 않습니다. 사용자가 안내 파일을 열고 단계별로 이동하며 설정 버튼을 누릅니다. 최종 열기 승인·인증은 macOS에서 직접 진행합니다. 이 안내는 preview.13부터 포함됩니다.
+
 `make release`는 Apple Silicon Mac에서 로컬 파일만 생성합니다. CI와 같은 workspace Cargo 명령 하나로 앱과 CLI를 함께 빌드합니다. 앱과 업데이트 파일은 `target/release/bundle/macos/`, DMG는 `target/release/bundle/dmg/`, CLI는 `target/release/foltra`에 생성됩니다. `make build`도 workspace로 빌드하고 서명 키가 필요 없는 개발용 앱을 `target/debug/bundle/macos/`에 만듭니다. Tauri의 `beforeBundleCommand`는 이미 빌드한 CLI를 `target/bundle-cli/foltra`에 준비해 앱에 넣으며 Cargo를 다시 실행하지 않습니다. 업데이트 압축 검사도 동봉된 CLI의 버전·arm64 아키텍처와 앱 서명을 확인합니다.
 
 서명 키를 지정하지 않으면 `~/.config/foltra/release/updater.key`를 사용합니다. 다른 키 파일이나 CI의 키 본문은 `TAURI_SIGNING_PRIVATE_KEY`, 키 암호는 `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` 환경변수로 전달합니다. Makefile은 키 값을 명령에 출력하지 않으며 파일이 없다고 새 키를 생성하지 않습니다.
@@ -116,7 +118,7 @@ GitHub의 동일 이름 파일 교체는 삭제 후 업로드이므로, 마지�
 
 ```sh
 foltra_feed_repair_dir=$(mktemp -d)
-gh release download v0.1.0-preview.12 --repo snacky101/foltra \
+gh release download v0.1.0-preview.13 --repo snacky101/foltra \
   --pattern latest.json --dir "$foltra_feed_repair_dir"
 gh release upload updater "$foltra_feed_repair_dir/latest.json" \
   --repo snacky101/foltra --clobber

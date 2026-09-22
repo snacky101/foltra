@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Foltra · 처음 시작하기</title>
+  <style>
+    :root { color-scheme: light; --paper: #f8f7f3; --panel: #efeee7; --ink: #293c35; --muted: #68736b; --line: #dce0d6; --accent: #36594a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--paper); color: var(--ink); font: 16px/1.8 -apple-system, BlinkMacSystemFont, sans-serif; }
+    main { max-width: 760px; margin: 48px auto; padding: 0 32px; }
+    header { display: flex; align-items: baseline; gap: 18px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+    .brand { font: 44px/1.2 Georgia, serif; letter-spacing: -2px; }
+    header span:last-child, .muted, footer { color: var(--muted); font-size: 13px; }
+    nav ol { display: flex; list-style: none; gap: 24px; padding: 0; margin: 28px 0 38px; color: var(--muted); font-size: 13px; }
+    nav [aria-current="step"] { color: var(--accent); font-weight: 700; border-bottom: 2px solid var(--accent); }
+    h1 { margin: 0 0 14px; font-size: 29px; line-height: 1.4; letter-spacing: -1px; }
+    h1:focus { outline: none; }
+    p { margin: 0 0 20px; }
+    .stage { min-height: 310px; }
+    .illustration { padding: 24px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); margin: 24px 0; }
+    .transfer { display: flex; justify-content: space-around; align-items: center; gap: 12px; }
+    .transfer b { font-size: 20px; }
+    .transfer span { color: var(--muted); font-size: 24px; }
+    .steps { padding-left: 22px; }
+    .steps li { padding: 3px 0; }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    button, .button { display: inline-flex; justify-content: center; align-items: center; border: 1px solid var(--line); border-radius: 7px; padding: 10px 18px; font: inherit; font-size: 14px; line-height: 1.5; cursor: pointer; color: var(--ink); background: transparent; text-decoration: none; }
+    .primary { color: var(--paper); background: var(--accent); border-color: var(--accent); }
+    button:hover, .button:hover { filter: brightness(.93); }
+    :focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+    .actions { display: flex; gap: 12px; justify-content: space-between; margin-top: 24px; border-top: 1px solid var(--line); padding-top: 24px; }
+    .actions .primary { margin-left: auto; }
+    footer { margin-top: 30px; }
+    [hidden] { display: none !important; }
+    @media (max-width: 520px) { main { margin: 24px auto; padding: 0 20px; } nav ol { gap: 14px; font-size: 12px; } .transfer b { font-size: 16px; } .stage { min-height: 0; } }
+    @media (prefers-color-scheme: dark) { :root { color-scheme: dark; --paper: #202923; --panel: #29342d; --ink: #e3e8de; --muted: #adb8ad; --line: #415047; --accent: #b2cbb0; } }
+    @media (prefers-reduced-motion: no-preference) { .stage { animation: arrive 180ms ease-out; } @keyframes arrive { from { opacity: .4; transform: translateY(5px); } to { opacity: 1; transform: none; } } }
+  </style>
+</head>
+<body>
+<main>
+  <header><span class="brand">foltra</span><span>처음 시작하기</span></header>
+  <nav aria-label="설치 단계"><ol>
+    <li aria-current="step">01 · 앱 옮기기</li><li>02 · 처음 실행</li><li>03 · 열기 허용</li>
+  </ol></nav>
+  <section class="stage" data-step="0">
+    <h1 tabindex="-1">나만의 기록을 시작해요.</h1>
+    <p>DMG 창에서 <strong>Foltra.app</strong>을 <strong>Applications</strong> 폴더로 끌어다 놓으세요.</p>
+    <div class="illustration transfer" aria-label="Foltra.app을 Applications로 이동"><b>Foltra.app</b><span aria-hidden="true">→</span><b>Applications</b></div>
+    <p class="muted">이미 설치했다면 다음 단계로 넘어가세요. 이 안내는 인터넷 없이도 볼 수 있습니다.</p>
+  </section>
+  <section class="stage" data-step="1" hidden>
+    <h1 tabindex="-1">응용 프로그램에서 실행하세요.</h1>
+    <p>Finder의 <strong>응용 프로그램</strong>에서 <strong>Foltra</strong>를 더블클릭하세요.</p>
+    <div class="illustration">
+      <strong>“Apple은 Foltra에 악성 코드가 없음을 확인할 수 없습니다”가 뜨나요?</strong>
+      <p class="muted" style="margin: 10px 0 0">현재 프리뷰는 Apple Developer ID 서명·공증 전입니다. 경고창을 닫고 다음 단계에서 직접 열기를 허용할 수 있습니다. 정상적으로 실행됐다면 이 안내를 닫아도 됩니다.</p>
+    </div>
+    <p class="muted">설정에 Foltra의 열기 버튼이 나타나려면, 먼저 앱을 한 번 실행해야 합니다.</p>
+  </section>
+  <section class="stage" data-step="2" hidden>
+    <h1 tabindex="-1">설정에서 Foltra 열기를 허용하세요.</h1>
+    <p>아래 버튼으로 설정을 연 뒤, <strong>개인정보 보호 및 보안</strong>의 아래쪽 <strong>보안</strong> 영역을 확인하세요.</p>
+    <a class="button primary" id="open-settings" target="_blank" rel="noopener" href="x-apple.systempreferences:com.apple.preference.security?General">개인정보 보호 및 보안 열기 ↗</a>
+    <p class="muted" style="margin-top: 12px">설정이 열리지 않으면 DMG 창의 <strong>보안 설정.inetloc</strong> 파일을 더블클릭하세요.</p>
+    <ol class="steps">
+      <li>Foltra 옆의 <strong>확인 없이 열기</strong>(Open Anyway)를 누르세요.</li>
+      <li>인증을 요청하면 Mac 암호 또는 Touch ID로 확인하세요.</li>
+      <li>다시 표시되는 확인창에서 <strong>열기</strong>를 누르세요.</li>
+    </ol>
+    <details>
+      <summary>설정이나 열기 버튼이 보이지 않나요?</summary>
+      <p class="muted">브라우저에서 시스템 설정 열기를 물으면 허용하세요. 새 창에 오류가 나오거나 설정이 열리지 않으면 DMG 창의 <strong>보안 설정.inetloc</strong> 파일을 더블클릭하세요. 직접 이동하려면 Apple 메뉴 → 시스템 설정 → 개인정보 보호 및 보안으로 직접 이동하세요. 이전 macOS에서는 시스템 환경설정 → 보안 및 개인 정보 보호 → 일반입니다. Foltra를 다시 실행한 뒤 설정을 확인하세요. 조직에서 관리하는 Mac은 관리자의 제한이 있을 수 있습니다.</p>
+    </details>
+  </section>
+  <section class="stage" data-step="3" hidden>
+    <h1 tabindex="-1">이제 Foltra에서 만나요.</h1>
+    <p>Foltra의 시작 화면에서 <strong>새 vault</strong>를 만드세요. Vault는 노트와 데이터를 담는 내 컴퓨터의 폴더입니다.</p>
+    <div class="illustration">다음부터는 응용 프로그램에서 Foltra를 평소처럼 열면 됩니다.</div>
+    <p class="muted">이 안내 창과 DMG 창은 닫아도 됩니다.</p>
+  </section>
+  <div class="actions">
+    <button id="back" hidden>이전</button>
+    <button class="primary" id="next">옮겼어요 · 다음</button>
+  </div>
+  <footer>열기 승인은 사용자가 직접 진행합니다. 이 안내는 Mac의 보안 설정을 변경하지 않습니다.<br><a href="https://support.apple.com/ko-kr/102445" target="_blank" rel="noreferrer">Apple의 앱 열기 안내</a></footer>
+  <noscript><p>응용 프로그램에 Foltra를 옮겨 실행한 뒤, 차단되면 시스템 설정 → 개인정보 보호 및 보안 → 확인 없이 열기를 누르세요.</p></noscript>
+</main>
+<script>
+  let step = 0;
+  const sections = [...document.querySelectorAll('[data-step]')];
+  const indicators = [...document.querySelectorAll('nav li')];
+  const next = document.querySelector('#next');
+  const back = document.querySelector('#back');
+  function showStep(value) {
+    step = Math.max(0, Math.min(value, sections.length - 1));
+    sections.forEach((section, index) => section.hidden = index !== step);
+    indicators.forEach((indicator, index) => {
+      if (index === Math.min(step, 2)) indicator.setAttribute('aria-current', 'step');
+      else indicator.removeAttribute('aria-current');
+    });
+    back.hidden = step === 0;
+    next.hidden = step === sections.length - 1;
+    next.textContent = ['옮겼어요 · 다음', '차단됐어요 · 설정 안내', '설정에서 열었어요'][step] || '';
+    sections[step].querySelector('h1').focus({ preventScroll: true });
+  }
+  back.addEventListener('click', () => showStep(step - 1));
+  next.addEventListener('click', () => showStep(step + 1));
+</script>
+</body>
+</html>

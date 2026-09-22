@@ -1,4 +1,4 @@
-import { PluginControls } from './PluginControls';
+import { PluginControls, PluginToggle, PluginDetails } from './PluginControls';
 import { PluginPolicyControls } from './PluginPolicyControls';
 import { PluginSettingsForm } from './PluginSettingsForm';
 import { PluginSettingsView } from './PluginSettingsView';
@@ -326,9 +326,24 @@ export function ExtensionsView({
                     <Puzzle size={24} />
                   </span>
                 )}
-                <span className="version">v{extension.version}</span>
+                {installed && extension.runtime ? (
+                  <PluginToggle
+                    pluginsEnabled={workspace.pluginPolicy?.enabled ?? false}
+                    beforeDisable={beforeDisable}
+                    extension={extension}
+                    status={status}
+                    vault={workspace.path}
+                    refresh={refresh}
+                    onError={onError}
+                  />
+                ) : (
+                  <span className="version">v{extension.version}</span>
+                )}
               </div>
-              <h2>{extension.name}</h2>
+              <h2>
+                {extension.name}
+                {installed && extension.runtime && <span className="version">v{extension.version}</span>}
+              </h2>
               <p>
                 {extension.description ||
                   (extension.kind === 'theme' ? '나만의 색상 테마' : '작업을 연결하는 확장')}
@@ -341,15 +356,10 @@ export function ExtensionsView({
                 </ul>
               )}
               {installed && extension.runtime && (
-                <PluginControls
+                <PluginDetails
                   pluginsEnabled={workspace.pluginPolicy?.enabled ?? false}
-                  beforeDisable={beforeDisable}
                   extension={extension}
-                  status={status}
-                  vault={workspace.path}
-                  refresh={refresh}
                   error={pluginErrors[extension.id]}
-                  onError={onError}
                 />
               )}
               <div className="extension-bottom">

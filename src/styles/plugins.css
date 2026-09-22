@@ -143,12 +143,31 @@
   border-top: 1px solid var(--line);
   padding-top: 16px;
 }
-.plugin-controls > label {
+.plugin-toggle {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   font-size: 12px;
+}
+.plugin-toggle .switch {
+  flex-shrink: 0;
+}
+.plugin-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.extension-card > .plugin-details {
+  margin-bottom: 18px;
+}
+.extension-card-top > .plugin-toggle {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.extension-card h2 > .version {
+  margin-left: 8px;
+  white-space: nowrap;
 }
 .plugin-permissions {
   font-size: 11px;

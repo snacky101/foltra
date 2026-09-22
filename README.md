@@ -4,7 +4,7 @@
 
 메모를 쓰고, 관련 노트를 연결하고, 표로 자료를 정리하세요. 계정 없이 시작하며 인터넷이 없어도 기록을 읽고 편집할 수 있습니다. Vim과 플러그인은 필요할 때 켜면 됩니다.
 
-[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.12) · [이번 버전의 변화](docs/releases/v0.1.0-preview.12.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
+[**macOS 다운로드**](https://github.com/snacky101/foltra/releases/tag/v0.1.0-preview.13) · [이번 버전의 변화](docs/releases/v0.1.0-preview.13.md) · [CLI 안내](docs/CLI.md) · [개발 안내](docs/DEVELOPMENT.md)
 
 ![Foltra에서 노트와 연결을 함께 보는 개발 화면](docs/preview.png)
 
@@ -13,18 +13,19 @@
 
 ## 설치하고 첫 노트 쓰기
 
-1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.12/Foltra_0.1.0-preview.12_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
+1. [**DMG 다운로드**](https://github.com/snacky101/foltra/releases/download/v0.1.0-preview.13/Foltra_0.1.0-preview.13_aarch64.dmg)를 열고 **Foltra.app → Applications**로 옮깁니다.
 2. 응용 프로그램에서 Foltra를 실행하고 **새 vault**를 만듭니다. Vault는 노트와 데이터를 담아두는 **내 컴퓨터의 폴더**입니다.
 3. **새 노트**를 눌러 적으세요. 편집 내용은 자동으로 저장됩니다. 둘러보고 싶다면 시작 화면에서 **예제 노트와 DB를 담아 시작하기**를 선택하세요.
 
 앱을 사용하는 데 Node.js나 Rust를 설치할 필요는 없습니다. 이미 사용 중이라면 **설정 → 앱 업데이트**에서 새 버전을 받을 수 있습니다. 업데이트 기능이 없는 `preview.1`은 DMG로 한 번 수동 설치해야 합니다.
 
-<details>
-<summary><strong>처음 실행할 때 macOS가 차단한다면</strong></summary>
+> [!IMPORTANT]
+> **처음 실행할 때 macOS가 차단한다면**
+>
+> 현재 프리뷰는 Apple Developer ID 서명·공증 전입니다. Foltra를 한 번 실행한 뒤 **시스템 설정 → 개인정보 보호 및 보안 → 확인 없이 열기 → 열기**로 진행하세요. 다운로드 출처를 확인한 뒤 직접 허용해야 합니다. [Apple 안내](https://support.apple.com/ko-kr/102445)
+>
+> DMG 안의 **설치 안내.html**을 열면 단계별로 따라 할 수 있습니다. **보안 설정.inetloc**을 더블클릭하면 해당 설정 화면으로 이동합니다.
 
-현재 배포본에는 Apple Developer ID 서명·공증이 없습니다. 다운로드 출처를 확인한 뒤 실행하기로 했다면 **시스템 설정 → 개인정보 보호 및 보안 → 확인 없이 열기**를 사용하세요. macOS 버전에 따른 절차는 [Apple 안내](https://support.apple.com/guide/mac-help/mh40616/mac)를 참고하세요.
-
-</details>
 
 ## 세 가지만 알면 시작할 수 있어요
 
