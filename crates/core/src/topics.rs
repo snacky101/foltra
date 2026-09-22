@@ -27,12 +27,12 @@ struct Block {
     line: usize,
     end_line: usize,
     topics: BTreeSet<String>,
+    visible: bool,
 }
 struct Index {
     notes: Vec<Note>,
     topics: BTreeMap<String, Topic>,
     blocks: Vec<Block>,
-    visible_notes: Vec<bool>,
     filter_revision: String,
 }
 
@@ -114,12 +114,22 @@ fn index(store: &Store, args: &Value) -> Result<Index> {
                 && !selected(&filter.exclude, note)
         })
         .collect();
-    let filter_revision = crate::storage::revision(&serde_json::to_string(&(&filter, &parents))?);
+    let hide_completed = args["hideCompleted"].as_bool().unwrap_or(false);
+    let filter_revision = crate::storage::revision(&serde_json::to_string(&(
+        &filter,
+        &parents,
+        hide_completed,
+    ))?);
     let mut topics = BTreeMap::new();
     let mut sources: BTreeMap<String, BTreeSet<usize>> = BTreeMap::new();
     let mut blocks = Vec::new();
     let mut resolved_names = BTreeMap::new();
     for (note_index, note) in notes.iter().enumerate() {
+        let tasks = if hide_completed {
+            crate::markdown_query::tasks(note)
+        } else {
+            vec![]
+        };
         let starts: Vec<_> = std::iter::once(0)
             .chain(note.body.match_indices('\n').map(|(i, _)| i + 1))
             .collect();
@@ -267,7 +277,14 @@ fn index(store: &Store, args: &Value) -> Result<Index> {
                     {
                         let line = line_number(source.range.start);
                         let end = note.body[..source.range.end].trim_end().len();
-                        if visible_notes[note_index] {
+                        let mut states = tasks
+                            .iter()
+                            .filter(|(pos, _)| source.range.contains(pos))
+                            .peekable();
+                        let completed = states.peek().is_some()
+                            && states.all(|(_, task)| task["status"] == "done");
+                        let visible = visible_notes[note_index] && !completed;
+                        if visible {
                             for id in &source.topics {
                                 topics.get_mut(id).unwrap().block_count += 1;
                                 sources.entry(id.clone()).or_default().insert(note_index);
@@ -279,6 +296,7 @@ fn index(store: &Store, args: &Value) -> Result<Index> {
                             line,
                             end_line: line_number(end.saturating_sub(1)),
                             topics: source.topics,
+                            visible,
                         });
                     }
                 }
@@ -289,11 +307,11 @@ fn index(store: &Store, args: &Value) -> Result<Index> {
     for (id, source_notes) in sources {
         topics.get_mut(&id).unwrap().note_count = source_notes.len();
     }
+    topics.retain(|_, topic| topic.block_count > 0);
     Ok(Index {
         notes,
         topics,
         blocks,
-        visible_notes,
         filter_revision,
     })
 }
@@ -440,9 +458,7 @@ pub fn blocks(store: &Store, args: &Value) -> Result<Value> {
         .positions
         .iter()
         .copied()
-        .filter(|&position| {
-            result.index.visible_notes[result.index.blocks[result.matching[position]].note]
-        })
+        .filter(|&position| result.index.blocks[result.matching[position]].visible)
         .collect();
     let total = positions.len();
     let page: Vec<_> = positions.iter().skip(usize::try_from(offset).unwrap_or(usize::MAX))
@@ -472,12 +488,10 @@ pub fn reorder(store: &Store, args: &Value) -> Result<Value> {
         ));
     }
     let source = result.positions.iter().position(|&i| {
-        result.index.visible_notes[result.index.blocks[result.matching[i]].note]
-            && result.anchors[i].id() == source
+        result.index.blocks[result.matching[i]].visible && result.anchors[i].id() == source
     });
     let target = result.positions.iter().position(|&i| {
-        result.index.visible_notes[result.index.blocks[result.matching[i]].note]
-            && result.anchors[i].id() == target
+        result.index.blocks[result.matching[i]].visible && result.anchors[i].id() == target
     });
     let (Some(source), Some(target)) = (source, target) else {
         return Err(Error::new(

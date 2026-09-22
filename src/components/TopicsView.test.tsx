@@ -434,3 +434,33 @@ test.each(['topics.list', 'topics.blocks'])(
     expect(ids()).toEqual(['c0', 'c1', 'c2']);
   },
 );
+
+test('completed filter reaches catalog, pagination and reorder; toggling resets the page and can recover empty results', async () => {
+  const implementation = vi.mocked(call).getMockImplementation()!;
+  let empty = false;
+  vi.mocked(call).mockImplementation(async (path, command, args) => {
+    if (command === 'topics.list' && (args as { hideCompleted?: boolean }).hideCompleted && empty) return [];
+    return implementation(path, command, args);
+  });
+  cards = Array.from({ length: 55 }, (_, i) => ({ ...cards[0], id: `c${i}`, line: i + 1 }));
+  workspace = { ...workspace, topicOrderRevision: 'more' };
+  await act(async () => root.render(<App />));
+  await act(async () => button('다음').click());
+  expect(lastArgs('topics.blocks')).toMatchObject({ offset: 50 });
+  await act(async () => button('완료된 항목 숨기기').click());
+  expect(button('완료된 항목 숨기기').getAttribute('aria-pressed')).toBe('true');
+  expect(lastArgs('topics.list')).toMatchObject({ hideCompleted: true });
+  expect(lastArgs('topics.blocks')).toMatchObject({ hideCompleted: true, offset: 0 });
+  await act(async () => dragEvent(handle('c2'), 'dragstart'));
+  expect(button('완료된 항목 숨기기').disabled).toBe(true);
+  await act(async () => dragEvent(elements()[0], 'drop', -1));
+  expect(lastArgs('topics.reorder')).toMatchObject({ hideCompleted: true });
+  empty = true;
+  workspace = { ...workspace, topicOrderRevision: 'empty' };
+  await act(async () => root.render(<App />));
+  expect(host.textContent).toContain('표시할 항목이 없습니다.');
+  await act(async () => button('완료된 항목 숨기기').click());
+  expect(lastArgs('topics.list')).not.toHaveProperty('hideCompleted');
+  expect(ids()).toHaveLength(50);
+  expect(button('완료된 항목 숨기기').getAttribute('aria-pressed')).toBe('false');
+});

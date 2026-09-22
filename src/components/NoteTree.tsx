@@ -5,7 +5,9 @@ import type { NoteMenuTarget } from './NoteContextMenu';
 import type { FolderAction, useTreeEditing } from '../lib/useTreeEditing';
 import { InlineTreeName } from './InlineTreeName';
 
-const noteDragType = 'application/x-foltra-note';
+const dragTypes = { note: 'application/x-foltra-note', folder: 'application/x-foltra-folder' };
+type TreeDrag = { kind: 'note' | 'folder'; id: string };
+type DragItem = { kind: 'note'; item: NoteSummary } | { kind: 'folder'; item: Folder };
 
 export function NoteTree({
   workspace,
@@ -46,8 +48,8 @@ export function NoteTree({
     }
     setCollapsed((old) => new Set([...old].filter((id) => !parents.has(id))));
   }, [editing?.id]);
-  const dragSource = useRef<string | null>(null);
-  const [dragging, setDragging] = useState<string | null>(null);
+  const dragSource = useRef<TreeDrag | null>(null);
+  const [dragging, setDragging] = useState<TreeDrag | null>(null);
   const [dropTarget, setDropTarget] = useState<string | null>(null);
   const destinationName =
     dropTarget === null
@@ -60,12 +62,35 @@ export function NoteTree({
     setDragging(null);
     setDropTarget(null);
   };
+  const startDrag = (event: DragEvent, kind: TreeDrag['kind'], id: string) => {
+    event.stopPropagation();
+    event.dataTransfer.setData(dragTypes[kind], id);
+    event.dataTransfer.effectAllowed = 'move';
+    dragSource.current = { kind, id };
+    setDragging(dragSource.current);
+  };
   const dropEvents = (folderId: string) => {
-    const source = (event: DragEvent) => {
-      // Only a drag started in this vault's tree can move a note. Never read external payloads.
-      if (!event.dataTransfer.types.includes(noteDragType)) return;
-      const note = workspace.notes.find((n) => n.id === dragSource.current);
-      if (note && (note.folderId ?? '') !== folderId) return note;
+    const source = (event: DragEvent): DragItem | undefined => {
+      // Only drags started in this vault's tree are accepted, never external payloads.
+      const drag = dragSource.current;
+      if (!drag || !event.dataTransfer.types.includes(dragTypes[drag.kind])) return;
+      if (drag.kind === 'note') {
+        const note = workspace.notes.find((n) => n.id === drag.id);
+        if (note && (note.folderId ?? '') !== folderId) return { kind: 'note', item: note };
+      } else {
+        const folder = workspace.folders.find((f) => f.id === drag.id);
+        if (!folder || (folder.parentId ?? '') === folderId) return;
+        const ancestors = new Set([folder.id]);
+        let parent = folderId;
+        while (parent) {
+          if (ancestors.has(parent)) return;
+          ancestors.add(parent);
+          const destination = workspace.folders.find((f) => f.id === parent);
+          if (!destination) return;
+          parent = destination.parentId ?? '';
+        }
+        return { kind: 'folder', item: folder };
+      }
     };
     return {
       onDragOver: (event: DragEvent<HTMLElement>) => {
@@ -83,12 +108,16 @@ export function NoteTree({
         if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDropTarget(null);
       },
       onDrop: (event: DragEvent<HTMLElement>) => {
-        const note = source(event);
+        const target = source(event);
         event.preventDefault();
         event.stopPropagation();
         endDrag();
-        if (!note) return;
-        void moveNote(note, folderId)
+        if (!target) return;
+        const move =
+          target.kind === 'note'
+            ? moveNote(target.item, folderId)
+            : treeEditing.moveFolder(target.item, folderId);
+        void move
           .then(() => {
             setCollapsed((old) => {
               const next = new Set(old);
@@ -114,7 +143,7 @@ export function NoteTree({
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((folder) => (
           <div
-            className={`folder-branch${dropTarget === folder.id ? ' note-drop-branch' : ''}`}
+            className={`folder-branch${dropTarget === folder.id ? ' note-drop-branch' : ''}${dragging?.kind === 'folder' && dragging.id === folder.id ? ' note-dragging' : ''}`}
             key={folder.id}
             {...dropEvents(folder.id)}
           >
@@ -132,6 +161,9 @@ export function NoteTree({
                 />
               ) : (
                 <button
+                  draggable
+                  onDragStart={(event) => startDrag(event, 'folder', folder.id)}
+                  onDragEnd={endDrag}
                   data-sidebar-item
                   data-tree-item
                   data-parent-folder={parentId ?? ''}
@@ -175,7 +207,7 @@ export function NoteTree({
         )
         .map((note) => (
           <div
-            className={`note-navigation-row${dragging === note.id ? ' note-dragging' : ''}`}
+            className={`note-navigation-row${dragging?.kind === 'note' && dragging.id === note.id ? ' note-dragging' : ''}`}
             key={note.id}
             data-note-id={note.id}
           >
@@ -184,13 +216,7 @@ export function NoteTree({
             ) : (
               <button
                 draggable
-                onDragStart={(event) => {
-                  event.stopPropagation();
-                  event.dataTransfer.setData(noteDragType, note.id);
-                  event.dataTransfer.effectAllowed = 'move';
-                  dragSource.current = note.id;
-                  setDragging(note.id);
-                }}
+                onDragStart={(event) => startDrag(event, 'note', note.id)}
                 onDragEnd={endDrag}
                 data-sidebar-item
                 data-tree-item

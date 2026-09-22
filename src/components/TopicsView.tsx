@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import {
   ArrowUpRight,
+  ListChecks,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -121,6 +122,15 @@ export function TopicsView({
         <code>[[주제]]</code>가 담긴 문단과 목록을 모아 봅니다. 목록은 하위 항목까지 포함합니다.
       </p>
       <TopicFolderFilter folders={workspace.folders} value={folderFilter} updateSettings={updateSettings} />
+      <button
+        className="secondary-button topic-completed-filter"
+        aria-pressed={options.hideCompleted}
+        title="카드 안의 체크박스가 모두 완료된 항목을 숨깁니다"
+        disabled={saving || !!drag}
+        onClick={() => onChange({ ...options, hideCompleted: !options.hideCompleted, offset: 0 })}
+      >
+        <ListChecks size={15} /> 완료된 항목 숨기기
+      </button>
       {error && (
         <div className="topics-error" role="alert">
           {error}
@@ -134,14 +144,21 @@ export function TopicsView({
           주제를 불러오는 중…
         </p>
       )}
-      {topics?.length === 0 && filtered && (
+      {topics?.length === 0 && options.hideCompleted && (
+        <div className="topics-empty">
+          <ListChecks size={28} />
+          <h2>표시할 항목이 없습니다.</h2>
+          <p>완료된 항목 숨기기를 끄거나 폴더 필터를 변경해 보세요.</p>
+        </div>
+      )}
+      {topics?.length === 0 && filtered && !options.hideCompleted && (
         <div className="topics-empty">
           <Layers3 size={28} />
           <h2>선택한 폴더에 주제가 없습니다.</h2>
           <p>폴더 선택을 바꾸거나 필터를 해제해 다른 노트의 주제를 볼 수 있습니다.</p>
         </div>
       )}
-      {topics?.length === 0 && !filtered && (
+      {topics?.length === 0 && !filtered && !options.hideCompleted && (
         <div className="topics-empty">
           <Layers3 size={28} />
           <h2>하나의 주제, 여러 날의 기록</h2>

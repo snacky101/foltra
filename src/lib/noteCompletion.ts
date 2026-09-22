@@ -5,7 +5,7 @@ import { getCM } from '@replit/codemirror-vim';
 import { call } from './api';
 import { wikiCompletions } from './wikiCompletion';
 import { tagCompletionRange, tagCompletions, type TagSuggestion } from './tagCompletion';
-import { pluginCompletions } from './pluginCompletion';
+import { pluginCompletions, pluginCompletionProviders } from './pluginCompletion';
 import type { PluginCompletionInvoke } from './pluginTypes';
 import type { Workspace } from './types';
 
@@ -36,8 +36,20 @@ export function noteCompletionExtension(
         (context) => {
           const vim = context.view && getCM(context.view)?.state.vim;
           if (vim && !vim.insertMode) return null;
+          const invoke = complete?.();
           const wiki = wikiCompletions(context, workspace(), () => composing);
-          if (wiki) return wiki;
+          if (wiki && invoke && pluginCompletionProviders(context, workspace(), () => composing).length)
+            return pluginCompletions(context, workspace, invoke, () => composing);
+          if (wiki)
+            return {
+              ...wiki,
+              // Typing a plugin trigger inside an already open wiki popup must
+              // restart the source instead of retaining the note suggestions.
+              update: (current, from, to, next) =>
+                complete?.() && pluginCompletionProviders(next, workspace(), () => composing).length
+                  ? null
+                  : wiki.update!(current, from, to, next),
+            };
           if (!tagCompletionRange(context, () => composing))
             return pluginCompletions(context, workspace, complete?.(), () => composing);
           return call<TagSuggestion[]>(workspace().path, 'tags.list')

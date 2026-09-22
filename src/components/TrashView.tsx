@@ -33,7 +33,8 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
   const pending = useRef(false);
   const mounted = useRef(true);
   const [removed, setRemoved] = useState<Set<string>>(() => new Set());
-  const [deleting, setDeleting] = useState<TrashItem | null>(null);
+  const [deleting, setDeleting] = useState<{ items: TrashItem[]; all: boolean } | null>(null);
+  const deletingItem = deleting && !deleting.all ? deleting.items[0] : null;
   const [error, setError] = useState('');
   useEffect(() => {
     mounted.current = true;
@@ -52,25 +53,31 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
     setDeleting(null);
     setError('');
   };
-  const perform = async (item: TrashItem, action: 'restore' | 'delete') => {
+  const perform = async (targets: TrashItem[], action: 'restore' | 'delete' | 'empty') => {
     if (pending.current) return;
     pending.current = true;
     setBusy(true);
     setError('');
     let committed = false;
     try {
-      await call(vault, `trash.${action}`, { id: item.id, expectedRevision: item.revision });
+      await call(
+        vault,
+        `trash.${action}`,
+        action === 'empty'
+          ? { items: targets.map((item) => ({ id: item.id, expectedRevision: item.revision })) }
+          : { id: targets[0].id, expectedRevision: targets[0].revision },
+      );
       committed = true;
       if (!mounted.current) return;
-      setRemoved((current) => new Set(current).add(item.id));
+      setRemoved((current) => new Set([...current, ...targets.map((item) => item.id)]));
       setDeleting(null);
       await refresh();
     } catch (e) {
       if (!mounted.current) return;
-      if (action === 'delete' && !committed) {
+      if (action !== 'restore' && !committed) {
         setError(
           e instanceof CoreError && e.code === 'conflict'
-            ? '휴지통 항목이 변경되었습니다. 취소한 뒤 최신 내용을 확인하고 다시 시도하세요.'
+            ? '휴지통 목록이나 항목이 변경되었습니다. 취소한 뒤 최신 내용을 확인하고 다시 시도하세요.'
             : (e as Error).message,
         );
       } else onError(e);
@@ -87,15 +94,28 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
       <div className="eyebrow">NOTHING LOST ALONG THE WAY</div>
       <h1>휴지통</h1>
       <p className="page-description">삭제한 노트·폴더·데이터베이스·DB 항목을 복원하거나 영구 삭제합니다.</p>
-      <label className="note-list-search trash-search">
-        <Search size={15} />
-        <input
-          aria-label="휴지통 검색"
-          placeholder="제목으로 찾기"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </label>
+      <div className="trash-toolbar">
+        <label className="note-list-search trash-search">
+          <Search size={15} />
+          <input
+            aria-label="휴지통 검색"
+            placeholder="제목으로 찾기"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <button
+          className="secondary-button trash-delete"
+          disabled={busy || !remaining.length}
+          onClick={() => {
+            setError('');
+            setDeleting({ items: [...remaining], all: true });
+          }}
+        >
+          <Trash2 size={14} />
+          전체 영구 삭제
+        </button>
+      </div>
       {filtered.map((item) => {
         const KindIcon = kindIcons[item.kind] ?? FileText;
         const kindName = kindNames[item.kind] ?? item.kind;
@@ -113,7 +133,7 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
             <button
               className="secondary-button"
               disabled={busy}
-              onClick={() => void perform(item, 'restore')}
+              onClick={() => void perform([item], 'restore')}
             >
               <RotateCcw size={14} />
               복원
@@ -123,7 +143,7 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
               disabled={busy}
               onClick={() => {
                 setError('');
-                setDeleting(item);
+                setDeleting({ items: [item], all: false });
               }}
             >
               영구 삭제
@@ -138,26 +158,38 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
         </div>
       )}
       {deleting && (
-        <Modal title="영구 삭제" close={dismiss}>
+        <Modal title={deleting.all ? '휴지통 전체 영구 삭제' : '영구 삭제'} close={dismiss}>
           <form
             onSubmit={(event) => {
               event.preventDefault();
-              void perform(deleting, 'delete');
+              void perform(deleting.items, deleting.all ? 'empty' : 'delete');
             }}
           >
-            <p>
-              “{deleting.title}” {kindNames[deleting.kind] ?? '항목'}을 영구 삭제합니다.
-            </p>
-            {deleting.kind === 'folder' && (
+            {deleting.all ? (
+              <>
+                <p>
+                  휴지통의 모든 항목 {deleting.items.length}개를 영구 삭제합니다. 검색으로 숨겨진 항목도
+                  포함됩니다.
+                </p>
+                <p>폴더 안의 하위 폴더·노트와 데이터베이스에 함께 보관된 DB 항목도 삭제됩니다.</p>
+              </>
+            ) : (
               <p>
-                함께 보관된 하위 폴더 {deleting.folderCount ?? 0}개와 노트 {deleting.noteCount ?? 0}개도
-                삭제됩니다.
+                “{deletingItem!.title}” {kindNames[deletingItem!.kind] ?? '항목'}을 영구 삭제합니다.
               </p>
             )}
-            {deleting.kind === 'database' && (
-              <p>함께 보관된 DB 항목 {deleting.recordCount ?? 0}개도 삭제됩니다. 연결된 노트는 유지됩니다.</p>
+            {deletingItem?.kind === 'folder' && (
+              <p>
+                함께 보관된 하위 폴더 {deletingItem.folderCount ?? 0}개와 노트 {deletingItem.noteCount ?? 0}
+                개도 삭제됩니다.
+              </p>
             )}
-            {deleting.kind === 'record' && <p>연결된 노트는 유지됩니다.</p>}
+            {deletingItem?.kind === 'database' && (
+              <p>
+                함께 보관된 DB 항목 {deletingItem.recordCount ?? 0}개도 삭제됩니다. 연결된 노트는 유지됩니다.
+              </p>
+            )}
+            {deletingItem?.kind === 'record' && <p>연결된 노트는 유지됩니다.</p>}
             <p className="muted">영구 삭제한 항목은 복원할 수 없습니다.</p>
             {error && (
               <p className="inline-error" role="alert">
@@ -169,7 +201,7 @@ function TrashContents({ vault, items, refresh, onError }: Props) {
                 취소
               </button>
               <button className="primary-button" disabled={busy}>
-                {busy ? '삭제 중…' : '영구 삭제'}
+                {busy ? '삭제 중…' : deleting.all ? '전체 영구 삭제' : '영구 삭제'}
               </button>
             </div>
           </form>

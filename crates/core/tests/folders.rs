@@ -199,3 +199,116 @@ fn folder_backup_roundtrip_and_invalid_hierarchy_are_atomic() {
     );
     assert!(!dest.path().join("notes").exists());
 }
+
+#[test]
+fn moving_a_folder_only_changes_its_parent_and_preserves_the_entire_subtree() {
+    let v = vault();
+    let parent = call(&v, "folder.create", json!({"name":"Projects"}));
+    let target = call(&v, "folder.create", json!({"name":"Archive"}));
+    let child = call(
+        &v,
+        "folder.create",
+        json!({"name":"Nested","parentId":parent["id"]}),
+    );
+    let note = call(
+        &v,
+        "note.create",
+        json!({"title":"Draft","body":"Exact content\n", "folderId":child["id"]}),
+    );
+    call(
+        &v,
+        "note.create",
+        json!({"title":"Reference","body":"[[Draft]]"}),
+    );
+    let original = call(&v, "vault.export", json!({}))["files"].clone();
+    let links = call(&v, "links.list", json!({}));
+    let file = format!("folders/{}.json", parent["id"].as_str().unwrap());
+    let mut current = parent.clone();
+    for destination in [target["id"].clone(), json!("")] {
+        current = call(
+            &v,
+            "folder.update",
+            json!({"id":current["id"],"name":current["name"],"expectedRevision":current["revision"],"parentId":destination}),
+        );
+        assert_eq!(current["id"], parent["id"]);
+        assert_eq!(current["name"], parent["name"]);
+        assert_eq!(
+            current["parentId"],
+            if destination == "" {
+                Value::Null
+            } else {
+                destination
+            }
+        );
+        let after = call(&v, "vault.export", json!({}))["files"].clone();
+        assert_eq!(
+            after.as_object().unwrap().len(),
+            original.as_object().unwrap().len()
+        );
+        for (path, content) in original.as_object().unwrap() {
+            if path != &file {
+                assert_eq!(&after[path], content, "unexpected write: {path}");
+            }
+        }
+        assert_eq!(call(&v, "note.read", json!({"id":note["id"]})), note);
+        assert_eq!(call(&v, "links.list", json!({})), links);
+        let snapshot = call(&v, "vault.export", json!({}));
+        let restored = tempfile::tempdir().unwrap();
+        call(&restored, "vault.import", json!({"snapshot":snapshot}));
+        assert_eq!(
+            call(&restored, "folder.list", json!({})),
+            call(&v, "folder.list", json!({}))
+        );
+    }
+}
+
+#[test]
+fn folder_moves_reject_cycles_duplicates_missing_parents_and_stale_revisions_without_writes() {
+    let v = vault();
+    let parent = call(&v, "folder.create", json!({"name":"Projects"}));
+    let child = call(
+        &v,
+        "folder.create",
+        json!({"name":"Child","parentId":parent["id"]}),
+    );
+    let grandchild = call(
+        &v,
+        "folder.create",
+        json!({"name":"Grandchild","parentId":child["id"]}),
+    );
+    let target = call(&v, "folder.create", json!({"name":"Archive"}));
+    call(
+        &v,
+        "folder.create",
+        json!({"name":"Projects","parentId":target["id"]}),
+    );
+    let before = call(&v, "vault.export", json!({}))["files"].clone();
+    for (destination, code) in [
+        (parent["id"].clone(), "invalid_folder"),
+        (child["id"].clone(), "invalid_folder"),
+        (grandchild["id"].clone(), "invalid_folder"),
+        (target["id"].clone(), "folder_exists"),
+        (json!("missing"), "not_found"),
+    ] {
+        reject(
+            &v,
+            "folder.update",
+            json!({"id":parent["id"],"name":parent["name"],"expectedRevision":parent["revision"],"parentId":destination}),
+            code,
+        );
+        assert_eq!(call(&v, "vault.export", json!({}))["files"], before);
+    }
+    call(
+        &v,
+        "folder.update",
+        json!({"id":child["id"],"name":"Changed","expectedRevision":child["revision"]}),
+    );
+    let before = call(&v, "vault.export", json!({}))["files"].clone();
+    reject(
+        &v,
+        "folder.update",
+        json!({"id":child["id"],"name":child["name"],"expectedRevision":child["revision"],"parentId":""}),
+        "conflict",
+    );
+    assert_eq!(call(&v, "vault.export", json!({}))["files"], before);
+}

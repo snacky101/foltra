@@ -103,6 +103,9 @@ pub fn update(store: &Store, args: &Value) -> Result<Value> {
     check_revision(text(args, "expectedRevision")?, &revision(&raw))?;
     let mut folder: Folder = serde_json::from_str(&raw)?;
     folder.name = nonempty(text(args, "name")?, "Folder name")?;
+    if args.get("parentId").is_some() {
+        folder.parent_id = destination(store, args.get("parentId"))?;
+    }
     let mut tree = folders(store)?;
     tree.retain(|f| f.id != folder.id);
     tree.push(folder.clone());

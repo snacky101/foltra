@@ -1218,10 +1218,21 @@
   font-size: 12px;
   line-height: 1.8;
 }
+.trash-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.trash-toolbar > button {
+  margin-left: auto;
+}
 .trash-search {
   display: block;
+  flex: 1 1 240px;
   max-width: 420px;
-  margin-bottom: 8px;
+  margin-bottom: 0;
 }
 .trash-delete {
   color: var(--danger);

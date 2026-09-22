@@ -3,6 +3,10 @@ import { EditorState } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 import { defaultKeymap, history, undo } from '@codemirror/commands';
 import { markdown } from '@codemirror/lang-markdown';
+import { GFM } from '@lezer/markdown';
+import { livePreviewExtension } from './livePreview';
+import { taskMarkers } from './markdownTasks';
+import type { Workspace } from './types';
 import { getCM, vim, Vim } from '@replit/codemirror-vim';
 import { syntaxTree } from '@codemirror/language';
 import { afterEach, beforeEach, expect, test } from 'vitest';
@@ -27,7 +31,7 @@ afterEach(() => {
   if (rect) Object.defineProperty(Range.prototype, 'getBoundingClientRect', rect);
   else delete (Range.prototype as Partial<Range>).getBoundingClientRect;
 });
-function editor(doc: string, vimEnabled = false) {
+function editor(doc: string, vimEnabled = false, live = false) {
   view = new EditorView({
     parent: document.body,
     state: EditorState.create({
@@ -35,7 +39,17 @@ function editor(doc: string, vimEnabled = false) {
       selection: { anchor: doc.length },
       extensions: [
         vimEnabled ? vim() : [],
-        markdown({ addKeymap: false }),
+        markdown({ addKeymap: false, extensions: [GFM] }),
+        live
+          ? livePreviewExtension(
+              () => ({
+                workspace: { notes: [], records: [] } as unknown as Workspace,
+                openNote() {},
+                openLink() {},
+              }),
+              true,
+            )
+          : [],
         markdownEditing,
         history(),
         keymap.of(defaultKeymap),
@@ -47,8 +61,6 @@ function editor(doc: string, vimEnabled = false) {
 }
 
 test.each([
-  [false, 'Backspace'],
-  [true, 'Backspace'],
   [false, 'Enter'],
   [true, 'Enter'],
 ] as const)('Vim %s: %s exits an empty bullet without adding a row', (vimEnabled, key) => {
@@ -143,3 +155,33 @@ test('Vim Normal Enter does not insert a code fence pair', () => {
   );
   expect(view.state.doc.toString()).toBe('```go');
 });
+
+test.each([false, true])(
+  'Vim %s: Backspace deletes empty task markup character by character in live preview',
+  (vimEnabled) => {
+    for (const { marker } of taskMarkers) {
+      const prefix = '- Parent\n  - Child\n  ';
+      const markup = `- [${marker}] `;
+      editor(prefix + markup, vimEnabled, true);
+      expect(view.contentDOM.querySelector('.cm-live-task')).not.toBeNull();
+      for (let remaining = markup.length - 1; remaining >= 0; remaining--) {
+        const event = new KeyboardEvent('keydown', {
+          key: 'Backspace',
+          code: 'Backspace',
+          bubbles: true,
+          cancelable: true,
+        });
+        view.contentDOM.dispatchEvent(event);
+        expect(event.defaultPrevented).toBe(true);
+        expect(view.state.doc.toString()).toBe(prefix + markup.slice(0, remaining));
+        expect(view.state.doc.lines).toBe(3);
+        expect(view.state.selection.main.head).toBe(prefix.length + remaining);
+        const dom = view.domAtPos(view.state.selection.main.head);
+        expect(view.posAtDOM(dom.node, dom.offset)).toBe(view.state.selection.main.head);
+      }
+      undo(view);
+      expect(view.state.doc.toString()).toBe(prefix + markup);
+      view.destroy();
+    }
+  },
+);

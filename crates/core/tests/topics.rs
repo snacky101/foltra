@@ -319,3 +319,133 @@ fn nested_tabs_are_renderable_and_deleted_topic_targets_keep_their_group_identit
         )
     );
 }
+
+#[test]
+fn completed_filter_counts_real_tasks_in_the_entire_card_and_preserves_other_blocks() {
+    let v = vault();
+    let cases = [
+        ("Done", "- [x] Done [[Foo]]\n  - [X] Child", false),
+        ("Parent", "- Parent [[Foo]]\n  - [x] Child", false),
+        ("Mixed", "- [x] Parent [[Foo]]\n  - [ ] Child", true),
+        ("Doing", "- [x] Parent [[Foo]]\n  - [/] Child", true),
+        ("Bookmark", "- [x] Parent [[Foo]]\n  - [b] Child", true),
+        ("Other states", "- [x] Parent [[Foo]]\n  - [-] Child", true),
+        ("No tasks", "- Plain [[Foo]]\n  - Child", true),
+        ("Literal", "A literal `- [x] done` [[Foo]]", true),
+        ("Malformed", "- [x]no separator [[Foo]]", true),
+        (
+            "Code only",
+            "- Parent [[Foo]]\n  ```md\n  - [x] Code\n  ```",
+            true,
+        ),
+        (
+            "Ignore code",
+            "- [x] Parent [[Foo]]\n  ```md\n  - [ ] Code\n  ```",
+            false,
+        ),
+        ("Done-only topic", "- [x] [[DoneOnly]]", false),
+    ];
+    for (title, body, _) in cases {
+        note(&v, title, body);
+    }
+    let before = call(&v, "vault.export", json!({}));
+    let catalog = call(&v, "topics.list", json!({"hideCompleted":true}));
+    let expected: Vec<_> = cases
+        .iter()
+        .filter(|(_, _, visible)| *visible)
+        .map(|(title, _, _)| *title)
+        .collect();
+    assert_eq!(catalog.as_array().unwrap().len(), 1);
+    assert_eq!(catalog[0]["blockCount"], expected.len());
+    assert_eq!(catalog[0]["noteCount"], expected.len());
+    let filtered = call(
+        &v,
+        "topics.blocks",
+        json!({"topic":"name:Foo","hideCompleted":true}),
+    );
+    let actual: std::collections::BTreeSet<_> = filtered["blocks"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|b| b["noteTitle"].as_str().unwrap())
+        .collect();
+    assert_eq!(actual, expected.iter().copied().collect());
+    assert_eq!(filtered["total"], expected.len());
+    assert_eq!(blocks(&v, "name:Foo")["total"], cases.len() - 1);
+    assert_eq!(
+        call(&v, "vault.export", json!({}))["files"],
+        before["files"]
+    );
+}
+
+#[test]
+fn completed_filter_paginates_after_filtering_and_reorder_preserves_hidden_cards() {
+    let v = vault();
+    let body = (0..55)
+        .map(|i| {
+            format!(
+                "- [{}] Card {i} [[Foo]]",
+                if i % 2 == 0 { "x" } else { " " }
+            )
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    let original = note(&v, "Checklist", &body);
+    let all = blocks(&v, "name:Foo");
+    let page = call(
+        &v,
+        "topics.blocks",
+        json!({"topic":"name:Foo","hideCompleted":true,"limit":2,"offset":1}),
+    );
+    assert_eq!(page["total"], 27);
+    assert_eq!(page["blocks"][0]["line"], 4);
+    assert_eq!(page["blocks"][1]["line"], 6);
+    let args = json!({"topic":"name:Foo","hideCompleted":true,"source":page["blocks"][1]["id"],"target":page["blocks"][0]["id"],"placement":"before","sort":"newest","expectedRevision":page["orderRevision"]});
+    let mut stale_scope = args.clone();
+    stale_scope["expectedRevision"] = all["orderRevision"].clone();
+    assert_eq!(
+        execute(v.path().to_str().unwrap(), "topics.reorder", stale_scope)
+            .unwrap_err()
+            .code,
+        "conflict"
+    );
+    let mut hidden = args.clone();
+    hidden["source"] = all["blocks"][0]["id"].clone();
+    assert_eq!(
+        execute(v.path().to_str().unwrap(), "topics.reorder", hidden)
+            .unwrap_err()
+            .code,
+        "not_found"
+    );
+    call(&v, "topics.reorder", args);
+    let reordered = blocks(&v, "name:Foo");
+    assert_eq!(reordered["total"], 55);
+    assert_eq!(
+        reordered["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .take(6)
+            .map(|b| b["line"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![1, 2, 3, 6, 4, 5]
+    );
+    assert_eq!(
+        call(&v, "note.read", json!({"id":original["id"]})),
+        original
+    );
+    let again = call(
+        &v,
+        "topics.blocks",
+        json!({"topic":"name:Foo","hideCompleted":true,"limit":3}),
+    );
+    assert_eq!(
+        again["blocks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|b| b["line"].as_u64().unwrap())
+            .collect::<Vec<_>>(),
+        vec![2, 6, 4]
+    );
+}

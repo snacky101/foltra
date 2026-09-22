@@ -7,6 +7,7 @@ export const defaultTopicOptions = {
   offset: 0,
   sort: null as TopicSort | null,
   showSources: false,
+  hideCompleted: false,
 };
 export type TopicOptions = typeof defaultTopicOptions;
 
@@ -16,6 +17,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const scopeKey = JSON.stringify([
     workspace.path,
     folders,
+    options.hideCompleted,
     workspace.notes
       .map((note) => [note.id, note.folderId ?? ''] as const)
       .sort(([a], [b]) => a.localeCompare(b)),
@@ -32,7 +34,10 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
   const [catalog, setCatalog] = useState<{ key: string; topics?: Topic[]; error?: string } | null>(null);
   useEffect(() => {
     let active = true;
-    void call<Topic[]>(workspace.path, 'topics.list', { folders }).then(
+    void call<Topic[]>(workspace.path, 'topics.list', {
+      folders,
+      ...(options.hideCompleted ? { hideCompleted: true } : {}),
+    }).then(
       (topics) => {
         if (active) setCatalog({ key: sourceKey, topics });
       },
@@ -63,6 +68,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
       offset,
       limit: 50,
       folders,
+      ...(options.hideCompleted ? { hideCompleted: true } : {}),
       ...(options.sort ? { sort: options.sort } : {}),
     }).then(
       (data) => {
@@ -106,6 +112,7 @@ export function useTopics(workspace: Workspace, options: TopicOptions) {
         expectedRevision,
         sort,
         folders,
+        ...(options.hideCompleted ? { hideCompleted: true } : {}),
       });
       if (currentContext.current !== context) return false;
       reload();

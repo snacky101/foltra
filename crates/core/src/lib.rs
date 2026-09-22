@@ -214,6 +214,7 @@ pub(crate) fn dispatch(store: &Store, command: &str, args: Value) -> Result<Valu
         "trash.list" => vault::trash(store),
         "trash.restore" => vault::restore(store, &args),
         "trash.delete" => vault::delete_trash(store, &args),
+        "trash.empty" => vault::empty_trash(store, &args),
         "database.create" => databases::create_database(store, &args),
         "database.list" => Ok(serde_json::to_value(databases::databases(store)?)?),
         "database.inspect" => database_lifecycle::inspect(store, &args),

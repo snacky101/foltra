@@ -406,3 +406,12 @@
     background: var(--panel);
   }
 }
+
+.topic-completed-filter {
+  margin-bottom: 20px;
+}
+.topic-completed-filter[aria-pressed='true'] {
+  color: var(--accent);
+  background: var(--selection);
+  border-color: var(--accent);
+}

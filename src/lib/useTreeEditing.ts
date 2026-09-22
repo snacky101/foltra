@@ -57,6 +57,16 @@ export function useTreeEditing(
       revision: folder.revision,
       parentId: folder.parentId,
     });
+  const moveFolder = async (folder: Folder, parentId: string) => {
+    if ((folder.parentId ?? '') === parentId) return;
+    await call(vault, 'folder.update', {
+      id: folder.id,
+      name: folder.name,
+      expectedRevision: folder.revision,
+      parentId,
+    });
+    if (currentVault.current === vault) await refresh();
+  };
   const create = async (kind: TreeEdit['kind'], parentId = '') => {
     if (busy.current || !workspace) return;
     busy.current = true;
@@ -104,6 +114,7 @@ export function useTreeEditing(
     commit,
     renameNote,
     renameFolder,
+    moveFolder,
     cancel: () => {
       if (!busy.current) setEditing(null);
     },

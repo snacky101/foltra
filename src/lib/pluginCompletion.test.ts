@@ -32,7 +32,10 @@ const rect = Object.getOwnPropertyDescriptor(Range.prototype, 'getBoundingClient
 beforeEach(() => {
   workspace = {
     path: '/disposable/completion',
-    notes: [],
+    notes: [{ id: 'alpha', title: 'Alpha' }],
+    folders: [],
+    links: [],
+    settings: {},
     extensions: [
       {
         id: 'dates',
@@ -193,7 +196,8 @@ test('emails, code, links, escapes and unselected text do not trigger replacemen
     '`@Today`',
     '```md\n@Today',
     '    @Today',
-    '[[@Today',
+    '\\[[@Today',
+    '[[prefix @Today',
     '[[@Today|alias',
     '[text](https://x/@Today)',
     '<!-- @Today',
@@ -244,4 +248,82 @@ test('Enter during composition does not accept an option', async () => {
   expect(editorView.state.doc.toString()).toBe('@To');
   editorView.contentDOM.dispatchEvent(new CompositionEvent('compositionend', { bubbles: true }));
   closeCompletion(editorView);
+});
+
+test('typing @ inside an open wiki popup switches to dates; accepting only replaces the date token', async () => {
+  const editorView = editor('[[');
+  startCompletion(editorView);
+  await vi.waitFor(() =>
+    expect(currentCompletions(editorView.state).map(({ label }) => label)).toEqual(['Alpha']),
+  );
+  editorView.dispatch({
+    changes: { from: 2, insert: '@' },
+    selection: { anchor: 3 },
+    userEvent: 'input.type',
+  });
+  await vi.waitFor(() =>
+    expect(currentCompletions(editorView.state).map(({ label }) => label)).toEqual([
+      'Today',
+      'Tomorrow',
+      'Yesterday',
+    ]),
+  );
+  editorView.dispatch({
+    changes: { from: 3, insert: 'ToD' },
+    selection: { anchor: 6 },
+    userEvent: 'input.type',
+  });
+  await vi.waitFor(() =>
+    expect(currentCompletions(editorView.state).map(({ label }) => label)).toEqual(['Today']),
+  );
+  await settle();
+  expect(acceptCompletion(editorView)).toBe(true);
+  expect(editorView.state.doc.toString()).toBe('[[2026-09-18');
+  expect(editorView.state.selection.main.head).toBe(12);
+  undo(editorView);
+  expect(editorView.state.doc.toString()).toBe('[[@ToD');
+});
+
+test.each(['[[@Today', '[[@Today]]', '[[@Today|오늘]]'])(
+  'Esc inside %s closes date suggestions and preserves the literal draft',
+  async (doc) => {
+    const editorView = editor(doc);
+    editorView.dispatch({ selection: { anchor: '[[@Today'.length } });
+    startCompletion(editorView);
+    await vi.waitFor(() =>
+      expect(currentCompletions(editorView.state).map(({ label }) => label)).toEqual(['Today']),
+    );
+    await settle();
+    editorView.contentDOM.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true, cancelable: true }),
+    );
+    await settle();
+    expect(completionStatus(editorView.state)).toBeNull();
+    expect(editorView.state.doc.toString()).toBe(doc);
+  },
+);
+
+test('date replacement preserves wiki closers, alias and surrounding text', async () => {
+  const doc = '이전 [[@Tomorrow|내일]] 이후';
+  const editorView = editor(doc);
+  editorView.dispatch({ selection: { anchor: 8 } });
+  const result = await pluginCompletions(
+    new CompletionContext(editorView.state, 8, false),
+    () => workspace,
+    invoke,
+  );
+  const option = result!.options.find(({ label }) => label === 'Tomorrow')!;
+  if (typeof option.apply !== 'function') throw new Error('Expected explicit apply');
+  option.apply(editorView, option, result!.from, 8);
+  expect(editorView.state.doc.toString()).toBe('이전 [[2026-09-19|내일]] 이후');
+});
+
+test('disabled date provider leaves normal wiki suggestions available', async () => {
+  workspace.pluginStates![0].enabled = false;
+  const editorView = editor('[[@Today');
+  startCompletion(editorView);
+  await vi.waitFor(() =>
+    expect(currentCompletions(editorView.state).map(({ label }) => label)).toEqual(['@Today']),
+  );
+  expect(invoke).not.toHaveBeenCalled();
 });

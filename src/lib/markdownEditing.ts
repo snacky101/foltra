@@ -79,9 +79,9 @@ export const deleteMarkdownMarkupBackward: StateCommand = (target) => {
         (task !== null && taskPrefix(task[1]) !== null))
     );
   });
-  // CodeMirror replaces a later item's marker with spaces. On an empty item,
-  // Backspace should exit one list level just like Enter, without a hidden indent.
-  if (emptyItems && continueMarkdownList(target)) return true;
+  // Delete empty task syntax literally, including the bare bullet left after
+  // removing its checkbox. Enter alone exits the list without leaving an indent.
+  if (emptyItems) return false;
   return deleteMarkupBackward(target);
 };
 

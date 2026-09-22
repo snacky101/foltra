@@ -28,7 +28,7 @@ fn marker(value: &str) -> Result<char> {
         .map(|(_, ch)| *ch).ok_or_else(|| Error::new("invalid_arguments", "Unknown task status; use todo, doing, done, bookmark, cancelled, deferred, question, important, star, info or pin"))
 }
 
-fn tasks(note: &Note) -> Vec<(usize, Value)> {
+pub(crate) fn tasks(note: &Note) -> Vec<(usize, Value)> {
     let mut out = vec![];
     for (event, range) in frontmatter::markdown_events(&note.body) {
         if !matches!(event, Event::Start(Tag::Item)) {

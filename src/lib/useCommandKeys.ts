@@ -11,6 +11,8 @@ import type { Settings } from './types';
 import { leaderMatches } from './leaderKey';
 import { moveSidebarFocus } from './workspaceFocus';
 import { commandKey } from './commandKey';
+import { EditorView } from '@codemirror/view';
+import { getCM } from '@replit/codemirror-vim';
 
 export function useCommandKeys(
   commands: Command[],
@@ -85,7 +87,18 @@ export function useCommandKeys(
         }
       }
       const key = commandMode ? commandKey(event) : event.key;
-      const allowLeader = canStartLeader(false, editable, inEditor, settings.vim, mode);
+      const editor = inEditor && target ? EditorView.findFromDOM(target) : null;
+      const vim = editor && getCM(editor)?.state.vim;
+      const vimPending =
+        vim &&
+        !vim.insertMode &&
+        (vim.expectLiteralNext ||
+          vim.inputState.operator ||
+          vim.inputState.keyBuffer.length ||
+          vim.inputState.prefixRepeat.length ||
+          vim.inputState.motionRepeat.length ||
+          vim.inputState.registerName);
+      const allowLeader = !vimPending && canStartLeader(false, editable, inEditor, settings.vim, mode);
       if (
         sequence === null &&
         allowLeader &&

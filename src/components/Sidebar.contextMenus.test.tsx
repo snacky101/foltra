@@ -115,6 +115,7 @@ beforeEach(() => {
       create: vi.fn().mockResolvedValue(undefined),
       renameNote: vi.fn(),
       renameFolder: vi.fn(),
+      moveFolder: vi.fn().mockResolvedValue(undefined),
     },
   };
 });

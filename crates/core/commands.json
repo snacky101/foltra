@@ -263,6 +263,40 @@
     }
   },
   {
+    "id": "trash.empty",
+    "title": "Permanently delete all trash items",
+    "readOnly": false,
+    "headless": true,
+    "argsSchema": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "expectedRevision": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "expectedRevision"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "items"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
     "id": "database.list",
     "title": "List databases",
     "readOnly": true,
@@ -634,6 +668,10 @@
     "argsSchema": {
       "type": "object",
       "properties": {
+        "hideCompleted": {
+          "type": "boolean",
+          "description": "Hide cards with at least one task and all tasks done; default false."
+        },
         "folders": {
           "type": "object",
           "properties": {
@@ -657,6 +695,10 @@
     "argsSchema": {
       "type": "object",
       "properties": {
+        "hideCompleted": {
+          "type": "boolean",
+          "description": "Hide cards with at least one task and all tasks done; default false."
+        },
         "folders": {
           "type": "object",
           "properties": {
@@ -706,6 +748,10 @@
     "argsSchema": {
       "type": "object",
       "properties": {
+        "hideCompleted": {
+          "type": "boolean",
+          "description": "Hide cards with at least one task and all tasks done; default false."
+        },
         "folders": {
           "type": "object",
           "properties": {
@@ -1043,6 +1089,9 @@
           "type": "string"
         },
         "name": {
+          "type": "string"
+        },
+        "parentId": {
           "type": "string"
         },
         "expectedRevision": {

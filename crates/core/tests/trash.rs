@@ -254,3 +254,106 @@ fn mismatched_id_and_unknown_kind_are_not_deleted_and_original_path_is_never_fol
     );
     assert_eq!(files(&v), expected);
 }
+
+fn empty_args(v: &TempDir) -> Value {
+    let items = call(v, "trash.list", json!({}));
+    json!({"items":items.as_array().unwrap().iter().map(|item| json!({"id":item["id"],"expectedRevision":item["revision"]})).collect::<Vec<_>>()})
+}
+
+fn add_deleted_note(v: &TempDir) {
+    let note = call(
+        v,
+        "note.create",
+        json!({"title":"Another", "body":"Another trash item"}),
+    );
+    call(
+        v,
+        "note.delete",
+        json!({"id":note["id"],"expectedRevision":note["revision"]}),
+    );
+}
+
+#[test]
+fn empty_trash_removes_all_confirmed_bundles_and_preserves_live_files_for_every_kind() {
+    for kind in ["note", "folder", "database", "record"] {
+        let (v, _) = fixture(kind);
+        add_deleted_note(&v);
+        let mut expected = files(&v);
+        expected
+            .as_object_mut()
+            .unwrap()
+            .retain(|path, _| !path.starts_with("trash/"));
+        assert_eq!(call(&v, "trash.empty", empty_args(&v))["deleted"], 2);
+        assert_eq!(call(&v, "trash.list", json!({})), json!([]));
+        assert_eq!(files(&v), expected, "live files changed for {kind}");
+        assert_eq!(call(&v, "trash.empty", json!({"items":[]}))["deleted"], 0);
+        assert!(!v.path().join(".foltra/local/pending.json").exists());
+    }
+}
+
+#[test]
+fn empty_trash_rejects_added_removed_or_changed_items_atomically() {
+    for change in ["added", "removed", "changed"] {
+        let (v, item) = fixture("note");
+        add_deleted_note(&v);
+        let args = empty_args(&v);
+        match change {
+            "added" => add_deleted_note(&v),
+            "removed" => {
+                call(
+                    &v,
+                    "trash.restore",
+                    json!({"id":item["id"],"expectedRevision":item["revision"]}),
+                );
+            }
+            _ => {
+                let path = v.path().join(trash_path(&item));
+                let raw = std::fs::read_to_string(&path).unwrap();
+                std::fs::write(path, format!("{raw}\n")).unwrap();
+            }
+        }
+        let before = files(&v);
+        assert_eq!(
+            execute(v.path().to_str().unwrap(), "trash.empty", args)
+                .unwrap_err()
+                .code,
+            "conflict"
+        );
+        assert_eq!(files(&v), before);
+    }
+}
+
+#[test]
+fn empty_trash_rejects_incomplete_duplicate_or_unsafe_confirmation_without_deleting_anything() {
+    let (v, item) = fixture("note");
+    let entry = json!({"id":item["id"],"expectedRevision":item["revision"]});
+    let before = files(&v);
+    for args in [
+        json!({}),
+        json!({"items":[]}),
+        json!({"items":[entry.clone(),entry.clone()]}),
+        json!({"items":[{"id":item["id"]}]}),
+        json!({"items":[{"id":"../notes/anything","expectedRevision":item["revision"]}]}),
+    ] {
+        assert!(execute(v.path().to_str().unwrap(), "trash.empty", args).is_err());
+        assert_eq!(files(&v), before);
+    }
+}
+
+#[test]
+fn empty_trash_validates_all_bundles_before_committing() {
+    let (v, item) = fixture("folder");
+    add_deleted_note(&v);
+    let path = v.path().join(trash_path(&item));
+    let mut raw: Value = serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    raw["kind"] = json!("unknown");
+    std::fs::write(path, raw.to_string()).unwrap();
+    let before = files(&v);
+    assert_eq!(
+        execute(v.path().to_str().unwrap(), "trash.empty", empty_args(&v))
+            .unwrap_err()
+            .code,
+        "invalid_data"
+    );
+    assert_eq!(files(&v), before);
+}

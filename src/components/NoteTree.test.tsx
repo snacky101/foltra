@@ -55,6 +55,7 @@ beforeEach(() => {
       create: vi.fn().mockResolvedValue(undefined),
       renameNote: vi.fn(),
       renameFolder: vi.fn(),
+      moveFolder: vi.fn().mockResolvedValue(undefined),
     },
   };
 });
@@ -92,6 +93,13 @@ async function drag(target: HTMLElement, type: string, data: ReturnType<typeof t
 async function start(id = 'source') {
   const data = transfer();
   await drag(button(id), 'dragstart', data);
+  return data;
+}
+async function startFolder(id: string) {
+  const data = transfer();
+  const source = folder(id).querySelector<HTMLButtonElement>('button')!;
+  expect(source.draggable).toBe(true);
+  await drag(source, 'dragstart', data);
   return data;
 }
 async function drop(target: HTMLElement, data: ReturnType<typeof transfer>) {
@@ -221,5 +229,95 @@ test('failed moves report once and clear drag feedback without opening a collaps
   expect(host.querySelector('.note-drop-target')).toBeNull();
   expect(host.querySelector('.note-dragging')).toBeNull();
   await drop(branch('parent'), await start());
+  expect(toggle.getAttribute('aria-expanded')).toBe('true');
+});
+
+test('folders move onto folder titles, child notes and the spaces between them', async () => {
+  await render();
+  for (const target of [
+    folder('parent'),
+    row('parent-note'),
+    branch('parent').querySelector<HTMLElement>('.folder-children')!,
+  ]) {
+    vi.mocked(props.treeEditing.moveFolder).mockClear();
+    const data = await startFolder('other');
+    expect(branch('other').classList.contains('note-dragging')).toBe(true);
+    await drag(target, 'dragover', data);
+    expect(data.dropEffect).toBe('move');
+    expect(folder('parent').classList.contains('note-drop-target')).toBe(true);
+    await drag(target, 'drop', data);
+    expect(props.treeEditing.moveFolder).toHaveBeenCalledExactlyOnceWith(workspace.folders[2], 'parent');
+    expect(props.moveNote).not.toHaveBeenCalled();
+    expect(host.querySelector('.note-dragging')).toBeNull();
+  }
+  vi.mocked(props.treeEditing.moveFolder).mockClear();
+  await drop(row('nested-note'), await startFolder('other'));
+  expect(props.treeEditing.moveFolder).toHaveBeenCalledExactlyOnceWith(workspace.folders[2], 'nested');
+});
+
+test('folders can move to root using the NOTES header, root notes or root background', async () => {
+  await render();
+  for (const target of [
+    row('source'),
+    host.querySelector<HTMLElement>('.notes-root')!,
+    host.querySelector<HTMLElement>('.note-navigation')!,
+  ]) {
+    vi.mocked(props.treeEditing.moveFolder).mockClear();
+    await drop(target, await startFolder('nested'));
+    expect(props.treeEditing.moveFolder).toHaveBeenCalledExactlyOnceWith(workspace.folders[1], '');
+  }
+});
+
+test('self, descendants and unchanged parents reject folder drops without falling through to root', async () => {
+  await render();
+  for (const target of [
+    folder('parent'),
+    folder('nested'),
+    row('nested-note'),
+    branch('parent').querySelector<HTMLElement>('.folder-children')!,
+  ]) {
+    const data = await startFolder('parent');
+    await drag(target, 'dragover', data);
+    expect(data.dropEffect).toBe('none');
+    await drag(target, 'drop', data);
+  }
+  await drop(row('parent-note'), await startFolder('nested'));
+  await drop(host.querySelector<HTMLElement>('.notes-root')!, await startFolder('parent'));
+  expect(props.treeEditing.moveFolder).not.toHaveBeenCalled();
+  expect(props.moveNote).not.toHaveBeenCalled();
+  expect(host.querySelector('.note-drop-target')).toBeNull();
+});
+
+test('folder drags reject external payloads, cancellation and a previous vault', async () => {
+  await render();
+  const external = transfer();
+  external.setData('application/x-foltra-folder', 'other');
+  await drop(folder('parent'), external);
+  const data = await startFolder('other');
+  await drag(folder('other').querySelector('button')!, 'dragend', data);
+  await drop(folder('parent'), data);
+  const old = await startFolder('other');
+  props.workspace = { ...workspace, vault: { ...workspace.vault, id: 'other-vault' } };
+  await render();
+  await drop(folder('parent'), old);
+  expect(props.treeEditing.moveFolder).not.toHaveBeenCalled();
+});
+
+test('folder moves use the current snapshot and report failure without changing the tree', async () => {
+  await render();
+  const data = await startFolder('other');
+  const updated = { ...workspace.folders[2], name: 'Updated', revision: 'o2' };
+  props.workspace = { ...workspace, folders: [...workspace.folders.slice(0, 2), updated] };
+  await render();
+  const toggle = folder('parent').querySelector<HTMLButtonElement>('button')!;
+  await act(async () => toggle.click());
+  const error = new Error('Folder already exists');
+  vi.mocked(props.treeEditing.moveFolder).mockRejectedValueOnce(error);
+  await drop(folder('parent'), data);
+  expect(props.treeEditing.moveFolder).toHaveBeenCalledExactlyOnceWith(updated, 'parent');
+  expect(props.onError).toHaveBeenCalledExactlyOnceWith(error);
+  expect(toggle.getAttribute('aria-expanded')).toBe('false');
+  expect(host.querySelector('.note-dragging')).toBeNull();
+  await drop(folder('parent'), await startFolder('other'));
   expect(toggle.getAttribute('aria-expanded')).toBe('true');
 });

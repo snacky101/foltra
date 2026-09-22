@@ -207,7 +207,7 @@ test('restore failure retains item and reports once; refresh failure after delet
   expect(onError).toHaveBeenCalledTimes(2);
 });
 
-test('vault switch resets search and confirmation and ignores an older in-flight response', async () => {
+test.each(['single', 'all'])('vault switch ignores an older in-flight %s deletion', async (kind) => {
   let finish!: () => void;
   vi.mocked(call).mockImplementationOnce(
     () =>
@@ -217,7 +217,8 @@ test('vault switch resets search and confirmation and ignores an older in-flight
   );
   await render();
   await search('Alpha');
-  await click(rows()[0], '영구 삭제');
+  if (kind === 'all') await click(host, '전체 영구 삭제');
+  else await click(rows()[0], '영구 삭제');
   await submit();
   const otherRefresh = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
   await act(async () =>
@@ -240,4 +241,80 @@ test('a later restored trash snapshot can appear again after the list observed d
   await render(items.slice(1));
   await render(items);
   expect(rows()).toHaveLength(4);
+});
+
+test('emptying trash confirms every item including search-hidden rows and allows pure cancellation', async () => {
+  await render();
+  await search('Alpha');
+  await click(host, '전체 영구 삭제');
+  const dialog = host.querySelector('[role="dialog"]')!;
+  expect(dialog.textContent).toContain('모든 항목 4개');
+  expect(dialog.textContent).toContain('검색으로 숨겨진 항목도');
+  expect(dialog.textContent).toContain('하위 폴더·노트');
+  expect(dialog.textContent).toContain('복원할 수 없습니다');
+  expect(call).not.toHaveBeenCalled();
+  await click(dialog, '취소');
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(rows()).toHaveLength(1);
+  expect(call).not.toHaveBeenCalled();
+  await click(host, '전체 영구 삭제');
+  let finish!: () => void;
+  refresh.mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await submit();
+  expect(call).toHaveBeenCalledExactlyOnceWith('/disposable', 'trash.empty', {
+    items: items.map(({ id, revision }) => ({ id, expectedRevision: revision })),
+  });
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(rows()).toHaveLength(0);
+  await search('');
+  expect(rows()).toHaveLength(0);
+  expect(host.textContent).toContain('휴지통이 비어 있어요');
+  await act(async () => finish());
+  expect(button(host, '전체 영구 삭제').disabled).toBe(true);
+});
+
+test('emptying trash retains the confirmation snapshot on conflict and never retries or partially removes rows', async () => {
+  await render();
+  await click(host, '전체 영구 삭제');
+  await render([{ ...items[0], revision: 'changed' }, ...items.slice(1), { ...items[0], id: 'new-note' }]);
+  vi.mocked(call).mockRejectedValueOnce(new CoreError('conflict', 'changed'));
+  await submit();
+  expect(call).toHaveBeenCalledExactlyOnceWith('/disposable', 'trash.empty', {
+    items: items.map(({ id, revision }) => ({ id, expectedRevision: revision })),
+  });
+  expect(rows()).toHaveLength(5);
+  expect(refresh).not.toHaveBeenCalled();
+  expect(host.querySelector('[role="alert"]')?.textContent).toContain('취소한 뒤');
+});
+
+test('pending empty blocks duplicate requests; successful removal survives refresh failure and preserves later items', async () => {
+  let finish!: () => void;
+  vi.mocked(call).mockImplementationOnce(
+    () =>
+      new Promise<void>((resolve) => {
+        finish = resolve;
+      }),
+  );
+  await render();
+  await click(host, '전체 영구 삭제');
+  await submit();
+  await submit();
+  expect(button(rows()[0], '복원').disabled).toBe(true);
+  await act(async () => window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })));
+  expect(host.querySelector('[role="dialog"]')).not.toBeNull();
+  refresh.mockRejectedValueOnce(new Error('Refresh failed'));
+  await act(async () => finish());
+  expect(call).toHaveBeenCalledOnce();
+  expect(onError).toHaveBeenCalledOnce();
+  expect(rows()).toHaveLength(0);
+  expect(host.querySelector('[role="dialog"]')).toBeNull();
+  expect(button(host, '전체 영구 삭제').disabled).toBe(true);
+  await render([{ ...items[0], id: 'new-note' }]);
+  expect(rows()).toHaveLength(1);
+  expect(button(host, '전체 영구 삭제').disabled).toBe(false);
 });

@@ -82,7 +82,7 @@ fn read_trash(store: &Store, args: &Value) -> Result<(String, Value)> {
     Ok((path, item))
 }
 
-pub fn delete_trash(store: &Store, args: &Value) -> Result<Value> {
+fn trash_deletion_path(store: &Store, args: &Value) -> Result<String> {
     text(args, "expectedRevision")?;
     let (path, item) = read_trash(store, args)?;
     if !matches!(
@@ -91,9 +91,38 @@ pub fn delete_trash(store: &Store, args: &Value) -> Result<Value> {
     ) {
         return Err(Error::new("invalid_data", "Unknown trash item type"));
     }
+    Ok(path)
+}
+
+pub fn delete_trash(store: &Store, args: &Value) -> Result<Value> {
+    let path = trash_deletion_path(store, args)?;
     // Delete only this saved trash bundle. Never follow its original paths or linked notes.
     store.commit(vec![(path, None)])?;
-    Ok(json!({"deleted":item["id"]}))
+    Ok(json!({"deleted":args["id"]}))
+}
+
+pub fn empty_trash(store: &Store, args: &Value) -> Result<Value> {
+    let items = args["items"]
+        .as_array()
+        .ok_or_else(|| Error::new("invalid_arguments", "Expected trash items"))?;
+    let mut paths = std::collections::BTreeSet::new();
+    for item in items {
+        let path = format!("trash/{}.json", id(text(item, "id")?)?);
+        if !paths.insert(path) {
+            return Err(Error::new("invalid_arguments", "Duplicate trash item"));
+        }
+    }
+    if paths != store.files("trash", "json")?.into_iter().collect() {
+        return Err(Error::new("conflict", "Trash changed after confirmation"));
+    }
+    let writes = items
+        .iter()
+        .map(|item| Ok((trash_deletion_path(store, item)?, None)))
+        .collect::<Result<Vec<_>>>()?;
+    if !writes.is_empty() {
+        store.commit(writes)?;
+    }
+    Ok(json!({"deleted":items.len()}))
 }
 
 pub fn restore(store: &Store, args: &Value) -> Result<Value> {

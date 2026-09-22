@@ -47,7 +47,8 @@ foltra trash restore --id TRASH_UUID
 - `append`와 `prepend`는 기본적으로 기존 본문과 추가 내용 사이에 필요한 줄바꿈 하나를 넣습니다. `--inline`이면 줄바꿈을 보충하지 않습니다. 이미 있는 공백·줄바꿈을 삭제하지 않으며 `prepend`는 사용자 frontmatter 다음에 삽입합니다.
 - `--content-file` / `--body-file`은 UTF-8 파일을 읽고 `-`이면 표준입력을 읽습니다. 본문은 16 MiB 입력 한도를 적용합니다. 문자열 인자는 일반적으로 `--인자-file` 형태도 지원합니다.
 - `--folder`는 정확한 폴더 이름 또는 ID를 받으며 `/`는 볼트 루트입니다. 중복 이름은 ID로 구분합니다. 새 노트의 폴더 또는 `folder.create`의 부모 폴더에도 사용할 수 있습니다.
-- `delete`는 휴지통으로 이동합니다. 영구 삭제는 별도의 `trash.delete --help`에 나온 ID·revision 계약을 따릅니다.
+- `delete`는 휴지통으로 이동합니다. 개별 영구 삭제는 `trash.delete --help`의 ID·revision 계약을 따릅니다. 전체 영구 삭제는 `trash.empty --items '[{"id":"TRASH_UUID","expectedRevision":"REVISION"}]'`처럼 `trash.list`의 전체 항목과 revision을 넘깁니다. 일부 항목만 넘기거나 조회 이후 항목이 추가·삭제·수정되면 충돌로 중단하며 아무 항목도 지우지 않습니다.
+- 폴더 이동은 `folder.update`에 현재 `id`, `name`, `expectedRevision`과 대상 `parentId`를 전달합니다. `parentId`가 빈 문자열이면 최상위로 이동합니다. 하위 폴더·노트의 ID와 본문은 유지합니다.
 
 ## 일지·할 일
 

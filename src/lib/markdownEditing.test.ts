@@ -93,25 +93,23 @@ test('exiting a nested empty item still returns to the parent list first', () =>
 });
 
 test.each([
-  ['- ', ''],
-  ['- First\n- ', '- First\n'],
-  ['1. First\n2. ', '1. First\n'],
-  ['- [x] First\n- [ ] ', '- [x] First\n'],
-  ['- First\n\n- ', '- First\n\n'],
-  ['> - First\n> - ', '> - First\n> '],
-  ['- Parent\n  - Child\n  - ', '- Parent\n  - Child\n- '],
-])('Backspace on an empty item exits one list level: %j', (before, after) => {
-  let s = state(before);
+  '- ',
+  '- First\n- ',
+  '1. First\n2. ',
+  '- [x] First\n- [ ] ',
+  '- First\n\n- ',
+  '> - First\n> - ',
+  '- Parent\n  - Child\n  - ',
+])('empty %j bypasses smart Backspace and leaves character deletion to the editor', (before) => {
+  const s = state(before);
   expect(
     deleteMarkdownMarkupBackward({
       state: s,
-      dispatch: (tr) => {
-        s = tr.state;
+      dispatch() {
+        throw new Error('Unexpected smart edit');
       },
     }),
-  ).toBe(true);
-  expect(s.doc.toString()).toBe(after);
-  expect(s.selection.main.head).toBe(after.length);
+  ).toBe(false);
 });
 
 test('Backspace preserves text in a nonempty item and leaves code and selections to normal deletion', () => {
@@ -199,18 +197,16 @@ test.each([
 });
 
 test.each(['- [/] ', '- [b]', '- [ ]', '- [x]', '> - [!]'])(
-  'Backspace exits an empty task without inserting a new row: %s',
+  'empty task %j bypasses smart Backspace',
   (before) => {
-    let s = state(before);
     expect(
       deleteMarkdownMarkupBackward({
-        state: s,
-        dispatch: (tr) => {
-          s = tr.state;
+        state: state(before),
+        dispatch() {
+          throw new Error('Unexpected smart edit');
         },
       }),
-    ).toBe(true);
-    expect(s.doc.toString()).toBe(before.startsWith('>') ? '> ' : '');
+    ).toBe(false);
   },
 );
 

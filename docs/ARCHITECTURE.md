@@ -160,7 +160,7 @@ DB 행 생성은 JSON 파일 한 개만 만듭니다. `record.body`를 명시적
 
 일지 캘린더의 `plugin.daily-calendar.open-today`는 실행할 때 지역 날짜의 `YYYY-MM-DD`를 계산하고 없으면 기존 `note.open-link`로 원자적으로 조회/생성한 뒤 `openNote` 효과를 반환합니다. 기존 제목이면 본문·폴더·revision을 유지하며 중복 제목은 캘린더의 기존 선택 목록을 엽니다. 빈 날짜 클릭의 생성 여부는 `create-missing-notes` 설정으로 정하고 기본값은 false입니다. 생성하지 않을 때는 `notify` 효과로 토스트를 보내며 렌더링과 시작 과정은 노트를 생성하지 않습니다. 기본 조합은 `Mod+Shift+d`와 `<leader>nd`이며 팔레트·설정·일반/Leader 라우터를 공유합니다. 현재 초안 저장과 노트 열기/편집기 포커스는 기존 `usePlugins` 및 앱의 경로를 사용합니다.
 
-`runtime.completions`는 `editor.write` 권한 아래 토큰 시작 기호와 후보 제공자 ID를 선언합니다. `usePlugins.complete`는 기존 직렬 세션에 검색어만 보내며 편집기 snapshot·명령 효과·저장·workspace 갱신을 실행하지 않습니다. 코어는 후보 호출에서 쓰기·UI 효과·편집기 읽기·Anki 연결을 거절하고 제한된 평문 후보만 허용합니다. `pluginCompletion`은 활성 패키지·digest·vault·현재 토큰·조합 상태를 다시 확인한 명시적 선택에만 CodeMirror transaction을 적용합니다. 코드·링크·이메일·이스케이프 안에서는 호출하지 않고, 선택하지 않은 원문은 유지합니다. 날짜 자동완성은 기기 현지 날짜를 계산해 `@Today`·`@Yesterday`·`@Tomorrow`를 `YYYY-MM-DD`로 대치하며 노트는 생성하지 않습니다.
+`runtime.completions`는 `editor.write` 권한 아래 토큰 시작 기호와 후보 제공자 ID를 선언합니다. `usePlugins.complete`는 기존 직렬 세션에 검색어만 보내며 편집기 snapshot·명령 효과·저장·workspace 갱신을 실행하지 않습니다. 코어는 후보 호출에서 쓰기·UI 효과·편집기 읽기·Anki 연결을 거절하고 제한된 평문 후보만 허용합니다. `pluginCompletion`은 활성 패키지·digest·vault·현재 토큰·조합 상태를 다시 확인한 명시적 선택에만 CodeMirror transaction을 적용합니다. 코드·일반 Markdown 링크·이메일·이스케이프 안에서는 호출하지 않습니다. 위키링크 시작 직후의 `[[@`에서는 날짜 후보로 전환하며 기존 닫는 괄호·alias를 보존합니다. 선택하지 않거나 Esc로 취소한 원문은 유지합니다. 날짜 자동완성은 기기 현지 날짜를 계산해 `@Today`·`@Yesterday`·`@Tomorrow`를 `YYYY-MM-DD`로 대치하며 노트는 생성하지 않습니다.
 
 `usePlugins`는 활성 패키지별 직렬 세션, JSON 상태, load/unload, 변경 이벤트와 오류 중단을 담당합니다. `pluginSession`은 vault나 패키지가 바뀌면 대기 요청을 취소하고 늦은 응답을 버립니다. Core invocation은 최대 500ms/32MiB JS heap/512KiB stack/64 host calls/512KiB output으로 제한하며, DOM·Node·파일·네트워크는 노출하지 않습니다. 권한을 가진 명령/뷰 action만 데이터를 쓸 수 있습니다. 렌더링과 변경 이벤트는 읽기 전용이며 UI 결과는 고유한 패키지의 화면/허용된 노트/편집기 동작만 전달합니다. CodeMirror 선택 수정은 원래 노트·본문·선택·조합 상태를 다시 확인한 일반 transaction이므로 undo/자동저장을 유지합니다.
 
@@ -232,15 +232,15 @@ Vim의 전역 Ex 등록과 설정 기반 Normal action은 WeakMap으로 호출�
 
 폴더는 `folders/<uuid>.json`의 `{id,name,parentId}`로 저장합니다. 노트 metadata의 선택적 `folderId`가 소속을 나타내며 기존 노트는 그대로 최상위에 표시됩니다. 제목·폴더 변경은 UUID 파일 경로를 바꾸지 않습니다. 폴더 이동은 본문 참조를 바꿀 필요가 없으며, 제목 변경은 연결된 본문의 대상을 함께 갱신합니다. 폴더 삭제는 `folder_lifecycle.rs`가 하위 폴더·노트를 묶어 휴지통으로 이동하며, subtree revision으로 동시 변경을 검사합니다. 복원은 원래 ID·내용·구조를 유지하고 충돌 시 덮어쓰기를 거절합니다. 휴지통의 노트가 참조하던 폴더가 없어졌다면 최상위로 복원합니다. 백업은 폴더 파일을 포함하고, import는 누락된 부모/노트 폴더·순환 계층을 쓰기 전에 거절합니다. 예전 백업은 폴더 없이 그대로 읽힙니다. 이전 앱 버전으로의 downgrade 보존은 아직 보장하지 않습니다.
 
-`workspace.get`은 노트·DB·폴더·휴지통 요약을 같은 잠금 아래에서 반환합니다. `TrashView`는 이 snapshot을 바로 렌더링하며 별도 목록 캐시를 갖지 않습니다. 앱 내부 쓰기는 완료 직후 `refresh()`하고, CLI 등 외부 변경은 기존 3초 주기의 workspace 갱신에 반영됩니다. 휴지통 본문은 snapshot에 넣지 않습니다.
+`workspace.get`은 노트·DB·폴더·휴지통 요약을 같은 잠금 아래에서 반환합니다. `TrashView`는 이 snapshot을 바로 렌더링하며 별도 목록 캐시를 갖지 않습니다. 앱 내부 쓰기는 완료 직후 `refresh()`하고, CLI 등 외부 변경은 기존 3초 주기의 workspace 갱신에 반영됩니다. 휴지통 본문은 snapshot에 넣지 않습니다. `trash.empty`는 확인창을 연 시점의 전체 `{id, expectedRevision}` 목록을 받습니다. 현재 파일 목록과 모든 revision·종류를 검증한 뒤 한 번의 journal commit으로 휴지통 묶음만 지우며, 중간 변경 시 전체 요청을 거절합니다. UI 검색 필터와 관계없이 전체 항목 수를 확인하고, 성공 직후 목록에서 제거합니다.
 
 `NoteTree`는 트리 표시와 접기 상태, `FolderDialog`는 폴더 수정과 노트 이동 입력을 담당합니다. 노트 이동 전 미저장 초안 저장과 revision 확인은 `useNoteActions`가 담당합니다. 노트·폴더·DB 행 메뉴는 `ContextMenu`의 포커스/키보드 동작을 공유합니다. `workspaceFocus`가 영역 이동과 sidebar 탐색을 처리하며 모든 단축키는 기존 공통 command router를 거칩니다.
 
 사이드바 노트·폴더 버튼의 더블클릭도 기존 인라인 이름 변경 경로를 사용합니다. 노트는 `useNoteActions.run('rename')`로 초안을 저장한 뒤 선택한 revision을 전달하며 두 번째 클릭은 노트를 다시 열지 않습니다. 폴더는 기존 클릭 토글 뒤 이름 변경으로 들어가므로 두 번 클릭한 후의 펼침 상태는 유지됩니다. 첫 클릭의 노트 로딩이 늦게 끝나도 `editorReady`와 읽기 화면의 포커스 요청은 인라인 이름 입력을 우선합니다.
 
-### 노트 드래그 이동
+### 노트·폴더 드래그 이동
 
-`NoteTree`는 현재 트리에서 시작한 note ID를 ref에 보관합니다. drop payload는 노트 정보로 역직렬화하지 않습니다. 폴더 제목뿐 아니라 해당 폴더의 파일 행·행 사이·들여쓰기 여백도 드롭 대상으로 처리합니다. 중첩 폴더는 포인터가 포함된 가장 안쪽의 표시된 폴더 영역을 사용하며, 같은 위치 드롭도 이벤트 전파를 중단해 상위 폴더로 잘못 이동하지 않습니다. 최상위 노트·배경과 NOTES 제목에서는 최상위로 이동합니다. 대상 폴더 제목·하위 영역과 NOTES 안내에 목적지를 표시하고 취소·실패 시 강조를 해제합니다. 드롭 시점의 workspace note snapshot을 `useNoteActions.moveTo`에 전달하면 공통 busy guard가 중복 실행을 막고 `moveNoteToFolder`가 편집 초안 저장 후 `expectedRevision`과 `folderId`만 core로 보냅니다. 성공 전 트리를 임의로 옮기지 않습니다. 대상 폴더 유효성 및 충돌 검사는 기존 core가 담당합니다. 컨텍스트 메뉴의 이동도 같은 함수로 처리합니다.
+`NoteTree`는 현재 트리에서 시작한 노트/폴더의 종류와 ID를 ref에 보관합니다. drop payload는 노트 정보로 역직렬화하지 않습니다. 폴더 제목뿐 아니라 해당 폴더의 파일 행·행 사이·들여쓰기 여백도 드롭 대상으로 처리합니다. 중첩 폴더는 포인터가 포함된 가장 안쪽의 표시된 폴더 영역을 사용하며, 같은 위치 드롭도 이벤트 전파를 중단해 상위 폴더로 잘못 이동하지 않습니다. 최상위 노트·배경과 NOTES 제목에서는 최상위로 이동합니다. 대상 폴더 제목·하위 영역과 NOTES 안내에 목적지를 표시하고 취소·실패 시 강조를 해제합니다. 드롭 시점의 workspace note snapshot을 `useNoteActions.moveTo`에 전달하면 공통 busy guard가 중복 실행을 막고 `moveNoteToFolder`가 편집 초안 저장 후 `expectedRevision`과 `folderId`만 core로 보냅니다. 성공 전 트리를 임의로 옮기지 않습니다. 대상 폴더 유효성 및 충돌 검사는 기존 core가 담당합니다. 컨텍스트 메뉴의 이동도 같은 함수로 처리합니다. 폴더 드롭은 `useTreeEditing.moveFolder`에서 `folder.update`에 기존 name/revision과 새 parentId만 전달합니다. 자기 자신·자손·현재 부모는 드롭 대상으로 받지 않으며 core에서도 순환·누락된 부모·동명 폴더·revision 충돌을 검증합니다. 하위 폴더/노트 파일을 다시 쓰지 않습니다.
 
 키 바인딩 설정은 `shortcutVersion: 4`에서 `keybindings[commandId]: [{ keys: string, leader: boolean }]` 형식을 사용합니다. Core는 기존 `leader`/`shortcut`/`vimNormal` 객체를 배열로 변환합니다. 버전 1의 대문자 일반 단축키는 이전 의미대로 소문자로 정규화하고, 버전 2 이상의 대소문자는 유지합니다. 이전 `note.follow-link`의 Normal 필드 누락은 기본 `gd`를 유지하며 명시적 빈 값은 해제로 보존합니다. 버전 1–3의 `note.follow-link`에 저장된 Leader 없는 소문자 `gd`만 `note.follow-existing-link`로 옮깁니다. 다른 조합과 명시적 해제는 보존하고, 새 명령을 이미 설정했다면 덮어쓰지 않습니다. 버전 4에서 사용자가 다시 지정한 조합은 이 변환을 적용하지 않습니다. 읽기는 원본 파일을 변경하지 않으며 다음 명시적 설정 저장 때 버전 4로 기록합니다. CLI도 새 배열을 조회·저장하며 이전 객체 형식의 입력은 호환 변환합니다. 버전 4를 모르는 구버전 앱으로의 downgrade는 지원하지 않습니다.
 
@@ -257,3 +257,5 @@ Cmd+W(macOS)/Ctrl+W(그 외)는 공통 `note.close` 명령으로 현재 노트�
 ### 플러그인 사용 동의
 
 `extension.policy`와 `extension.policy.update`는 기기의 앱 데이터에 vault 경로별 최초 동의·전체 사용 여부를 저장합니다. vault 원본·Git·백업으로 전파하지 않습니다. 전체 사용을 꺼도 개별 digest 활성화 기록은 보존하고 `pluginStates.enabled`를 false로 반환하므로 UI 세션·명령·자동완성·백그라운드 실행이 함께 중단됩니다. 코어 invoke와 Git 재검증도 같은 정책을 확인합니다. `extension.update`를 통한 명시적 로컬 업데이트만 기존 활성화 digest를 갱신하며 외부 파일 변경은 자동 활성화하지 않습니다. 기존 사용자는 첫 전체 동의 후 보존된 개별 상태로 복귀합니다.
+
+주제 모음의 `hideCompleted`는 `markdown_query::tasks`의 실제 작업 파싱을 재사용해 블록 범위 내 작업이 하나 이상이며 모두 done일 때 숨깁니다. catalog 수·페이지·드래그 대상에 동일하게 적용하며, 전체 카드 anchors는 보존해 필터 중 재정렬이 숨긴 카드를 잃지 않게 합니다. 필터는 orderRevision에도 포함됩니다.
